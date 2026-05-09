@@ -20,20 +20,17 @@
 })();
 </script>
 
-  <!-- Leaflet + plugins (CDN) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 
   <style>
-
-/* === Theme variables (from dashboard) === */
 :root{
 --bg-color: #050505;
             --panel-bg: #0e0e0e;
             --text-main: #a0a0a0;
             --accent: #00f3ff;
-            --alert: #ff003c; /* Rouge vif pour Surge */
+            --alert: #ff003c;
             --border: 1px solid #333;
             --wl-bg: #ffeb3b;
             --wl-text: #000000;
@@ -53,7 +50,7 @@ html[data-theme='dark'], body[data-theme='dark']{
 html[data-theme='matrix'], body[data-theme='matrix']{
 --bg-color: #000000;
             --panel-bg: #031503;
-            --text-main: #00ff41; /* Vert Matrix */
+            --text-main: #00ff41;
             --accent: #00ff41;
             --alert: #ff004c;
             --border: 1px solid #005500;
@@ -65,15 +62,13 @@ html[data-theme='sunset'], body[data-theme='sunset']{
 --bg-color: #2b0c3d;
             --panel-bg: #4a1961;
             --text-main: #f0e6ff;
-            --accent: #ff9900; /* Orange coucher de soleil */
+            --accent: #ff9900;
             --alert: #ff3366;
             --border: 1px solid #7c4d9e;
             --wl-bg: #ffcc66;
             --wl-text: #2b0c3d;
             --open-color: #ff66a3;
 }
-
-/* === Map variable mapping === */
 :root{
   --bg: var(--bg-color);
   --panel: var(--panel-bg);
@@ -85,8 +80,6 @@ html[data-theme='sunset'], body[data-theme='sunset']{
   --shadow: 0 14px 40px rgba(0,0,0,.55);
   --radius: 16px;
 }
-
-
     *{box-sizing:border-box}
     body{
       margin:0;
@@ -116,10 +109,8 @@ html[data-theme='sunset'], body[data-theme='sunset']{
     }
     .nav a:hover{border-color:rgba(0,243,255,.45); box-shadow:0 0 0 4px rgba(0,243,255,.08)}
     .nav a.active{border-color:rgba(0,243,255,.55); background:rgba(0,243,255,.08)}
-
     .grid{display:grid; grid-template-columns: 420px 1fr; gap:16px; margin-top:16px;}
     @media (max-width:1100px){ .grid{grid-template-columns:1fr;} }
-
     .panel{
       border: var(--border, 1px solid rgba(255,255,255,.10));
       background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
@@ -134,7 +125,6 @@ html[data-theme='sunset'], body[data-theme='sunset']{
     }
     .title{color:var(--text2);font-weight:900;font-size:13px;letter-spacing:.25px}
     .bd{padding:14px}
-
     .pillrow{display:flex;flex-wrap:wrap;gap:10px}
     .pill{
       border: var(--border, 1px solid rgba(255,255,255,.10));
@@ -145,7 +135,6 @@ html[data-theme='sunset'], body[data-theme='sunset']{
     }
     .pill .k{font-size:11px;opacity:.9}
     .pill .v{font-size:16px;color:var(--text2);font-weight:900;margin-top:4px}
-
     .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
     .row{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap}
     label{font-size:12px;opacity:.95;display:block;margin:0 0 6px 2px}
@@ -170,7 +159,6 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       user-select:none;
     }
     .btn.secondary{border-color:var(--border);background:rgba(255,255,255,.03);font-weight:700}
-
     .toggles{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
     .toggle{
       border: var(--border, 1px solid rgba(255,255,255,.10));
@@ -187,57 +175,47 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       background:rgba(0,243,255,.12);
       box-shadow:0 0 0 4px rgba(0,243,255,.06);
     }
-
+    #t_grey.on{
+      border-color:rgba(255,204,0,.60);
+      background:rgba(255,204,0,.12);
+      box-shadow:0 0 0 4px rgba(255,204,0,.06);
+    }
     .status{
-      margin-top:12px;
-      font-size:12px;
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
+      margin-top:12px;font-size:12px;
+      display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;
     }
     .status code{
-      padding:6px 8px;
-      border-radius:10px;
+      padding:6px 8px;border-radius:10px;
       border: var(--border, 1px solid rgba(255,255,255,.10));
-      background:rgba(255,255,255,.02);
-      color:var(--text2);
+      background:rgba(255,255,255,.02);color:var(--text2);
     }
     #explain{
-      margin-top:12px;
-      padding:12px;
-      border-radius:14px;
+      margin-top:12px;padding:12px;border-radius:14px;
       border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-      background:rgba(0,243,255,.06);
-      color:var(--text2);
-      font-size:12px;
-      line-height:1.4;
+      background:rgba(0,243,255,.06);color:var(--text2);font-size:12px;line-height:1.4;
     }
-
     .mapwrap{padding:14px;position:relative}
     #map{width:100%; height: calc(100vh - 150px); min-height: 720px; border-radius: var(--radius);}
     #overlayErr{
-      display:none;
-      position:absolute; inset:14px;
-      border-radius: var(--radius);
-      border:1px solid rgba(255,0,60,.55);
-      background: rgba(255,0,60,.08);
-      color: var(--text2);
-      padding:14px;
-      font-size:13px;
-      line-height:1.35;
-      pointer-events:none;
-      white-space:pre-wrap;
+      display:none;position:absolute; inset:14px;border-radius: var(--radius);
+      border:1px solid rgba(255,0,60,.55);background: rgba(255,0,60,.08);
+      color: var(--text2);padding:14px;font-size:13px;line-height:1.35;
+      pointer-events:none;white-space:pre-wrap;
     }
-
-    /* Leaflet popup theming */
     .leaflet-popup-content-wrapper, .leaflet-popup-tip{
-      background: rgba(10,18,32,.96);
-      color: var(--text2);
-      border:1px solid rgba(255,255,255,.08);
-      box-shadow: var(--shadow);
+      background: rgba(10,18,32,.96);color: var(--text2);
+      border:1px solid rgba(255,255,255,.08);box-shadow: var(--shadow);
     }
     .leaflet-popup-content{margin:10px 12px}
+
+    /* Greyline legend */
+    .grey-legend {
+      position:absolute;bottom:30px;left:14px;z-index:1000;
+      background:rgba(0,0,0,0.65);border:1px solid rgba(255,204,0,0.4);
+      border-radius:8px;padding:6px 10px;font-size:11px;color:#ffcc00;
+      display:none;pointer-events:none;
+    }
+    .grey-legend.visible { display:block; }
   </style>
 </head>
 
@@ -292,7 +270,6 @@ html[data-theme='sunset'], body[data-theme='sunset']{
                 <option value="3000">3000</option>
               </select>
             </div>
-
             <div>
               <label for="band">Bande</label>
               <select id="band">
@@ -319,7 +296,6 @@ html[data-theme='sunset'], body[data-theme='sunset']{
                 <option value="SSTV">SSTV</option>
               </select>
             </div>
-
             <div class="row">
               <button class="btn" id="refresh">Refresh</button>
               <button class="btn secondary" id="recenter">Recentrer</button>
@@ -332,6 +308,7 @@ html[data-theme='sunset'], body[data-theme='sunset']{
             <div class="toggle" id="t_heat">Heat (bande): OFF</div>
             <div class="toggle" id="t_circles">Cercles: OFF</div>
             <div class="toggle on" id="t_auto">Auto: ON</div>
+            <div class="toggle" id="t_grey">🌓 Greyline: OFF</div>
           </div>
 
           <div class="status">
@@ -341,13 +318,12 @@ html[data-theme='sunset'], body[data-theme='sunset']{
 
           <div id="explain"></div>
 
-          <!-- Spot manuel (comme dashboard) -->
+          <!-- Spot manuel -->
           <div style="margin-top:12px;padding:12px;border-radius:14px;border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);background:rgba(255,255,255,.02);">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
               <div style="color:var(--text2);font-weight:900;font-size:13px">Spot manuel</div>
               <code id="spot_status" style="padding:6px 8px;border-radius:10px;border: var(--border, 1px solid rgba(255,255,255,.10));background:rgba(255,255,255,.02);color:var(--text2);">—</code>
             </div>
-
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
               <div>
                 <label for="m_freq">Fréquence (MHz ou kHz)</label>
@@ -366,27 +342,28 @@ html[data-theme='sunset'], body[data-theme='sunset']{
                 <button class="btn secondary" id="m_fill">Remplir depuis le dernier spot cliqué</button>
               </div>
             </div>
-
             <div style="margin-top:10px;font-size:12px;opacity:.85;line-height:1.35">
-              Envoie une commande <code>DX</code> au cluster via <code>/api/spot</code>. Si ça répond “Cluster not connected”, c’est juste que le telnet n’est pas connecté.
+              Envoie une commande <code>DX</code> au cluster via <code>/api/spot</code>.
             </div>
           </div>
-
         </div>
       </div>
 
       <!-- RIGHT -->
       <div class="panel">
-        <div class="hd"><div class="title">Carte</div><div style="font-size:12px;opacity:.85">Points / Heat / Cercles</div></div>
+        <div class="hd"><div class="title">Carte</div><div style="font-size:12px;opacity:.85">Points / Heat / Cercles / Greyline</div></div>
         <div class="mapwrap">
           <div id="map"></div>
           <div id="overlayErr"></div>
+          <div class="grey-legend" id="grey-legend">
+            🌓 Greyline · <span id="grey-time">—</span> UTC<br>
+            <span style="opacity:.7;font-size:10px;">Zone sombre = nuit · Ligne jaune = terminateur</span>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
@@ -399,9 +376,10 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       "13cm":"#bdc3c7","QO-100":"#00a8ff"
     };
 
-    let showCluster=true, showPoints=true, showHeat=false, showCircles=false, autoRefresh=true;
-
+    let showCluster=true, showPoints=true, showHeat=false, showCircles=false, autoRefresh=true, showGrey=false;
     let map, clusterLayer, pointsLayer, heatLayer, circlesLayer;
+    let greylineLayer = null;
+    let greyTimer = null;
     let lastSpots = [];
     let lastClickedSpot = null;
 
@@ -428,28 +406,21 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       document.getElementById('t_heat').textContent    = "Heat (bande): " + (showHeat ? "ON" : "OFF");
       document.getElementById('t_circles').textContent = "Cercles: " + (showCircles ? "ON" : "OFF");
       document.getElementById('t_auto').textContent    = "Auto: "    + (autoRefresh ? "ON" : "OFF");
+      document.getElementById('t_grey').textContent    = "🌓 Greyline: " + (showGrey ? "ON" : "OFF");
     }
 
     function syncExplain(){
       const band = document.getElementById('band').value;
       const el = document.getElementById('explain');
       if(!el) return;
-
       if(showHeat){
-        el.innerHTML =
-          "<b>Mode A — Heatmap (bande)</b><br>" +
-          "<span style='opacity:.92'>Actif uniquement si tu choisis une bande (actuel : <b>" + (band||"—") + "</b>). " +
-          "Affiche les zones d'activité sur la fenêtre choisie. 15 min = ouverture en cours.</span>";
+        el.innerHTML = "<b>Mode A — Heatmap (bande)</b><br><span style='opacity:.92'>Actif uniquement si tu choisis une bande (actuel : <b>" + (band||"—") + "</b>). Affiche les zones d'activité sur la fenêtre choisie. 15 min = ouverture en cours.</span>";
       } else if(showCircles){
-        el.innerHTML =
-          "<b>Mode C — Cercles</b><br>" +
-          "<span style='opacity:.92'>Rend l'activité lisible même avec très peu de spots. " +
-          "Couleur = bande. Chaque spot dessine une zone autour de lui (sans mentir sur la densité).</span>";
+        el.innerHTML = "<b>Mode C — Cercles</b><br><span style='opacity:.92'>Rend l'activité lisible même avec très peu de spots. Couleur = bande. Chaque spot dessine une zone autour de lui.</span>";
+      } else if(showGrey){
+        el.innerHTML = "<b>🌓 Greyline</b><br><span style='opacity:.92'>Zone sombre = nuit. Ligne jaune pointillée = terminateur solaire. ☀️ = position du soleil. Mise à jour toutes les minutes.</span>";
       } else {
-        el.innerHTML =
-          "<b>Mode points</b><br>" +
-          "<span style='opacity:.92'>Affichage spot par spot (couleur = bande). " +
-          "Active <b>Cercles</b> quand il y a peu de spots, ou <b>Heat (bande)</b> si tu analyses une bande précise.</span>";
+        el.innerHTML = "<b>Mode points</b><br><span style='opacity:.92'>Affichage spot par spot (couleur = bande). Active <b>Cercles</b> quand il y a peu de spots, ou <b>Heat (bande)</b> si tu analyses une bande précise.</span>";
       }
     }
 
@@ -458,13 +429,110 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       if(map.hasLayer(pointsLayer)) map.removeLayer(pointsLayer);
       if(map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
       if(map.hasLayer(circlesLayer)) map.removeLayer(circlesLayer);
-
       if(showPoints){
         if(showCluster) map.addLayer(clusterLayer);
         else map.addLayer(pointsLayer);
       }
       if(showHeat) map.addLayer(heatLayer);
       if(showCircles) map.addLayer(circlesLayer);
+    }
+
+    // ── GREYLINE ──────────────────────────────────────────────────
+    function calcSunPos(date) {
+      const rad = Math.PI / 180;
+      const jd = date.getTime() / 86400000 + 2440587.5;
+      const n  = jd - 2451545.0;
+      const L  = ((280.460 + 0.9856474 * n) % 360 + 360) % 360;
+      const g  = ((357.528 + 0.9856003 * n) % 360 + 360) % 360;
+      const lam = L + 1.915 * Math.sin(g * rad) + 0.020 * Math.sin(2 * g * rad);
+      const eps = 23.439 - 0.0000004 * n;
+      const sinDec = Math.sin(eps * rad) * Math.sin(lam * rad);
+      const dec = Math.asin(sinDec) / rad;
+      // Right ascension
+      const RA = Math.atan2(
+        Math.cos(eps * rad) * Math.sin(lam * rad),
+        Math.cos(lam * rad)
+      ) / rad;
+      // Equation of time (degrees)
+      const eot = L - RA;
+      const utcH = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
+      // Sub-solar longitude
+      const sunLon = ((-(utcH - 12) * 15 + eot) % 360 + 540) % 360 - 180;
+      return { dec, sunLon };
+    }
+
+    function buildGreyline() {
+      if (greylineLayer) { map.removeLayer(greylineLayer); greylineLayer = null; }
+      if (!showGrey) return;
+
+      const now = new Date();
+      const { dec, sunLon } = calcSunPos(now);
+      const rad = Math.PI / 180;
+
+      // Build terminator points: for each longitude, solve lat where altitude=0
+      // sin(alt) = sin(lat)sin(dec) + cos(lat)cos(dec)cos(H) = 0
+      // => tan(lat) = -cos(H)/tan(dec)
+      const termPts = [];
+      for (let lon = -180; lon <= 180; lon += 1) {
+        const H = (lon - sunLon) * rad;
+        if (Math.abs(dec) < 0.001) {
+          // equinox: terminator is the 90° meridian from subsolar point
+          termPts.push([lon === sunLon + 90 || lon === sunLon - 90 ? 0 : null, lon]);
+        } else {
+          const latRad = Math.atan(-Math.cos(H) / Math.tan(dec * rad));
+          termPts.push([latRad / rad, lon]);
+        }
+      }
+
+      // Night polygon: terminator + polar cap on night side
+      const nightPoly = termPts.filter(p => p[0] !== null).map(p => [p[0], p[1]]);
+      const poleLat = dec >= 0 ? -90 : 90;
+      nightPoly.push([poleLat, 180]);
+      nightPoly.push([poleLat, -180]);
+
+      greylineLayer = L.layerGroup();
+
+      // Night zone
+      L.polygon(nightPoly, {
+        color: 'transparent',
+        fillColor: '#00004a',
+        fillOpacity: 0.40,
+        weight: 0,
+        interactive: false
+      }).addTo(greylineLayer);
+
+      // Terminator line
+      const termLine = termPts.filter(p => p[0] !== null).map(p => [p[0], p[1]]);
+      L.polyline(termLine, {
+        color: '#ffcc00',
+        weight: 1.5,
+        opacity: 0.80,
+        dashArray: '6 4',
+        interactive: false
+      }).addTo(greylineLayer);
+
+      // Sun marker
+      L.circleMarker([dec, sunLon], {
+        radius: 8,
+        color: '#ffcc00',
+        fillColor: '#ffee44',
+        fillOpacity: 0.95,
+        weight: 2,
+        interactive: true
+      }).addTo(greylineLayer)
+        .bindTooltip('☀️ Soleil · Déc. ' + dec.toFixed(1) + '°', {permanent: false, direction: 'right'});
+
+      greylineLayer.addTo(map);
+
+      // Update legend
+      const legend = document.getElementById('grey-legend');
+      const timeEl = document.getElementById('grey-time');
+      if (legend) legend.classList.add('visible');
+      if (timeEl) {
+        const h = now.getUTCHours().toString().padStart(2,'0');
+        const m = now.getUTCMinutes().toString().padStart(2,'0');
+        timeEl.textContent = h + ':' + m;
+      }
     }
 
     function initMap(){
@@ -476,29 +544,18 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       map = L.map('map', {worldCopyJump:true}).setView([43.1, 5.88], 3);
       L.tileLayer(
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-         maxZoom: 18,
-         attribution: "Tiles © Esri"
-  }
-).addTo(map);
-
+        { maxZoom: 18, attribution: "Tiles © Esri" }
+      ).addTo(map);
 
       clusterLayer = L.markerClusterGroup({showCoverageOnHover:false, maxClusterRadius:50});
       pointsLayer = L.layerGroup();
-
-      // Heatmap: tuned for visibility (but still needs density)
       heatLayer = L.heatLayer([], {
         radius: 55, blur: 35, maxZoom: 6, max: 1.0,
         gradient: {
-          0.10:"#001018",
-          0.30:"#004d66",
-          0.50:"#00b3b3",
-          0.70:"#ffcc00",
-          0.85:"#ff6600",
-          1.00:"#ff003c"
+          0.10:"#001018", 0.30:"#004d66", 0.50:"#00b3b3",
+          0.70:"#ffcc00", 0.85:"#ff6600", 1.00:"#ff003c"
         }
       });
-
       circlesLayer = L.layerGroup();
       applyVis();
       return true;
@@ -515,7 +572,6 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       }catch(e){}
     }
 
-    
     function setSpotStatus(msg, bad=false){
       const el = document.getElementById('spot_status');
       if(!el) return;
@@ -528,13 +584,8 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       const freq = (document.getElementById('m_freq')?.value || "").trim();
       const call = (document.getElementById('m_call')?.value || "").trim().toUpperCase();
       const comment = (document.getElementById('m_comment')?.value || "").trim();
-
-      if(!freq || !call){
-        setSpotStatus("freq/call ?", true);
-        return;
-      }
+      if(!freq || !call){ setSpotStatus("freq/call ?", true); return; }
       setSpotStatus("envoi…", false);
-
       try{
         const r = await fetch('/api/spot', {
           method: 'POST',
@@ -542,29 +593,20 @@ html[data-theme='sunset'], body[data-theme='sunset']{
           body: JSON.stringify({freq, call, comment})
         });
         const j = await r.json().catch(()=>null);
-        if(r.ok && j && j.ok){
-          setSpotStatus("OK", false);
-        } else {
-          const err = (j && j.error) ? j.error : ("HTTP " + r.status);
-          setSpotStatus(err, true);
-        }
-      }catch(e){
-        setSpotStatus("réseau", true);
-      }
+        if(r.ok && j && j.ok){ setSpotStatus("OK", false); }
+        else { setSpotStatus((j && j.error) ? j.error : ("HTTP " + r.status), true); }
+      }catch(e){ setSpotStatus("réseau", true); }
     }
 
     function fillManualFromLastClicked(){
-      if(!lastClickedSpot){
-        setSpotStatus("clic un spot", true);
-        return;
-      }
+      if(!lastClickedSpot){ setSpotStatus("clic un spot", true); return; }
       if(document.getElementById('m_freq')) document.getElementById('m_freq').value = lastClickedSpot.freq || "";
       if(document.getElementById('m_call')) document.getElementById('m_call').value = lastClickedSpot.call || "";
       if(document.getElementById('m_comment')) document.getElementById('m_comment').value = lastClickedSpot.comment || "";
       setSpotStatus("pré-rempli", false);
     }
 
-function markerForSpot(s){
+    function markerForSpot(s){
       const band=s.band||"Unknown";
       const color=BAND_COLORS[band]||"#00f3ff";
       const spd=Number(s.score||0);
@@ -581,81 +623,54 @@ function markerForSpot(s){
 
     function rebuildFromCache(){
       if(!map) return;
-
       clusterLayer.clearLayers();
       pointsLayer.clearLayers();
       circlesLayer.clearLayers();
-
       const heatPts = [];
       for(const s of lastSpots){
         const {m, spd, band, color} = markerForSpot(s);
-
         if(showPoints){
           if(showCluster) clusterLayer.addLayer(m);
           else pointsLayer.addLayer(m);
         }
-
-        // Strong heat intensity mapping
-        // SPD 40 -> 1.0, SPD 20 -> 0.6, SPD 10 -> 0.6 (floor)
         const inten = Math.min(1.0, Math.max(0.6, Number(spd||0) / 40));
         heatPts.push([s.lat, s.lon, inten]);
-
         if(showCircles){
-          // Circle radius (meters) => readable even with low spot count
-          // Uses distance_km if present; else fixed 320km.
           const dist = Number(s.distance_km || 0);
           const km = (dist && dist > 0) ? Math.max(220, Math.min(520, dist/10)) : 320;
           L.circle([s.lat, s.lon], {
-            radius: km*1000,
-            color: color,
-            weight: 1,
-            opacity: 0.9,
-            fillColor: color,
-            fillOpacity: 0.14
+            radius: km*1000, color, weight:1, opacity:0.9, fillColor:color, fillOpacity:0.14
           }).addTo(circlesLayer);
         }
       }
-
       heatLayer.setLatLngs(heatPts);
       applyVis();
     }
 
     async function loadSpots(){
       if(!map) return;
-
       const minutes=document.getElementById('minutes').value;
       const limit=document.getElementById('limit').value;
       const band=document.getElementById('band').value;
       const mode=document.getElementById('mode').value;
-
-      // Heatmap is band-only (Solution A)
       if(showHeat && !band){
         showHeat = false;
         document.getElementById('t_heat').classList.remove('on');
-        syncToggleLabels();
-        syncExplain();
+        syncToggleLabels(); syncExplain();
         setDiag("Heat: choisir une bande", false);
       }
-
       const p=new URLSearchParams();
-      p.set('minutes', minutes);
-      p.set('limit', limit);
+      p.set('minutes', minutes); p.set('limit', limit);
       if(band) p.set('band', band);
       if(mode) p.set('mode', mode);
-
-      const url="/api/map/spots?"+p.toString();
-
       try{
         setDiag("Loading…");
-        const r = await fetch(url, {cache:'no-store'});
+        const r = await fetch("/api/map/spots?"+p.toString(), {cache:'no-store'});
         const j = await r.json();
         if(!j || !j.ok){ setDiag("API bad", true); return; }
-
         lastSpots = (j.spots||[]).filter(s => typeof s.lat==='number' && typeof s.lon==='number' && s.lat!==0 && s.lon!==0);
-
         document.getElementById('count').textContent=String(lastSpots.length);
         document.getElementById('last').textContent=new Date().toLocaleTimeString();
-
         rebuildFromCache();
         setDiag("OK");
       }catch(e){
@@ -667,10 +682,7 @@ function markerForSpot(s){
     function toggle(el, setter, refetch=true){
       el.classList.toggle('on');
       setter(el.classList.contains('on'));
-      syncToggleLabels();
-      syncExplain();
-      applyVis();
-
+      syncToggleLabels(); syncExplain(); applyVis();
       if(refetch) loadSpots();
       else rebuildFromCache();
     }
@@ -678,45 +690,50 @@ function markerForSpot(s){
     async function boot(){
       if(!initMap()) return;
 
-      // Toggle handlers
       document.getElementById('t_cluster').addEventListener('click', (e)=>toggle(e.currentTarget, v=>showCluster=v, false));
       document.getElementById('t_points').addEventListener('click', (e)=>toggle(e.currentTarget, v=>showPoints=v, false));
-
       document.getElementById('t_heat').addEventListener('click', (e)=>{
         const band = document.getElementById('band').value;
-        if(!band && !showHeat){
-          setDiag("Heat: choisir une bande", false);
-          // keep OFF
-          return;
-        }
+        if(!band && !showHeat){ setDiag("Heat: choisir une bande", false); return; }
         toggle(e.currentTarget, v=>showHeat=v, false);
       });
-
       document.getElementById('t_circles').addEventListener('click', (e)=>toggle(e.currentTarget, v=>showCircles=v, false));
       document.getElementById('t_auto').addEventListener('click', (e)=>toggle(e.currentTarget, v=>autoRefresh=v, false));
+
+      // Greyline toggle
+      document.getElementById('t_grey').addEventListener('click', (e)=>{
+        e.currentTarget.classList.toggle('on');
+        showGrey = e.currentTarget.classList.contains('on');
+        syncToggleLabels();
+        syncExplain();
+        if (!showGrey) {
+          if (greylineLayer) { map.removeLayer(greylineLayer); greylineLayer = null; }
+          const legend = document.getElementById('grey-legend');
+          if (legend) legend.classList.remove('visible');
+          if (greyTimer) { clearInterval(greyTimer); greyTimer = null; }
+        } else {
+          buildGreyline();
+          greyTimer = setInterval(buildGreyline, 60000);
+        }
+      });
 
       document.getElementById('refresh').addEventListener('click', async ()=>{ await loadSolar(); await loadSpots(); });
       document.getElementById('recenter').addEventListener('click', ()=>map.setView([43.1,5.88],3,{animate:true}));
 
-      // Spot manuel
       document.getElementById('m_send')?.addEventListener('click', (ev)=>{ ev.preventDefault(); sendManualSpot(); });
       document.getElementById('m_fill')?.addEventListener('click', (ev)=>{ ev.preventDefault(); fillManualFromLastClicked(); });
       setSpotStatus('—', false);
 
       for(const id of ["m_freq","m_call","m_comment"]){
         const el = document.getElementById(id);
-        if(el){
-          el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendManualSpot(); }});
-        }
+        if(el) el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendManualSpot(); }});
       }
-
       for(const id of ["minutes","limit","band","mode"]){
         document.getElementById(id).addEventListener('change', ()=>{ syncExplain(); loadSpots(); });
       }
 
       syncToggleLabels();
       syncExplain();
-
       await loadSolar();
       await loadSpots();
 

@@ -1,4 +1,4 @@
-# 📡 Radio Spot Watcher DX — v7.5
+# 📡 Radio Spot Watcher DX — v7.6
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -132,6 +132,8 @@ Aucune dépendance cloud.
 ---
 
 ### 🗂️ Historique des versions
+
+### v7.6 ajout de la greyline dans la page map
 
 ### v7.5 purge pavé "watching list"
 
