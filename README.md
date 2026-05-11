@@ -1,4 +1,4 @@
-# 📡 Radio Spot Watcher DX — v7.6
+# 📡 Radio Spot Watcher DX — v7.7
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -132,6 +132,20 @@ Aucune dépendance cloud.
 ---
 
 ### 🗂️ Historique des versions
+
+### v7.7 responsive
+
+- v7.7 — améliorations mobiles :
+
+ -Header : titre réduit à 0.82em, indicateurs plus compacts, flex-wrap sur tout
+ -Nav links : boutons plus petits, sans margin inutile
+ -Voice controls : masqués par défaut sur mobile, bouton 🔊 Voice ▾ pour les afficher/masquer
+ -Tableaux spots : colonnes SPD et km masquées sur mobile (gain de place)
+ -Bandmap : canvas réduit à 80px de hauteur
+ -Cartes HF/VHF : hauteur 180px
+ -Dashboard grid : 2 colonnes au lieu de auto-fill
+ -Purge modal : 96vw sur mobile
+ -Passages satellites : timeline réduite à 90px
 
 ### v7.6 greyline 
 

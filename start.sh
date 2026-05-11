@@ -6,7 +6,7 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${YELLOW}[INIT] Démarrage de Radio Spot Watcher DX v7.6 crée par F1SMV...${NC}"
+echo -e "${YELLOW}[INIT] Démarrage de Radio Spot Watcher DX v7.7 crée par F1SMV...${NC}"
 sleep 10
 
 # 1. Nettoyage des ports

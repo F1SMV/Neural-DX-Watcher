@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>📡 NEURAL DX v7.7</title>
+<title>📡 NEURAL DX v7.6</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230e0e0e'/><text y='.9em' font-size='80' x='10'>📡</text></svg>"/>
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -130,174 +130,6 @@
         }
         @media (max-width: 760px){
             #main-container{ grid-template-columns: 1fr; }
-        }
-
-        /* ── MOBILE ≤768px ─────────────────────────── */
-        @media (max-width: 768px) {
-
-            /* Header compact */
-            #header {
-                padding: 6px 10px;
-                gap: 4px;
-            }
-            #header-row1 {
-                gap: 4px;
-            }
-            #title {
-                font-size: 0.82em;
-                letter-spacing: 0;
-            }
-            #indicators {
-                font-size: 0.7em;
-                gap: 6px;
-                flex-wrap: wrap;
-            }
-            .indicator-item {
-                font-size: 0.85em;
-            }
-
-            /* Nav links : icônes seules, plus petites */
-            #header-row2 {
-                gap: 4px;
-                flex-wrap: wrap;
-            }
-            #nav-links {
-                gap: 3px;
-                flex-wrap: wrap;
-            }
-            .icon-button {
-                font-size: 0.72em;
-                padding: 3px 6px;
-                margin-left: 0;
-            }
-
-            /* Voice controls compacts */
-            #voice-controls {
-                gap: 4px;
-                margin-left: 0;
-                flex-wrap: wrap;
-            }
-            #voice-distance-filter,
-            #voice-language-filter {
-                font-size: 0.7em;
-                padding: 3px 6px;
-                max-width: 130px;
-            }
-            #synth-toggle-button {
-                font-size: 0.7em;
-                padding: 3px 8px;
-            }
-
-            /* Ticker plus petit */
-            #ticker-container {
-                font-size: 0.75em;
-            }
-
-            /* Dashboard panel compact */
-            #dashboard-panel {
-                margin: 4px 6px 0 6px;
-            }
-            #dashboard-grid {
-                grid-template-columns: repeat(2, 1fr) !important;
-                gap: 4px;
-                padding: 6px;
-            }
-            .dash-item {
-                font-size: 0.7em;
-                padding: 4px 6px;
-            }
-
-            /* Bandmap réduit */
-            #bandmap-canvas {
-                height: 80px !important;
-            }
-            #bandmap-controls {
-                flex-wrap: wrap;
-                gap: 4px;
-            }
-            #bandmap-controls button,
-            #bandmap-controls select {
-                font-size: 0.7em;
-                padding: 2px 5px;
-            }
-
-            /* Pavés panels */
-            .panel {
-                padding: 7px;
-                min-height: unset;
-            }
-            .panel-header {
-                font-size: 0.78em;
-                padding: 5px 8px;
-            }
-            .panel-hdr {
-                font-size: 0.78em;
-            }
-
-            /* Tableaux spots compacts */
-            .spot-table {
-                font-size: 0.68em;
-            }
-            .spot-table th,
-            .spot-table td {
-                padding: 3px 4px;
-            }
-
-            /* Masquer colonnes moins utiles sur mobile */
-            .spot-table th:nth-child(6),
-            .spot-table td:nth-child(6),
-            .spot-table th:nth-child(7),
-            .spot-table td:nth-child(7) {
-                display: none;
-            }
-
-            /* Maps réduites */
-            .map-container,
-            #map-hf,
-            #map-vhf {
-                height: 180px !important;
-            }
-
-            /* Filtres spots */
-            .filter-controls {
-                flex-wrap: wrap;
-                gap: 4px;
-            }
-            .filter-controls select,
-            .filter-controls input {
-                font-size: 0.72em;
-                padding: 3px 5px;
-            }
-
-            /* Solar indices */
-            .solar-grid {
-                grid-template-columns: repeat(3, 1fr) !important;
-            }
-
-            /* Passages satellites timeline */
-            #passes-canvas {
-                height: 90px !important;
-            }
-
-            /* Watchlist table */
-            #watchlist-table {
-                font-size: 0.7em;
-            }
-
-            /* WL tracking */
-            #wl-track-filter {
-                font-size: 0.75em;
-                padding: 4px;
-            }
-
-            /* Purge modal */
-            #purge-box {
-                width: 96vw;
-                max-height: 85vh;
-            }
-            #purge-list {
-                grid-template-columns: repeat(2, 1fr);
-            }
         }
         .column {
             flex: 1;
@@ -915,18 +747,6 @@
             opacity: 0.55;
             padding: 2px 8px 4px;
         }
-
-        /* Mobile voice toggle */
-        @media (max-width: 768px) {
-            #mobile-voice-toggle { display: inline-block !important; }
-            #voice-controls {
-                display: none !important;
-                width: 100%;
-            }
-            #voice-controls.mobile-open {
-                display: flex !important;
-            }
-        }
 </style>
 </head>
 <body>
@@ -1097,7 +917,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V7.7</div>
+    <div id="title">📡 NEURAL DX WATCHER V7.6</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -1107,11 +927,6 @@
   </div>
   <!-- Ligne 2 : nav + voice controls -->
   <div id="header-row2">
-    <button id="mobile-voice-toggle" onclick="document.getElementById('voice-controls').classList.toggle('mobile-open')"
-      style="display:none;padding:3px 8px;font-size:.7em;cursor:pointer;border-radius:4px;
-      background:rgba(0,243,255,0.1);border:1px solid rgba(0,243,255,0.3);color:var(--accent);font-family:monospace;">
-      🔊 Voice ▾
-    </button>
     <div id="nav-links">
       <a class="icon-button" href="analysis.html" title="Visualiser les algorithmes d'analyse">📊 AI INSIGHT</a>
       <a class="icon-button" href="/briefing" title="Briefing DX">📰 BRIEFING</a>
