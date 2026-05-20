@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>📡 NEURAL DX v7.7</title>
+<title>📡 NEURAL DX v8.0</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230e0e0e'/><text y='.9em' font-size='80' x='10'>📡</text></svg>"/>
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -44,6 +44,17 @@
             --wl-bg: #4cff7e;
             --wl-text: #000000;
             --open-color: #00aa00;
+        }
+        body[data-theme='smart'] {
+            --bg-color: #070B1A;
+            --panel-bg: #10172A;
+            --text-main: #F8FAFC;
+            --accent: #22D3EE;
+            --alert: #EF4444;
+            --border: 1px solid #1E293B;
+            --wl-bg: #8B5CF6;
+            --wl-text: #F8FAFC;
+            --open-color: #2563EB;
         }
         * {
             box-sizing: border-box;
@@ -927,6 +938,165 @@
                 display: flex !important;
             }
         }
+
+        /* ── MODE SMART ──────────────────────────────── */
+        #smart-toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            background: rgba(0,0,0,0.2);
+            cursor: pointer;
+            user-select: none;
+            transition: all .3s;
+        }
+        #smart-toggle-wrap:hover { border-color: var(--accent); }
+        #smart-toggle-wrap.active {
+            border-color: #22D3EE;
+            background: rgba(34,211,238,0.08);
+            box-shadow: 0 0 12px rgba(34,211,238,0.2);
+        }
+        .smart-slider {
+            position: relative;
+            width: 36px;
+            height: 18px;
+            border-radius: 9px;
+            background: #333;
+            transition: background .3s;
+            flex-shrink: 0;
+        }
+        .smart-slider::after {
+            content: '';
+            position: absolute;
+            left: 2px;
+            top: 2px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #666;
+            transition: all .3s;
+        }
+        #smart-toggle-wrap.active .smart-slider {
+            background: linear-gradient(90deg, #2563EB, #22D3EE);
+        }
+        #smart-toggle-wrap.active .smart-slider::after {
+            left: 20px;
+            background: #fff;
+            box-shadow: 0 0 6px rgba(34,211,238,0.6);
+        }
+        .smart-label {
+            font-size: 0.7em;
+            font-family: 'Orbitron', monospace;
+            letter-spacing: 1px;
+            color: #555;
+            transition: color .3s;
+        }
+        #smart-toggle-wrap.active .smart-label { color: #22D3EE; }
+
+        /* Pavé top spots smart */
+        #smart-panel {
+            display: none;
+        }
+        body[data-theme='smart'] #smart-panel,
+        .smart-mode #smart-panel {
+            display: block;
+        }
+        .smart-mode #spots-hf-panel {
+            display: none !important;
+        }
+        #smart-spots-list {
+            padding: 0;
+        }
+        .smart-spot {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 8px 12px;
+            padding: 9px 12px;
+            border-bottom: 1px solid #0f172a;
+            align-items: center;
+            transition: background .15s;
+            cursor: pointer;
+        }
+        .smart-spot:hover { background: rgba(34,211,238,0.04); }
+        .smart-spot-rank {
+            font-size: 0.75em;
+            color: #94A3B8;
+            font-family: monospace;
+            width: 18px;
+            text-align: right;
+        }
+        .smart-spot-main {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .smart-spot-call {
+            font-size: 1.05em;
+            font-weight: bold;
+            color: #F8FAFC;
+        }
+        .smart-spot-call a { color: inherit; text-decoration: none; }
+        .smart-spot-call a:hover { color: #22D3EE; }
+        .smart-spot-meta {
+            font-size: 0.78em;
+            color: #94A3B8;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .smart-spot-score {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 3px;
+        }
+        .smart-score-bar {
+            width: 56px;
+            height: 5px;
+            border-radius: 2px;
+            background: #1E293B;
+            overflow: hidden;
+        }
+        .smart-score-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width .4s;
+        }
+        .smart-score-val {
+            font-size: 0.78em;
+            color: #94A3B8;
+            font-family: monospace;
+        }
+        .smart-badge {
+            display: inline-block;
+            font-size: 0.6em;
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+        .sb-new  { background: rgba(239,68,68,0.15);  border:1px solid #EF4444; color:#EF4444; }
+        .sb-wl   { background: rgba(139,92,246,0.15); border:1px solid #8B5CF6; color:#8B5CF6; }
+        .sb-conf { background: rgba(34,197,94,0.15);  border:1px solid #22C55E; color:#22C55E; }
+        .sb-prop { background: rgba(34,211,238,0.12); border:1px solid #22D3EE; color:#22D3EE; }
+        .smart-empty {
+            padding: 24px;
+            text-align: center;
+            color: #94A3B8;
+            font-size: 0.8em;
+            font-style: italic;
+        }
+        /* Panel header smart */
+        body[data-theme='smart'] .panel-header {
+            border-bottom: 1px solid #1E293B;
+            background: rgba(34,211,238,0.03);
+        }
+        body[data-theme='smart'] .panel {
+            border-color: #1E293B;
+            box-shadow: 0 0 20px rgba(34,211,238,0.04);
+        }
 </style>
 </head>
 <body>
@@ -1097,12 +1267,19 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V7.7</div>
+    <div id="title">📡 NEURAL DX WATCHER V8.0</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
       <div class="indicator-item">LOC: <span id="local-time"></span></div>
       <div class="indicator-item">MODE: <span id="display-mode">SoftTech</span></div>
+    </div>
+    <!-- SMART MODE TOGGLE -->
+    <div id="smart-toggle-wrap" onclick="toggleSmartMode()" title="Basculer en mode Intelligent">
+      <span class="smart-label" id="smart-label">BASIC</span>
+      <div class="smart-slider"></div>
+      <span style="font-size:1em;">🧠</span>
+    </div>
     </div>
   </div>
   <!-- Ligne 2 : nav + voice controls -->
@@ -1216,6 +1393,15 @@
                     </div>
 </div>
 </div>
+<!-- SMART PANEL -->
+<div class="panel" data-panel-id="smart-spots" id="smart-panel">
+<div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;">
+  <span>🧠 TOP SPOTS · MODE INTELLIGENT</span>
+  <span id="smart-last-update" style="font-size:.65em;color:#94A3B8;font-family:monospace;"></span>
+</div>
+<div id="smart-spots-list"><div class="smart-empty">Chargement…</div></div>
+</div>
+
 <div class="panel" data-panel-id="spots-hf" id="spots-hf-panel">
 <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;">
   <span><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> DX SPOTS HF</span>
@@ -2162,6 +2348,199 @@
             return isNaN(num) ? 0 : num;
         }
 
+
+        // ── MODE SMART ────────────────────────────────
+        let smartMode = localStorage.getItem('smartMode') === '1';
+
+        function toggleSmartMode() {
+            smartMode = !smartMode;
+            localStorage.setItem('smartMode', smartMode ? '1' : '0');
+            applySmartMode();
+            if (smartMode) renderSmartSpots(lastRawSpotsHF);
+        }
+
+        function applySmartMode() {
+            const wrap = document.getElementById('smart-toggle-wrap');
+            const label = document.getElementById('smart-label');
+            if (smartMode) {
+                wrap.classList.add('active');
+                label.textContent = 'SMART';
+                document.body.classList.add('smart-mode');
+                document.body.setAttribute('data-theme', 'smart');
+                localStorage.setItem('theme', 'smart');
+                document.documentElement.setAttribute('data-theme', 'smart');
+            } else {
+                wrap.classList.remove('active');
+                label.textContent = 'BASIC';
+                document.body.classList.remove('smart-mode');
+                // Restaurer thème précédent
+                const prev = localStorage.getItem('prevTheme') || 'softtech';
+                document.body.setAttribute('data-theme', prev);
+                document.documentElement.setAttribute('data-theme', prev);
+                localStorage.setItem('theme', prev);
+            }
+        }
+
+        // Stocker les spots HF bruts pour le mode smart
+        let lastRawSpotsHF = [];
+
+        // ── SCORE COMPOSITE ───────────────────────────
+        function calcSmartScore(spot) {
+            let score = 0;
+            const reasons = [];
+
+            // 1. Nouveau DXCC LoTW (+40)
+            if (spot.lotw_active && spot.lotw_dxcc_new) {
+                score += 40;
+                reasons.push({label:'NEW DXCC', cls:'sb-new'});
+            }
+            // 2. Dans la watchlist (+30)
+            if (isWanted(spot.dx_call)) {
+                score += 30;
+                reasons.push({label:'WL', cls:'sb-wl'});
+            }
+            // 3. Confirmé LoTW mais bande manquante (+10)
+            if (spot.lotw_active && spot.lotw_dxcc_confirmed && !spot.lotw_dxcc_new) {
+                score += 10;
+                reasons.push({label:'CONF', cls:'sb-conf'});
+            }
+            // 4. Propagation favorable : SFI + Kp (+ jusqu'à 20)
+            const sfiEl = document.getElementById('solar-sfi');
+            const sfi = sfiEl ? Number(sfiEl.textContent) : 0;
+            if (!isNaN(sfi) && sfi > 70) {
+                const propScore = Math.min(20, Math.floor((sfi - 70) / 4));
+                if (propScore > 0) {
+                    score += propScore;
+                    if (propScore >= 8) reasons.push({label:'PROP+', cls:'sb-prop'});
+                }
+            }
+            // 5. SPD natif (fiabilité spot) — normalisé sur 30
+            const spd = Number(spot.score || 0);
+            const spdScore = Math.min(30, Math.floor(spd / 2));
+            score += spdScore;
+            if (spdScore >= 20) reasons.push({label:'SPD+', cls:'sb-prop'});
+
+            // 6. Distance DX (> 5000 km = bonus, > 10000 km = bonus max)
+            const dist = Number(spot.distance_km || 0);
+            if (dist > 10000) { score += 15; reasons.push({label:'DX++', cls:'sb-new'}); }
+            else if (dist > 5000) { score += 8; reasons.push({label:'DX+', cls:'sb-wl'}); }
+            else if (dist > 2000) { score += 3; }
+
+            return { total: Math.min(100, score), reasons };
+        }
+
+        function renderSmartSpots(spots) {
+            const panel = document.getElementById('smart-spots-list');
+            const lastUpd = document.getElementById('smart-last-update');
+            if (!panel) return;
+
+            if (!spots || !spots.length) {
+                panel.innerHTML = '<div class="smart-empty">Aucun spot HF disponible</div>';
+                return;
+            }
+
+            const scored = spots
+                .filter(function(s) { return (s.type||'').toLowerCase() === 'hf'; })
+                .map(function(s) { return Object.assign({}, s, {smart: calcSmartScore(s)}); })
+                .sort(function(a, b) { return b.smart.total - a.smart.total; })
+                .slice(0, 15);
+
+            if (!scored.length) {
+                panel.innerHTML = '<div class="smart-empty">Pas assez de donnees pour analyser</div>';
+                return;
+            }
+
+            panel.innerHTML = '';
+
+            scored.forEach(function(spot, i) {
+                const pct = Math.min(100, spot.smart.total);
+                const fillColor = pct >= 60 ? '#22D3EE' : pct >= 35 ? '#8B5CF6' : '#2563EB';
+                const isBeacon = /\/b$/i.test((spot.dx_call || '').trim());
+
+                const div = document.createElement('div');
+                div.className = 'smart-spot';
+                div.addEventListener('click', function() { addToWatchlist(spot.dx_call); });
+
+                // Rank
+                const rank = document.createElement('span');
+                rank.className = 'smart-spot-rank';
+                rank.textContent = i + 1;
+
+                // Main
+                const main = document.createElement('div');
+                main.className = 'smart-spot-main';
+
+                const callDiv = document.createElement('div');
+                callDiv.className = 'smart-spot-call';
+
+                const link = document.createElement('a');
+                link.href = 'https://qrz.com/db/' + spot.dx_call;
+                link.target = '_blank';
+                link.textContent = spot.dx_call;
+                link.addEventListener('click', function(e) { e.stopPropagation(); });
+                callDiv.appendChild(link);
+
+                spot.smart.reasons.forEach(function(r) {
+                    const badge = document.createElement('span');
+                    badge.className = 'smart-badge ' + r.cls;
+                    badge.textContent = r.label;
+                    callDiv.appendChild(badge);
+                });
+
+                if (isBeacon) {
+                    const bcn = document.createElement('span');
+                    bcn.className = 'smart-badge';
+                    bcn.style.cssText = 'background:rgba(180,100,255,0.15);border:1px solid #cc88ff;color:#cc88ff;';
+                    bcn.textContent = 'BCN';
+                    callDiv.appendChild(bcn);
+                }
+
+                const meta = document.createElement('div');
+                meta.className = 'smart-spot-meta';
+                [spot.freq, spot.band || '', spot.mode || '', spot.time,
+                 spot.distance_km ? Math.round(spot.distance_km) + ' km' : '']
+                .filter(Boolean)
+                .forEach(function(txt) {
+                    const s = document.createElement('span');
+                    s.textContent = txt;
+                    meta.appendChild(s);
+                });
+
+                main.appendChild(callDiv);
+                main.appendChild(meta);
+
+                // Score
+                const scoreDiv = document.createElement('div');
+                scoreDiv.className = 'smart-spot-score';
+
+                const bar = document.createElement('div');
+                bar.className = 'smart-score-bar';
+                const fill = document.createElement('div');
+                fill.className = 'smart-score-fill';
+                fill.style.width = pct + '%';
+                fill.style.background = fillColor;
+                bar.appendChild(fill);
+
+                const val = document.createElement('span');
+                val.className = 'smart-score-val';
+                val.textContent = spot.smart.total;
+
+                scoreDiv.appendChild(bar);
+                scoreDiv.appendChild(val);
+
+                div.appendChild(rank);
+                div.appendChild(main);
+                div.appendChild(scoreDiv);
+                panel.appendChild(div);
+            });
+
+            if (lastUpd) {
+                const now = new Date();
+                lastUpd.textContent = now.getUTCHours().toString().padStart(2, '0') + ':' +
+                    now.getUTCMinutes().toString().padStart(2, '0') + 'Z';
+            }
+        }
+
         async function updateSpots(type) {
             const bodyId = `spots-body-${type}`;
             const filterBand = document.getElementById(`${type}-band-filter`).value;
@@ -2181,6 +2560,12 @@
                 } else {
                     // Filtrer par type
                     spots = spots.filter(spot => spot.type.toLowerCase() === type);
+
+                    // Stocker pour le mode smart
+                    if (type === 'hf') {
+                        lastRawSpotsHF = spots;
+                        if (smartMode) renderSmartSpots(spots);
+                    }
 
                     // Tri par fréquence si demandé
                     if (freqSort === 'asc') {
@@ -2548,6 +2933,13 @@
              } catch (e) {
                  console.error("Failed to initialize Drag and Drop. Check Sortable.js script.", e);
              }
+
+             // Init mode smart
+             if (!smartMode) {
+                 const cur = document.body.getAttribute('data-theme') || 'softtech';
+                 if (cur !== 'smart') localStorage.setItem('prevTheme', cur);
+             }
+             applySmartMode();
 
              setInterval(updateTimeDisplay, 1000);
 

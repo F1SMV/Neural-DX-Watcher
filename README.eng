@@ -1,4 +1,4 @@
-# 📡 Radio Spot Watcher DX — v7.7
+# 📡 Radio Spot Watcher DX — v8.0
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -132,6 +132,27 @@ No cloud dependency.
 ---
 
 ## 🗂️ Version History
+
+### v8.0 — Smart Mode 🧠
+
+**BASIC / SMART toggle in the header**
+
+- 🧠 slider in the header — switches between BASIC mode (standard display) and SMART mode (intelligent analysis)
+- Dedicated visual theme: background `#070B1A`, surfaces `#10172A`, cyan accent `#22D3EE` and violet `#8B5CF6`
+- State persisted in localStorage — mode is remembered between sessions
+
+**"TOP SPOTS · SMART MODE" panel**
+
+In SMART mode, the HF table is replaced by a selection of the **15 best spots** ranked by composite score:
+
+- 🔴 **+40 pts** — New DXCC never worked (LoTW cross-reference)
+- 🟣 **+30 pts** — Call in the watchlist
+- 🟢 **+10 pts** — Confirmed LoTW DXCC, missing band
+- 🔵 **+20 pts** — Favorable propagation (SFI > 70)
+- ⚡ **+30 pts** — Native SPD score (spot reliability)
+- 📡 **+15 pts** — Distance > 10,000 km (long-range DX)
+
+Each spot displays: callsign, colored badges, frequency / band / mode / time / distance, visual score bar.
 
 ### v7.7 version responsive 
 
