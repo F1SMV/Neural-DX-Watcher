@@ -40,3 +40,58 @@ most_wanted_cache.json
 # Runtime data (à adapter)
 data/*.json
 !data/ai_presets.json
+# ── Données personnelles & sensibles ──────────────
+watchlist.json
+watchlist.txt
+config.json
+config.local.py
+secrets.py
+.env
+*.key
+*.pem
+
+# ── Logs ──────────────────────────────────────────
+*.log
+*.log.*
+logs/
+
+# ── Données générées à l'exécution ────────────────
+data/
+data/meta/
+data/briefing/
+data/tle/
+data/cache/
+solar_state.json
+app_state.json
+
+# ── Python ────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.Python
+
+# ── Environnement virtuel ─────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── OS & éditeurs ─────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Fichiers temporaires Flask ────────────────────
+instance/
+*.sqlite
+flask_session/
+
+# ── Fichiers de débogage ──────────────────────────
+*.dump
+debug_*.json
+test_*.json
