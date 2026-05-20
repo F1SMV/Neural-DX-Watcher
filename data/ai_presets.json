@@ -1,9 +1,0 @@
-[
-  {
-    "id": "DX_BRIEFING",
-    "label": "DX Briefing",
-    "ttl_sec": 900,
-    "prompt_hint": "Bullet points, très concret, propagation & opportunités DX.",
-    "sources": ["dxworld_rss", "425dxn_rss", "solar_json", "cluster_spots", "dxcc_stats_24h"]
-  }
-]
