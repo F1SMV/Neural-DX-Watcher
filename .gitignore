@@ -95,3 +95,4 @@ flask_session/
 *.dump
 debug_*.json
 test_*.json
+pre-push-clean.sh
