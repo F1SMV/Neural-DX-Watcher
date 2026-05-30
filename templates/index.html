@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>📡 NEURAL DX v9.0</title>
+<title>📡 NEURAL DX v9.2</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230e0e0e'/><text y='.9em' font-size='80' x='10'>📡</text></svg>"/>
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -13,15 +13,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&amp;family=Share+Tech+Mono&amp;display=swap" rel="stylesheet"/>
 <style>
         :root {
-            --bg-color: #050505;
-            --panel-bg: #0e0e0e;
-            --text-main: #a0a0a0;
+            /* ── THÈME COCKPIT — défaut v9.2 ── */
+            --bg-color: #050810;
+            --panel-bg: #0a0f1e;
+            --text-main: #8899bb;
             --accent: #00f3ff;
-            --alert: #ff003c;
-            --border: 1px solid #333;
-            --wl-bg: #ffeb3b;
-            --wl-text: #000000;
-            --open-color: #d35400;
+            --alert: #EF4444;
+            --border: 1px solid rgba(0,243,255,0.1);
+            --wl-bg: #8B5CF6;
+            --wl-text: #F8FAFC;
+            --open-color: #fb923c;
+        }
+        body[data-theme='cockpit'] {
+            --bg-color: #050810;
+            --panel-bg: #0a0f1e;
+            --text-main: #8899bb;
+            --accent: #00f3ff;
+            --alert: #EF4444;
+            --border: 1px solid rgba(0,243,255,0.1);
+            --wl-bg: #8B5CF6;
+            --wl-text: #F8FAFC;
+            --open-color: #fb923c;
         }
         body[data-theme='dark'] {
             --bg-color: #1a1a1a;
@@ -186,6 +198,49 @@
         @media (max-width: 600px) {
             #title { font-size: 0.85em; letter-spacing: 1px; }
         }
+        /* ── INPUTS & BUTTONS COCKPIT STYLE v9.2 ── */
+        select, input[type=text], input[type=number], input[type=password] {
+            background: rgba(5,8,16,0.7) !important;
+            color: var(--text-main) !important;
+            border: 1px solid rgba(0,243,255,0.12) !important;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.82em;
+            font-family: 'Share Tech Mono', monospace;
+            outline: none;
+            transition: border-color .2s;
+        }
+        select:focus, input[type=text]:focus, input[type=number]:focus,
+        input[type=password]:focus {
+            border-color: rgba(0,243,255,0.35) !important;
+            box-shadow: 0 0 8px rgba(0,243,255,0.1);
+        }
+        select option {
+            background: #050810;
+            color: #8899bb;
+        }
+        button:not(.mode-btn):not(.ck-btn):not(.ck-voacap-btn) {
+            cursor: pointer;
+            padding: 5px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,243,255,0.15);
+            background: rgba(0,243,255,0.04);
+            color: var(--text-main);
+            font-size: 0.8em;
+            font-family: 'Share Tech Mono', monospace;
+            transition: all 0.2s;
+        }
+        button:not(.mode-btn):not(.ck-btn):not(.ck-voacap-btn):hover {
+            border-color: rgba(0,243,255,0.3);
+            background: rgba(0,243,255,0.08);
+            color: var(--accent);
+        }
+        /* Scrollbars cockpit */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(0,243,255,0.15); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,243,255,0.3); }
+
         #ticker-container {
             background: linear-gradient(90deg, #050810, #080d1a, #050810);
             border-top: 1px solid rgba(0,243,255,0.08);
@@ -444,7 +499,14 @@
         .spot-table, .wl-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.85em;
+            font-size: 0.82em;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .spot-table td, .wl-table td {
+            border-bottom: 1px solid rgba(0,243,255,0.04);
+        }
+        .spot-table tr:hover td {
+            background: rgba(0,243,255,0.025);
         }
         .spot-call-white-bold {
             color: #ffffff;
@@ -2016,12 +2078,12 @@
         }
         /* Panel header smart */
         body[data-theme='smart'] .panel-header {
-            border-bottom: 1px solid #1E293B;
-            background: rgba(34,211,238,0.03);
+            border-bottom: 1px solid rgba(0,243,255,0.08);
+            background: linear-gradient(90deg, rgba(0,243,255,0.05), transparent 70%);
         }
         body[data-theme='smart'] .panel {
-            border-color: #1E293B;
-            box-shadow: 0 0 20px rgba(34,211,238,0.04);
+            border-color: rgba(0,243,255,0.08);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.025);
         }
 
 
@@ -3346,6 +3408,222 @@
             min-height: 14px !important;
         }
 
+
+
+        /* ===== PATCH COCKPIT v4 — carte heatmap senior / VOACAP stable ===== */
+        body.mode-cockpit .ck6m-world-stage {
+            border: 1px solid rgba(34,211,238,.58) !important;
+            border-radius: 20px !important;
+            background:
+                linear-gradient(180deg, rgba(1,20,46,.96), rgba(1,8,22,.99)) !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.04),
+                0 0 34px rgba(34,211,238,.18),
+                0 18px 42px rgba(0,0,0,.42) !important;
+        }
+        body.mode-cockpit .ck6m-world-shell {
+            height: clamp(430px, 46vh, 620px) !important;
+            margin: 10px 14px 14px !important;
+            border-radius: 999px / 46% !important;
+            border: 1px solid rgba(34,211,238,.42) !important;
+            background:
+                radial-gradient(ellipse at 50% 48%, rgba(0,148,255,.24), transparent 58%),
+                linear-gradient(180deg, #052d5c 0%, #031732 100%) !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.035),
+                inset 0 0 60px rgba(0,174,255,.14),
+                0 0 34px rgba(0,174,255,.12) !important;
+        }
+        body.mode-cockpit #ck-6m-map {
+            inset: 0 !important;
+            border-radius: inherit !important;
+            border: 0 !important;
+            background: #052b58 !important;
+            box-shadow: inset 0 0 70px rgba(0,20,48,.62) !important;
+            filter: saturate(1.35) contrast(1.18) brightness(.82) !important;
+        }
+        body.mode-cockpit #ck-6m-map .leaflet-tile {
+            /* v5: rendu cartographique bleu réaliste : on neutralise les couleurs satellite puis on recolore en cyan/bleu.
+               Objectif : éviter la terre rouge/violette tout en gardant relief + côtes lisibles. */
+            filter: grayscale(1) sepia(.65) hue-rotate(165deg) saturate(2.35) contrast(1.20) brightness(.66) !important;
+        }
+        body.mode-cockpit .ck6m-map-graticule {
+            position:absolute; inset:0; z-index:5; pointer-events:none;
+            border-radius:inherit;
+            background-image:
+                linear-gradient(rgba(0,210,255,.16) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,210,255,.13) 1px, transparent 1px),
+                radial-gradient(ellipse at center, transparent 58%, rgba(4,12,28,.72) 100%);
+            background-size: 100% 12.5%, 7.142% 100%, auto;
+            mix-blend-mode: screen;
+            opacity:.82;
+        }
+        body.mode-cockpit .ck6m-map-scan {
+            z-index:7 !important;
+            opacity:.42 !important;
+            background:
+                repeating-linear-gradient(to bottom, rgba(125,211,252,.06) 0, rgba(125,211,252,.06) 1px, transparent 1px, transparent 6px) !important;
+        }
+        body.mode-cockpit .ck6m-map-vignette {
+            z-index:8 !important;
+            border-radius:inherit;
+            background:
+                radial-gradient(ellipse at center, transparent 46%, rgba(1,8,23,.25) 70%, rgba(1,8,23,.92) 100%),
+                linear-gradient(90deg, rgba(1,8,23,.68), transparent 12%, transparent 88%, rgba(1,8,23,.68)) !important;
+        }
+        body.mode-cockpit .ck6m-world-shell::after {
+            content:"";
+            position:absolute;
+            inset:0;
+            border-radius:inherit;
+            pointer-events:none;
+            z-index:4;
+            background: linear-gradient(180deg, rgba(0,190,255,.14), rgba(0,75,180,.20));
+            mix-blend-mode: color;
+            opacity:.78;
+        }
+        body.mode-cockpit .ck6m-heat-layer {
+            position:absolute; inset:0; z-index:6; pointer-events:none; border-radius:inherit; overflow:hidden;
+            mix-blend-mode: screen;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity .35s ease, visibility .35s ease;
+        }
+        body.mode-cockpit .ck6m-world-shell.heat-active .ck6m-heat-layer {
+            opacity: .72;
+            visibility: visible;
+        }
+        body.mode-cockpit .ck6m-world-shell:not(.heat-active) .ck6m-hot {
+            display: none !important;
+        }
+        body.mode-cockpit .ck6m-hot {
+            position:absolute; width:13%; aspect-ratio:1/1; border-radius:50%; transform:translate(-50%,-50%);
+            background:
+                radial-gradient(circle, rgba(255,0,0,.92) 0 10%, rgba(255,130,0,.86) 11% 22%, rgba(255,230,0,.72) 23% 36%, rgba(34,255,92,.50) 37% 54%, rgba(0,204,255,.24) 55% 72%, transparent 73%);
+            filter: blur(.6px) saturate(1.25);
+            box-shadow: 0 0 26px rgba(255,70,0,.38), 0 0 54px rgba(0,221,255,.14);
+            opacity:.86;
+        }
+        body.mode-cockpit .ck6m-hot::after {
+            content:""; position:absolute; inset:33%; border-radius:50%;
+            background: rgba(255,0,0,.92); box-shadow:0 0 12px rgba(255,0,0,.85);
+        }
+        body.mode-cockpit .ck6m-hot.h-us { left:20%; top:39%; width:15%; }
+        body.mode-cockpit .ck6m-hot.h-eu { left:50%; top:30%; width:12%; }
+        body.mode-cockpit .ck6m-hot.h-med { left:46%; top:41%; width:10%; }
+        body.mode-cockpit .ck6m-hot.h-ja { left:80%; top:40%; width:12%; }
+        body.mode-cockpit .ck6m-hot.h-india { left:70%; top:48%; width:9%; opacity:.70; }
+        body.mode-cockpit .ck6m-hot.h-au { left:82%; top:74%; width:13%; }
+        body.mode-cockpit .ck6m-hot.h-brazil { left:34%; top:66%; width:10%; opacity:.66; }
+        body.mode-cockpit .ck6m-hot.h-sa { left:56%; top:74%; width:9%; opacity:.72; }
+        body.mode-cockpit .ck6m-legend {
+            left: 28px !important; bottom: 28px !important; z-index: 12 !important;
+        }
+        body.mode-cockpit .ck-6m-spots { z-index: 12 !important; }
+        body.mode-cockpit .ck-6m-map-label { z-index: 12 !important; }
+
+        body.mode-cockpit #ck-stats-row {
+            overflow: visible !important;
+            padding-bottom: 2px !important;
+        }
+        body.mode-cockpit .ck-stat {
+            min-width: 0 !important;
+            padding: 13px 6px 10px !important;
+        }
+        body.mode-cockpit .ck-stat-v {
+            font-size: clamp(1.65rem, 2.2vw, 2.4rem) !important;
+            white-space: nowrap !important;
+            letter-spacing: -.03em !important;
+            overflow: visible !important;
+        }
+        body.mode-cockpit .ck-stat-l { font-size:.58em !important; }
+
+        body.mode-cockpit [data-panel-id="ck-voacap"] { min-height: 320px !important; }
+        body.mode-cockpit #ck-voacap-canvas {
+            height: 235px !important;
+            min-height: 235px !important;
+            background: #031329 !important;
+            border: 1px solid rgba(125,211,252,.16);
+        }
+
+        @media (max-width: 760px) {
+            body.mode-cockpit .ck6m-world-shell { height: 340px !important; margin: 8px !important; }
+            body.mode-cockpit .ck6m-hot { width:18%; }
+        }
+
+
+
+        /* ===== PATCH COCKPIT v6 — carte réaliste, heatmap uniquement sur vrais spots ===== */
+        body.mode-cockpit .ck6m-world-stage {
+            border-radius: 18px !important;
+        }
+        body.mode-cockpit .ck6m-world-shell {
+            border-radius: 14px !important;
+            overflow: hidden !important;
+            background:
+                linear-gradient(180deg, rgba(3, 42, 77, .96), rgba(1, 18, 42, .99)) !important;
+        }
+        body.mode-cockpit #ck-6m-map {
+            border-radius: 0 !important;
+            background: #04294d !important;
+            filter: saturate(1.22) contrast(1.06) brightness(.86) !important;
+        }
+        body.mode-cockpit #ck-6m-map .leaflet-tile {
+            /* Bleu/cyan global, sans dominante rouge : mer + terres restent froides et lisibles. */
+            filter: grayscale(.82) sepia(.25) hue-rotate(155deg) saturate(1.65) contrast(1.08) brightness(.76) !important;
+        }
+        body.mode-cockpit .ck6m-world-shell::after {
+            border-radius: 0 !important;
+            background: linear-gradient(180deg, rgba(0,155,255,.10), rgba(0,72,160,.16)) !important;
+            mix-blend-mode: color !important;
+            opacity: .58 !important;
+        }
+        body.mode-cockpit .ck6m-map-graticule,
+        body.mode-cockpit .ck6m-map-vignette,
+        body.mode-cockpit .ck6m-map-scan {
+            border-radius: 0 !important;
+        }
+        body.mode-cockpit .ck6m-map-vignette {
+            background:
+                radial-gradient(ellipse at center, transparent 58%, rgba(1,8,23,.26) 82%, rgba(1,8,23,.72) 100%),
+                linear-gradient(90deg, rgba(1,8,23,.42), transparent 8%, transparent 92%, rgba(1,8,23,.42)) !important;
+        }
+        body.mode-cockpit .ck6m-heat-layer {
+            z-index: 9 !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+        }
+        body.mode-cockpit .ck6m-world-shell.heat-active .ck6m-heat-layer {
+            opacity: .78 !important;
+            visibility: visible !important;
+        }
+        body.mode-cockpit .ck6m-hot { display:none !important; }
+        body.mode-cockpit .ck6m-heat-dot {
+            position: absolute;
+            width: var(--sz, 8%);
+            aspect-ratio: 1 / 1;
+            left: var(--x, 50%);
+            top: var(--y, 50%);
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            pointer-events: none;
+            background:
+                radial-gradient(circle, rgba(255,0,0,.90) 0 10%, rgba(255,142,0,.82) 11% 22%, rgba(255,230,0,.70) 23% 36%, rgba(34,255,92,.42) 37% 53%, rgba(0,204,255,.20) 54% 72%, transparent 73%);
+            filter: blur(.4px) saturate(1.15);
+            box-shadow: 0 0 22px rgba(255,70,0,.30), 0 0 42px rgba(0,221,255,.10);
+        }
+        body.mode-cockpit .ck6m-heat-dot::after {
+            content: "";
+            position: absolute;
+            inset: 34%;
+            border-radius: 50%;
+            background: rgba(255,0,0,.88);
+            box-shadow: 0 0 10px rgba(255,0,0,.72);
+        }
+        body.mode-cockpit #ck-6m-map .leaflet-interactive {
+            filter: drop-shadow(0 0 8px rgba(255,216,77,.70)) !important;
+        }
+
 </style>
 </head>
 <body>
@@ -3516,7 +3794,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V9.0</div>
+    <div id="title">📡 NEURAL DX WATCHER V9.2</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -3664,6 +3942,9 @@
           <div class="ck6m-world-shell">
             <div id="ck-6m-map"></div>
 
+            <div class="ck6m-heat-layer" aria-hidden="true"></div>
+
+            <div class="ck6m-map-graticule" aria-hidden="true"></div>
             <div class="ck6m-map-scan"></div>
             <div class="ck6m-map-vignette"></div>
 
@@ -4420,42 +4701,65 @@
         }
 
         async function loadStale(days) {
+            days = parseInt(days, 10) || 30;
             // Highlight active button
             document.querySelectorAll('.purge-day-btn').forEach(b => {
-                b.style.background = parseInt(b.dataset.days) === days
-                    ? 'rgba(255,80,80,0.25)' : '#111';
-                b.style.borderColor = parseInt(b.dataset.days) === days ? '#ff4444' : '#333';
-                b.style.color = parseInt(b.dataset.days) === days ? '#ff8888' : '#666';
+                const active = parseInt(b.dataset.days, 10) === days;
+                b.style.background = active ? 'rgba(255,80,80,0.25)' : '#111';
+                b.style.borderColor = active ? '#ff4444' : '#333';
+                b.style.color = active ? '#ff8888' : '#666';
             });
             const list = document.getElementById('purge-list');
             list.innerHTML = '<div style="padding:20px;text-align:center;color:#555;">Chargement…</div>';
-            document.getElementById('purge-status').textContent = '—';
+            document.getElementById('purge-status').textContent = 'Filtre inactifs ≥ ' + days + ' jours';
             document.getElementById('purge-confirm-btn').disabled = true;
 
             try {
-                const r = await fetch('/api/watchlist/stale?days=' + days);
+                const url = '/api/watchlist/stale?days=' + encodeURIComponent(days) + '&_=' + Date.now();
+                const r = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
                 const data = await r.json();
-                purgeStaleList = data.stale || [];
+                let raw = data.stale || data.calls || data.items || [];
+                if (!Array.isArray(raw)) raw = Object.values(raw);
+
+                const now = Date.now();
+                const items = raw.map(x => {
+                    if (typeof x === 'string') return { call: x.toUpperCase(), days: null, raw: x };
+                    const call = String(x.call || x.callsign || x.dx_call || '').toUpperCase();
+                    const last = x.last_seen_utc || x.last_seen || x.utc || x.time || null;
+                    const ts = last ? Date.parse(last) : NaN;
+                    const ageDays = Number.isFinite(ts) ? Math.floor((now - ts) / 86400000) : (Number(x.days_inactive || x.age_days || x.days) || null);
+                    return { call, days: ageDays, raw: x };
+                }).filter(x => x.call);
+
+                // Si l'API renvoie les âges, on refiltre côté navigateur pour garantir que les boutons 7/14/30/60 changent vraiment la liste.
+                const filtered = items.some(x => x.days !== null)
+                    ? items.filter(x => x.days === null || x.days >= days)
+                    : items;
+
+                filtered.sort((a,b) => (b.days ?? -1) - (a.days ?? -1) || a.call.localeCompare(b.call));
+                purgeStaleList = filtered.map(x => x.call);
 
                 if (!purgeStaleList.length) {
                     list.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-style:italic;">Aucun call inactif depuis ' + days + ' jours 🎉</div>';
-                    document.getElementById('purge-status').textContent = 'Rien à purger';
+                    document.getElementById('purge-status').textContent = '0 call · filtre ≥ ' + days + ' jours';
                     return;
                 }
 
-                list.innerHTML = purgeStaleList.map(call =>
+                list.innerHTML = filtered.map(item =>
                     '<label class="purge-item">' +
-                    '<input type="checkbox" class="purge-cb" value="' + call + '" checked>' +
-                    '<span>' + call + '</span>' +
+                    '<input type="checkbox" class="purge-cb" value="' + item.call + '" checked>' +
+                    '<span>' + item.call + (item.days !== null ? ' <small style="opacity:.55;">' + item.days + 'j</small>' : '') + '</span>' +
                     '</label>'
                 ).join('');
 
-                // Update status on checkbox change
-                list.addEventListener('change', updatePurgeStatus);
+                list.onchange = updatePurgeStatus;
                 updatePurgeStatus();
 
             } catch(e) {
+                console.error('Purge stale load failed:', e);
                 list.innerHTML = '<div style="padding:20px;text-align:center;color:#ff4444;">Erreur de chargement</div>';
+                document.getElementById('purge-status').textContent = 'Erreur filtre purge';
             }
         }
 
@@ -4991,7 +5295,7 @@
 
             // Save theme before smart/cockpit
             if (prev === 'classic') {
-                const cur = document.body.getAttribute('data-theme') || 'softtech';
+                const cur = document.body.getAttribute('data-theme') || 'cockpit';
                 if (cur !== 'smart') localStorage.setItem('prevTheme', cur);
             }
 
@@ -5024,10 +5328,9 @@
                 setTimeout(refreshCockpitLayoutAfterDrag, 1100);
             } else {
                 document.body.classList.add('mode-classic');
-                const prev2 = localStorage.getItem('prevTheme') || 'softtech';
-                document.body.setAttribute('data-theme', prev2);
-                document.documentElement.setAttribute('data-theme', prev2);
-                localStorage.setItem('theme', prev2);
+                document.body.setAttribute('data-theme', 'cockpit');
+                document.documentElement.setAttribute('data-theme', 'cockpit');
+                localStorage.setItem('theme', 'cockpit');
             }
         }
 
@@ -5170,7 +5473,7 @@
             initCockpitHeatmapMap();
             if (!cockpitHeatmapMap || !cockpitHeatmapLayer) return;
             cockpitHeatmapLayer.clearLayers();
-            const usable = (spots || []).filter(s => s.lat && s.lon && !isNaN(s.lat) && !isNaN(s.lon));
+            const usable = (spots || []).filter(s => Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon)));
             const groups = new Map();
             usable.forEach(s => {
                 const lat = Math.round(Number(s.lat) * 2) / 2;
@@ -5252,7 +5555,7 @@
             initCockpit6mMap();
             if (!cockpit6mMap || !cockpit6mLayer) return;
             cockpit6mLayer.clearLayers();
-            const mapped = (spots6m || []).filter(s => s.lat && s.lon && !isNaN(s.lat) && !isNaN(s.lon)).slice(0, 24);
+            const mapped = (spots6m || []).filter(s => Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon))).slice(0, 24);
             mapped.forEach((s, idx) => {
                 const dist = Number(s.distance_km) || 0;
                 const col = dist >= 9000 ? '#6dfc6d' : dist >= 4500 ? '#ffb020' : '#22d3ee';
@@ -5402,6 +5705,30 @@
             }).join('');
         }
 
+
+        function render6mHeatLayer(mappedSpots) {
+            const layer = document.querySelector('.ck6m-heat-layer');
+            const shell = document.querySelector('.ck6m-world-shell');
+            if (!layer || !shell) return;
+            const valid = (mappedSpots || [])
+                .filter(s => s && Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon)))
+                .slice(0, 12);
+            layer.innerHTML = '';
+            shell.classList.toggle('heat-active', valid.length > 0);
+            if (!valid.length) return;
+            layer.innerHTML = valid.map(s => {
+                const lat = Math.max(-85, Math.min(85, Number(s.lat)));
+                const lon = Math.max(-180, Math.min(180, Number(s.lon)));
+                const x = ((lon + 180) / 360) * 100;
+                const y = ((90 - lat) / 180) * 100;
+                const spd = Math.max(0, Math.min(100, Number(s.spd || s.score || 50)));
+                const km = Math.max(0, Number(s.distance_km) || 0);
+                const size = Math.max(6, Math.min(14, 6 + spd / 14 + km / 3500));
+                const title = String(s.dx_call || 'DX').replace(/"/g, '&quot;');
+                return '<span class="ck6m-heat-dot" title="' + title + '" style="--x:' + x.toFixed(2) + '%;--y:' + y.toFixed(2) + '%;--sz:' + size.toFixed(1) + '%"></span>';
+            }).join('');
+        }
+
         function render6mGauge(allSpots, recentByBand) {
             const spots6m = (allSpots || []).filter(s => (s.band||'').toLowerCase() === '6m');
             const total6m = spots6m.length;
@@ -5427,6 +5754,9 @@
             if (strengthFill) strengthFill.style.width = pct + '%';
             if (liveLabel) liveLabel.textContent = total6m ? 'ACTIVE' : 'IDLE';
 
+            // v6: les halos ne sont plus prédéfinis. Ils sont générés uniquement à partir des vrais spots 6 m mappables.
+            render6mHeatLayer(spots6m);
+
             let statusText, statusColor;
             if (pct >= 80) { statusText = 'EXCELLENT'; statusColor = '#6dfc6d'; }
             else if (pct >= 55) { statusText = 'STRONG'; statusColor = '#95f84b'; }
@@ -5449,14 +5779,14 @@
 
             // hotspot tags + mini map
             const el6m = document.getElementById('ck-6m-spots');
-            const mapped = spots6m.filter(s => s.lat && s.lon && !isNaN(s.lat) && !isNaN(s.lon))
+            const mapped = spots6m.filter(s => Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon)))
                                  .sort((a,b) => (Number(b.distance_km)||0) - (Number(a.distance_km)||0));
             const hotspotList = document.getElementById('ck-6m-hotspot-list');
             const zoneNames = ['EUROPE', 'EAST COAST NA', 'JAPAN / ASIA', 'AUSTRALIA'];
             const zoneStatus = ['VERY HIGH', 'HIGH', 'HIGH', 'MEDIUM'];
             if (el6m) {
                 if (!mapped.length) {
-                    el6m.innerHTML = '<span class="ck-6m-tag" style="--dot:#7dd3fc;">No hotspot</span>';
+                    el6m.innerHTML = '<span class="ck-6m-tag" style="--dot:#334155;opacity:.65;">No active hotspot</span>';
                 } else {
                     el6m.innerHTML = mapped.slice(0,5).map(s => {
                         const col = (Number(s.distance_km)||0) >= 9000 ? '#6dfc6d' : (Number(s.distance_km)||0) >= 4500 ? '#ffd84d' : '#22d3ee';
@@ -6199,20 +6529,15 @@
         }
 
         function toggleTheme() {
-            const themes = ['light','dark','matrix','softtech'];
-            const currentTheme = document.body.getAttribute('data-theme') || 'softtech';
-            const currentIndex = themes.indexOf(currentTheme);
-            const nextIndex = (currentIndex + 1) % themes.length;
-            const newTheme = themes[nextIndex];
-
-            document.body.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
+            // Thème cockpit unifié v9.2 — plus de cycle
+            document.body.setAttribute('data-theme', 'cockpit');
+            localStorage.setItem('theme', 'cockpit');
             initThemeDisplay();
             updateChartColors();
         }
 
         function initThemeDisplay() {
-            const savedTheme = localStorage.getItem('theme') || 'softtech';
+            const savedTheme = 'cockpit'; // v9.2 thème unifié
             document.body.setAttribute('data-theme', savedTheme);
 
             let displayName;
@@ -6346,7 +6671,7 @@
 
              // Init 3-state mode
              {
-                 const cur = document.body.getAttribute('data-theme') || 'softtech';
+                 const cur = document.body.getAttribute('data-theme') || 'cockpit';
                  if (cur !== 'smart') localStorage.setItem('prevTheme', cur);
              }
              setMode(currentMode);
@@ -7769,6 +8094,242 @@ fetch('/api/check_update')
       return result;
     };
   }
+})();
+</script>
+
+
+<script>
+/* ===== PATCH COCKPIT v4 — VOACAP auto-rendu + recalage carte ===== */
+(function(){
+  function safeNum(v, fb) {
+    if (v === null || v === undefined || v === '') return fb;
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    const m = String(v).replace(',', '.').match(/-?\d+(?:\.\d+)?/);
+    if (!m) return fb;
+    const n = Number(m[0]);
+    return Number.isFinite(n) ? n : fb;
+  }
+
+  window.drawCockpitVoacapCanvas = function(zone, solar) {
+    const canvas = document.getElementById('ck-voacap-canvas');
+    const meta = document.getElementById('ck-voacap-meta');
+    if (!canvas) return;
+    const parent = canvas.parentElement || canvas.closest('.ck-panel');
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(235, Math.floor((parent && parent.clientWidth) ? parent.clientWidth - 4 : 320));
+    const h = 235;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = '100%';
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+    const z = zone || 'EU';
+    const sfi = safeNum(solar && (solar.sfi ?? solar.SFI), 142);
+    const kp = safeNum(solar && (solar.kp ?? solar.k ?? solar.k_index), 2);
+    const off = ({EU:.12, NA:.04, AS:.00, OC:-.05, SA:.05, AF:.06})[z] || 0;
+    const base = Math.max(.06, Math.min(.95, (sfi - 72) / 132 - Math.max(0, kp - 2) * .075 + off));
+
+    const bg = ctx.createLinearGradient(0,0,0,h);
+    bg.addColorStop(0,'#061a33'); bg.addColorStop(1,'#020817');
+    ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
+
+    ctx.strokeStyle='rgba(125,211,252,.10)'; ctx.lineWidth=1;
+    for(let x=34;x<w-10;x+=Math.max(26,(w-48)/6)){ctx.beginPath();ctx.moveTo(x,30);ctx.lineTo(x,h-32);ctx.stroke();}
+    for(let y=44;y<h-40;y+=35){ctx.beginPath();ctx.moveTo(32,y);ctx.lineTo(w-10,y);ctx.stroke();}
+
+    ctx.font="12px 'Share Tech Mono', monospace"; ctx.fillStyle='#7dd3fc';
+    ctx.fillText('6 m propagation probability · ' + z, 10, 18);
+    const bands=['50MHz','70MHz','144MHz','432MHz'];
+    const hrs=['06z','09z','12z','15z','18z','21z'];
+    const left=38, top=40, right=12, cellW=(w-left-right)/6, cellH=29, gap=7;
+    ctx.fillStyle='#88a6c8'; ctx.font="11px 'Share Tech Mono', monospace";
+    bands.forEach((b,i)=>ctx.fillText(b,4,top+19+i*(cellH+gap)));
+    hrs.forEach((hr,i)=>ctx.fillText(hr,left+5+i*cellW,h-10));
+
+    for(let r=0;r<4;r++){
+      for(let c=0;c<6;c++){
+        const diurnal=Math.sin((c/5)*Math.PI);
+        const penalty=[0,.25,.43,.60][r];
+        const rel=Math.max(.02,Math.min(.98,base*(.50+diurnal*.58)-penalty));
+        let color = rel>.72 ? [34,220,110] : rel>.48 ? [245,190,40] : rel>.25 ? [45,150,255] : [210,225,240];
+        const x=left+c*cellW, y=top+r*(cellH+gap), cw=Math.max(22,cellW-6);
+        ctx.fillStyle=`rgba(${color[0]},${color[1]},${color[2]},${rel>.25 ? .82 : .88})`;
+        ctx.fillRect(x,y,cw,cellH);
+        ctx.strokeStyle= rel>.25 ? 'rgba(255,255,255,.13)' : 'rgba(180,200,220,.55)';
+        ctx.strokeRect(x+.5,y+.5,cw-1,cellH-1);
+        ctx.fillStyle= rel>.45 ? '#031329' : '#59677a';
+        ctx.font="bold 10px 'Share Tech Mono', monospace"; ctx.textAlign='center';
+        ctx.fillText(Math.round(rel*100)+'%',x+cw/2,y+19); ctx.textAlign='left';
+      }
+    }
+    if(meta) meta.textContent='Zone '+z+' · SFI '+sfi+' · Kp '+kp.toFixed(1)+' · generated locally';
+  };
+
+  window.loadCockpitVoacap = async function(zone) {
+    window.ckVoacapZone = zone || window.ckVoacapZone || localStorage.getItem('ck_voacap_zone') || 'EU';
+    localStorage.setItem('ck_voacap_zone', window.ckVoacapZone);
+    document.querySelectorAll('[data-ckzone]').forEach(btn => {
+      const active = btn.dataset.ckzone === window.ckVoacapZone;
+      btn.style.background = active ? 'rgba(0,243,255,.18)' : 'rgba(0,0,0,.3)';
+      btn.style.borderColor = active ? 'rgba(0,243,255,.55)' : '#333';
+      btn.style.color = active ? 'var(--accent)' : '#556';
+    });
+    let solar={sfi:142,kp:2};
+    try { const r=await fetch('/api/solar.json',{cache:'no-store'}); if(r.ok) solar=await r.json(); } catch(e) {}
+    window.drawCockpitVoacapCanvas(window.ckVoacapZone, solar);
+  };
+
+  function repaintCockpitV4(){
+    if(!document.body.classList.contains('mode-cockpit')) return;
+    window.loadCockpitVoacap(window.ckVoacapZone || localStorage.getItem('ck_voacap_zone') || 'EU');
+    ['cockpit6mMap','ck6mMap'].forEach(n=>{ try{ if(window[n] && window[n].invalidateSize) window[n].invalidateSize(true); }catch(e){} });
+  }
+  window.addEventListener('resize', () => setTimeout(repaintCockpitV4,80));
+  document.addEventListener('DOMContentLoaded', () => { [200,700,1400,2600].forEach(t=>setTimeout(repaintCockpitV4,t)); });
+  const prevSetMode = window.setMode;
+  if (typeof prevSetMode === 'function') {
+    window.setMode = function(mode){ const r = prevSetMode.apply(this, arguments); if(mode==='cockpit') [120,500,1200].forEach(t=>setTimeout(repaintCockpitV4,t)); return r; };
+  }
+})();
+
+
+/* ===== PATCH COCKPIT v7 — zéro halo artificiel, marqueurs propres ===== */
+(function(){
+  window.render6mHeatLayer = function(mappedSpots){
+    const layer = document.querySelector('.ck6m-heat-layer');
+    const shell = document.querySelector('.ck6m-world-shell');
+    if (layer) layer.innerHTML = '';
+    if (shell) shell.classList.remove('heat-active');
+  };
+
+  window.updateCockpit6mMap = function(spots6m){
+    initCockpit6mMap();
+    if (!cockpit6mMap || !cockpit6mLayer) return;
+    cockpit6mLayer.clearLayers();
+    const mapped = (spots6m || [])
+      .filter(s => Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon)))
+      .slice(0, 24);
+
+    mapped.forEach((s) => {
+      const dist = Number(s.distance_km) || 0;
+      const mode = (s.mode || '').toUpperCase();
+      const call = (s.dx_call || 'DX').toUpperCase();
+      const col = dist >= 9000 ? '#7dffac' : dist >= 4500 ? '#ffd84d' : '#42e6ff';
+      const safeCall = call.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+      const safeMode = mode.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+      const icon = L.divIcon({
+        className: 'ck6m-clean-marker',
+        html: '<span class="ck6m-clean-dot" style="background:'+col+';box-shadow:0 0 10px '+col+'"></span>' +
+              '<span class="ck6m-clean-label">'+safeCall+(safeMode ? ' · '+safeMode : '')+'</span>',
+        iconSize: [120, 24],
+        iconAnchor: [10, 10]
+      });
+      const m = L.marker([Number(s.lat), Number(s.lon)], { icon }).bindPopup(
+        '<b>' + safeCall + '</b><br>' + (s.freq || '') + ' · ' + safeMode + '<br>' + (dist ? Math.round(dist) + ' km' : '')
+      );
+      cockpit6mLayer.addLayer(m);
+    });
+
+    try {
+      if (mapped.length) cockpit6mMap.fitBounds(cockpit6mLayer.getBounds().pad(0.25));
+      else cockpit6mMap.setView(userLatLng, 2);
+      cockpit6mMap.invalidateSize();
+      setTimeout(() => { try { cockpit6mMap.invalidateSize(); } catch(e){} }, 180);
+    } catch(e) {}
+  };
+
+  function parseAnyDate(value){
+    if (!value) return NaN;
+    if (typeof value === 'number') return value > 100000000000 ? value : value * 1000;
+    const str = String(value).trim();
+    let t = Date.parse(str);
+    if (Number.isFinite(t)) return t;
+    // Cas fréquent : HH:MM ou HH:MM:SS UTC sans date -> aujourd'hui UTC.
+    const m = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (m) {
+      const d = new Date();
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), Number(m[1]), Number(m[2]), Number(m[3]||0));
+    }
+    return NaN;
+  }
+
+  async function fetchWatchlistCalls(){
+    if (window.watchlist && watchlist.size) return Array.from(watchlist).map(c => String(c).toUpperCase());
+    const r = await fetch('/watchlist.json?_=' + Date.now(), {cache:'no-store'});
+    const data = await r.json();
+    const arr = Array.isArray(data) ? data : (data.calls || data.watchlist || []);
+    return arr.map(c => String(c.call || c.callsign || c).toUpperCase()).filter(Boolean);
+  }
+
+  async function getLastSeenForCall(call){
+    try {
+      const r = await fetch('/api/watchlist/tracking.json?limit=1&q=' + encodeURIComponent(call) + '&_=' + Date.now(), {cache:'no-store'});
+      if (!r.ok) return null;
+      const data = await r.json();
+      const calls = data.calls || {};
+      const key = Object.keys(calls).find(k => k.toUpperCase() === call.toUpperCase()) || Object.keys(calls)[0];
+      const spots = key ? (calls[key] || []) : [];
+      const s = spots[0];
+      if (!s) return null;
+      const t = parseAnyDate(s.utc || s.time || s.last_seen_utc || s.last_seen || s.timestamp);
+      return Number.isFinite(t) ? t : null;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  window.loadStale = async function(days){
+    days = parseInt(days, 10) || 30;
+    document.querySelectorAll('.purge-day-btn').forEach(b => {
+      const active = parseInt(b.dataset.days, 10) === days;
+      b.style.background = active ? 'rgba(255,80,80,0.25)' : '#111';
+      b.style.borderColor = active ? '#ff4444' : '#333';
+      b.style.color = active ? '#ff8888' : '#666';
+    });
+
+    const list = document.getElementById('purge-list');
+    const status = document.getElementById('purge-status');
+    const btn = document.getElementById('purge-confirm-btn');
+    if (!list || !status || !btn) return;
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#555;">Analyse watchlist…</div>';
+    status.textContent = 'Calcul local des inactifs ≥ ' + days + ' jours';
+    btn.disabled = true;
+
+    try {
+      const calls = await fetchWatchlistCalls();
+      const now = Date.now();
+      const results = [];
+      for (let i = 0; i < calls.length; i++) {
+        const call = calls[i];
+        status.textContent = 'Analyse ' + (i+1) + ' / ' + calls.length + ' · filtre ≥ ' + days + ' jours';
+        const last = await getLastSeenForCall(call);
+        const ageDays = last ? Math.floor((now - last) / 86400000) : 99999;
+        if (ageDays >= days) results.push({call, days: ageDays, never: !last});
+      }
+      results.sort((a,b) => (b.days - a.days) || a.call.localeCompare(b.call));
+      window.purgeStaleList = results.map(x => x.call);
+
+      if (!results.length) {
+        list.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-style:italic;">Aucun call inactif depuis ' + days + ' jours 🎉</div>';
+        status.textContent = '0 call · filtre ≥ ' + days + ' jours';
+        return;
+      }
+      list.innerHTML = results.map(item =>
+        '<label class="purge-item">' +
+        '<input type="checkbox" class="purge-cb" value="' + item.call + '" checked>' +
+        '<span>' + item.call + ' <small style="opacity:.55;">' + (item.never ? 'jamais vu' : item.days + 'j') + '</small></span>' +
+        '</label>'
+      ).join('');
+      list.onchange = updatePurgeStatus;
+      updatePurgeStatus();
+    } catch(e) {
+      console.error('Purge locale impossible:', e);
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:#ff4444;">Erreur calcul purge watchlist</div>';
+      status.textContent = 'Erreur purge locale';
+    }
+  };
 })();
 </script>
 

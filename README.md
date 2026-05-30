@@ -1,6 +1,6 @@
-# 📡 Radio Spot Watcher DX — v9.0
+# 📡 Radio Spot Watcher DX — v9.2
 
-> Désormais badgée **NEURAL DX WATCHER v9.0** dans l'interface.
+> Désormais badgée **NEURAL DX WATCHER v9.2** dans l'interface.
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -135,11 +135,27 @@ Aucune dépendance cloud.
 
 ### 🗂️ Historique des versions
 
+### v9.2 — Thème Cockpit unifié
+
+**Thème visuel unique pour tous les modes**
+
+- Le thème **Cockpit** (`#050810`, panneaux dégradés sombres, accents cyan) devient le thème par défaut de toute l'application
+- Suppression du sélecteur de thème light/dark/matrix/softtech — l'identité visuelle est désormais unique et cohérente
+- Les modes ⚡ CLASSIC et 🧠 SMART adoptent l'habillage Cockpit tout en conservant leur layout respectif
+
+**Harmonisation globale**
+
+- Inputs et selects : style terminal (fond quasi-noir, bordure cyan fine, glow au focus)
+- Boutons : bordure cyan subtile, hover coloré
+- Tables : séparateurs et hover rows en cyan très léger
+- Scrollbars : fines (5px), thumb cyan
+- Smart panel : bordures et gradients unifiés avec le mode Cockpit
+
 ### v9.0 — NEURAL DX & Mode COCKPIT 6 m
 
 **Rebranding**
 
-- L'application devient **NEURAL DX WATCHER v9.0** (titre de page et en-tête)
+- L'application devient **NEURAL DX WATCHER v9.2** (titre de page et en-tête)
 
 **Nouveau sélecteur de modes (3 modes dans le header)**
 

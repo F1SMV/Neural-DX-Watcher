@@ -1,6 +1,6 @@
-# 📡 Radio Spot Watcher DX — v9.0
+# 📡 Radio Spot Watcher DX — v9.2
 
-> Now badged **NEURAL DX WATCHER v9.0** in the interface.
+> Now badged **NEURAL DX WATCHER v9.2** in the interface.
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -135,11 +135,27 @@ No cloud dependency.
 
 ## 🗂️ Version History
 
+### v9.2 — Unified Cockpit Theme
+
+**Single visual theme across all modes**
+
+- The **Cockpit** theme (`#050810`, dark gradient panels, cyan accents) becomes the application-wide default
+- Theme selector (light/dark/matrix/softtech) removed — visual identity is now unified and consistent
+- ⚡ CLASSIC and 🧠 SMART modes adopt the Cockpit styling while keeping their respective layouts
+
+**Global harmonization**
+
+- Inputs and selects: terminal style (near-black background, subtle cyan border, glow on focus)
+- Buttons: subtle cyan border, colored hover
+- Tables: cyan-tinted separators and row hovers
+- Scrollbars: thin (5px), cyan thumb
+- Smart panel: borders and gradients unified with Cockpit mode
+
 ### v9.0 — NEURAL DX & COCKPIT 6 m mode
 
 **Rebranding**
 
-- The application becomes **NEURAL DX WATCHER v9.0** (page title and header)
+- The application becomes **NEURAL DX WATCHER v9.2** (page title and header)
 
 **New mode selector (3 modes in the header)**
 

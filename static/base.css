@@ -272,3 +272,43 @@ body.mode-cockpit #ck-voacap-canvas {
   height: 230px !important;
   min-height: 230px !important;
 }
+
+/* PATCH COCKPIT v4 fallback */
+body.mode-cockpit .ck6m-world-shell{background:#052d5c;}
+body.mode-cockpit #ck-voacap-canvas{background:#031329;}
+
+/* v6 cockpit fixes are embedded in index.html to override inline cockpit CSS safely. */
+
+
+/* PATCH v7 cockpit 6m: plus de halo/point chaud artificiel */
+body.mode-cockpit .ck6m-heat-layer,
+body.mode-cockpit .ck6m-heat-dot,
+body.mode-cockpit .ck6m-heat-dot::after {
+  display: none !important;
+  opacity: 0 !important;
+}
+body.mode-cockpit .ck6m-clean-marker {
+  pointer-events: auto;
+}
+body.mode-cockpit .ck6m-clean-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.75);
+  vertical-align: middle;
+}
+body.mode-cockpit .ck6m-clean-label {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #eaf7ff;
+  background: rgba(1, 8, 23, .78);
+  border: 1px solid rgba(125, 211, 252, .38);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(0,0,0,.30);
+}
