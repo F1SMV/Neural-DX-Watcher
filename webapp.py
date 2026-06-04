@@ -55,12 +55,17 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = "9.2"
+APP_VERSION = "9.3"
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
 SPOT_LIFETIME = 900
 SPD_THRESHOLD = 70
+
+# --- WSJT-X UDP ---
+WSJTX_UDP_PORT = 2237        # Port UDP WSJT-X (défaut)
+WSJTX_ENABLED  = True        # Mettre False pour désactiver
+WSJTX_SPOT_LIFETIME = 600    # Durée de vie d'un spot WSJT-X (10 min)
 
 
 
@@ -134,7 +139,8 @@ CLUSTERS = [
 ]
 CTY_URL = "https://www.country-files.com/cty/cty.dat"
 CTY_FILE = "cty.dat"
-WATCHLIST_FILE = "watchlist.json"
+WATCHLIST_FILE    = "watchlist.json"
+WL_ACTIVITY_FILE  = Path("data/wl_activity.json")  # Persistance dernière activité watchlist
 SOLAR_URL = "https://services.swpc.noaa.gov/text/wwv.txt"
 NOAA_KP_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"
 BRIEFING_SOURCES_FILE = Path("data/briefing_sources.json")
@@ -328,7 +334,9 @@ solar_lock = threading.Lock()
 solar_cache = {"sfi": "N/A", "a": "N/A", "k": "N/A", "kp": None, "kp_time_utc": None, "kp_a_running": None, "kp_station_count": None, "ts_utc": None}
 solar_xml_cache = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><solar><sfi>N/A</sfi><a>N/A</a><k>N/A</k><kp></kp><kp_time_utc></kp_time_utc><updated_utc></updated_utc></solar>"
 # --- END SOLAR CACHE ---
-watchlist = set()
+watchlist    = set()
+wl_activity  = {}        # {call_upper: timestamp_float} — dernier spot vu
+wl_activity_lock = threading.Lock()
 surge_bands = []
 history_30min = {band: [0] * HISTORY_SLOTS for band in HISTORY_BANDS}
 history_lock = threading.Lock()
@@ -424,6 +432,32 @@ def is_meteor_shower_active():
     return False, None
 
 # --- Watchlist ---
+def load_wl_activity():
+    """Charge l'historique d'activité de la watchlist depuis le disque."""
+    global wl_activity
+    try:
+        if WL_ACTIVITY_FILE.exists():
+            with open(WL_ACTIVITY_FILE, "r") as f:
+                data = json.load(f)
+            with wl_activity_lock:
+                wl_activity = {k.upper(): float(v) for k, v in data.items()}
+            logger.info(f"WL activity chargée: {len(wl_activity)} calls")
+    except Exception as e:
+        logger.warning(f"Impossible de charger wl_activity: {e}")
+
+
+def save_wl_activity():
+    """Sauvegarde l'historique d'activité de la watchlist sur le disque."""
+    try:
+        WL_ACTIVITY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with wl_activity_lock:
+            data = dict(wl_activity)
+        with open(WL_ACTIVITY_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.warning(f"Impossible de sauvegarder wl_activity: {e}")
+
+
 def load_watchlist():
     global watchlist
     if os.path.exists(WATCHLIST_FILE):
@@ -441,6 +475,7 @@ def save_watchlist():
         with open(WATCHLIST_FILE, "w") as f:
             json.dump(sorted(list(watchlist)), f, indent=2)
         logger.info(f"Watchlist sauvegardée avec {len(watchlist)} indicatifs.")
+        save_wl_activity()   # sync l'activité avec la nouvelle watchlist
     except Exception as e:
         logger.error(f"Impossible de sauvegarder la Watchlist: {e}")
 
@@ -799,6 +834,7 @@ def history_maintenance_worker():
 
         logger.debug(f"Prochaine rotation dans {seconds_until_next_slot} secondes.")
         time.sleep(seconds_until_next_slot + 5)
+        save_wl_activity()   # persister l'activité watchlist toutes les 30 min
 
         with history_lock:
             for band in HISTORY_BANDS:
@@ -959,6 +995,11 @@ def telnet_worker():
                             "spot_id": spot_id # Ajout de l'ID
                         }
                         spots_buffer.append(spot_obj)
+                        # Mettre à jour l'activité watchlist si le call est suivi
+                        _dx = spot_obj.get("dx_call", "").upper()
+                        if _dx and _dx in watchlist:
+                            with wl_activity_lock:
+                                wl_activity[_dx] = spot_obj.get("timestamp", time.time())
                         # Tracking Watchlist: petit historique RAM (léger, filtrable)
                         try:
                             with spot_history_lock:
@@ -1391,12 +1432,43 @@ def purge_watchlist():
 def watchlist_stale():
     days = int(request.args.get("days", 30))
     since = time.time() - days * 86400
-    seen = set()
+    now   = time.time()
+
+    # Source 1 : wl_activity (persisté sur disque, survit aux redémarrages)
+    with wl_activity_lock:
+        activity = dict(wl_activity)
+
+    # Source 2 : spots_buffer récents (complète wl_activity pour la session courante)
     for s in spots_buffer:
-        if s.get("timestamp", 0) >= since:
-            seen.add(s.get("dx_call", "").upper())
-    stale = sorted([x for x in watchlist if x not in seen])
-    return jsonify({"stale": stale, "days": days, "total": len(stale)})
+        call = s.get("dx_call", "").upper()
+        ts   = s.get("timestamp", 0)
+        if call in [x.upper() for x in watchlist]:
+            if call not in activity or ts > activity.get(call, 0):
+                activity[call] = ts
+
+    stale_items = []
+    for x in sorted(watchlist):
+        call   = x.upper()
+        last_ts = activity.get(call)
+
+        if last_ts:
+            age_days = int((now - last_ts) / 86400)
+            last_seen_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(last_ts))
+        else:
+            # Jamais vu depuis le démarrage — considéré inactif depuis longtemps
+            age_days      = 9999
+            last_seen_utc = None
+
+        # Inclure dans la liste stale seulement si inactif >= days
+        if age_days >= days:
+            stale_items.append({
+                "call":          x,
+                "days_inactive": age_days if age_days < 9999 else None,
+                "last_seen_utc": last_seen_utc,
+            })
+
+    stale_items.sort(key=lambda o: (-(o["days_inactive"] or 9999), o["call"]))
+    return jsonify({"stale": stale_items, "days": days, "total": len(stale_items)})
 
 @app.get("/api/watchlist/tracking.json")
 def api_watchlist_tracking():
@@ -2647,6 +2719,482 @@ briefing_cache = {
     "ts": 0.0,
     "payload": None,
 }
+
+# ═══════════════════════════════════════════════════════════
+# WSJT-X UDP WORKER — Écoute le flux UDP WSJT-X sur le réseau
+# Protocol: https://sourceforge.net/p/wsjt/wsjtx/ci/master/tree/Network/NetworkMessage.hpp
+# ═══════════════════════════════════════════════════════════
+
+import socket
+import struct
+
+# État WSJT-X partagé (thread-safe via lock)
+wsjtx_lock = threading.Lock()
+wsjtx_state = {
+    "connected":    False,          # Heartbeat reçu récemment
+    "last_seen":    0.0,            # Timestamp dernier message
+    "dial_freq":    None,           # Fréquence VFO en Hz
+    "mode":         None,           # Mode actif (FT8, FT4, …)
+    "dx_call":      "",             # DXCall courant dans WSJT-X
+    "tx_enabled":   False,          # TX activé
+    "decoding":     False,          # Décodage en cours
+    "version":      "",             # Version WSJT-X
+    "last_decode":  None,           # Dernier décodage (dict)
+    "session_spots": 0,             # Spots injectés cette session
+}
+
+# Buffer spécifique spots WSJT-X (pour affichage dédié)
+wsjtx_spots = deque(maxlen=200)
+
+# ── Constantes message type WSJT-X ──
+WSJTX_MAGIC   = 0xadbccbda
+WSJTX_SCHEMA  = 2
+MSG_HEARTBEAT = 0
+MSG_STATUS    = 1
+MSG_DECODE    = 2
+MSG_CLEAR     = 3
+MSG_REPLY     = 4
+MSG_QSOLOG    = 5
+MSG_CLOSE     = 6
+MSG_REPLAY    = 7
+MSG_HALT      = 8
+MSG_FREETEXT  = 9
+
+
+def _wsjtx_read_utf8(data, offset):
+    """Lit une QString Qt (uint32 length + bytes) depuis data[offset]."""
+    if offset + 4 > len(data):
+        return "", offset + 4
+    length = struct.unpack_from(">I", data, offset)[0]
+    offset += 4
+    if length == 0xFFFFFFFF:   # null QString
+        return "", offset
+    if offset + length > len(data):
+        return "", offset + length
+    text = data[offset:offset + length].decode("utf-8", errors="replace")
+    return text, offset + length
+
+
+def _wsjtx_read_bool(data, offset):
+    if offset >= len(data):
+        return False, offset + 1
+    return bool(data[offset]), offset + 1
+
+
+def _wsjtx_read_uint8(data, offset):
+    if offset >= len(data):
+        return 0, offset + 1
+    return data[offset], offset + 1
+
+
+def _wsjtx_read_uint32(data, offset):
+    if offset + 4 > len(data):
+        return 0, offset + 4
+    return struct.unpack_from(">I", data, offset)[0], offset + 4
+
+
+def _wsjtx_read_int32(data, offset):
+    if offset + 4 > len(data):
+        return 0, offset + 4
+    return struct.unpack_from(">i", data, offset)[0], offset + 4
+
+
+def _wsjtx_read_uint64(data, offset):
+    if offset + 8 > len(data):
+        return 0, offset + 8
+    return struct.unpack_from(">Q", data, offset)[0], offset + 8
+
+
+def _wsjtx_read_double(data, offset):
+    if offset + 8 > len(data):
+        return 0.0, offset + 8
+    return struct.unpack_from(">d", data, offset)[0], offset + 8
+
+
+def _wsjtx_parse_header(data):
+    """Retourne (magic, schema, msg_type, id_str, next_offset) ou None."""
+    if len(data) < 8:
+        return None
+    magic, schema = struct.unpack_from(">II", data, 0)
+    if magic != WSJTX_MAGIC:
+        return None
+    msg_type, offset = _wsjtx_read_uint32(data, 8)
+    id_str, offset = _wsjtx_read_utf8(data, offset)
+    return magic, schema, msg_type, id_str, offset
+
+
+def _wsjtx_parse_heartbeat(data, offset):
+    """MSG_HEARTBEAT : max_schema(uint32) + version(utf8) + revision(utf8)"""
+    max_schema, offset = _wsjtx_read_uint32(data, offset)
+    version, offset   = _wsjtx_read_utf8(data, offset)
+    revision, offset  = _wsjtx_read_utf8(data, offset)
+    return {"max_schema": max_schema, "version": version, "revision": revision}
+
+
+def _wsjtx_parse_status(data, offset):
+    """MSG_STATUS — état complet de la radio."""
+    dial_freq, offset  = _wsjtx_read_uint64(data, offset)
+    mode, offset       = _wsjtx_read_utf8(data, offset)
+    dx_call, offset    = _wsjtx_read_utf8(data, offset)
+    report, offset     = _wsjtx_read_utf8(data, offset)
+    tx_mode, offset    = _wsjtx_read_utf8(data, offset)
+    tx_enabled, offset = _wsjtx_read_bool(data, offset)
+    transmitting, offset = _wsjtx_read_bool(data, offset)
+    decoding, offset   = _wsjtx_read_bool(data, offset)
+    return {
+        "dial_freq":    dial_freq,
+        "mode":         mode,
+        "dx_call":      dx_call,
+        "tx_enabled":   tx_enabled,
+        "transmitting": transmitting,
+        "decoding":     decoding,
+    }
+
+
+def _wsjtx_parse_decode(data, offset):
+    """MSG_DECODE — un décodage FT8/FT4/JT65/…"""
+    is_new,  offset = _wsjtx_read_bool(data, offset)
+    time_ms, offset = _wsjtx_read_uint32(data, offset)   # ms depuis minuit UTC
+    snr,     offset = _wsjtx_read_int32(data, offset)
+    dt,      offset = _wsjtx_read_double(data, offset)
+    delta_f, offset = _wsjtx_read_uint32(data, offset)   # Hz
+    mode,    offset = _wsjtx_read_utf8(data, offset)
+    message, offset = _wsjtx_read_utf8(data, offset)
+    low_conf,offset = _wsjtx_read_bool(data, offset)
+    return {
+        "is_new":   is_new,
+        "time_ms":  time_ms,
+        "snr":      snr,
+        "dt":       dt,
+        "delta_f":  delta_f,
+        "mode":     mode,
+        "message":  message,
+        "low_conf": low_conf,
+    }
+
+
+def _wsjtx_parse_qsolog(data, offset):
+    """MSG_QSOLOG — QSO loggé."""
+    # time_off (QDateTime = uint64 julian day + uint32 ms + uint8 tz)
+    jd,     offset = _wsjtx_read_uint64(data, offset)
+    ms_day, offset = _wsjtx_read_uint32(data, offset)
+    tz,     offset = _wsjtx_read_uint8(data, offset)
+    dx_call,offset = _wsjtx_read_utf8(data, offset)
+    mode,   offset = _wsjtx_read_utf8(data, offset)
+    report_sent, offset = _wsjtx_read_utf8(data, offset)
+    report_rcvd, offset = _wsjtx_read_utf8(data, offset)
+    tx_power,    offset = _wsjtx_read_utf8(data, offset)
+    comments,    offset = _wsjtx_read_utf8(data, offset)
+    name,        offset = _wsjtx_read_utf8(data, offset)
+    return {
+        "dx_call":      dx_call,
+        "mode":         mode,
+        "report_sent":  report_sent,
+        "report_rcvd":  report_rcvd,
+        "comments":     comments,
+    }
+
+
+def _maidenhead_to_latlon(grid):
+    """Convertit un locator Maidenhead (4 ou 6 caractères) en (lat, lon) centre de la case."""
+    grid = grid.strip().upper()
+    if len(grid) < 4:
+        return None, None
+    try:
+        # Paire de chiffres 1 : champs (A-R)
+        lon = (ord(grid[0]) - ord('A')) * 20 - 180
+        lat = (ord(grid[1]) - ord('A')) * 10 - 90
+        # Paire de chiffres 2 : sous-champs (0-9)
+        lon += int(grid[2]) * 2
+        lat += int(grid[3]) * 1
+        # Centre de la case 4 caractères
+        lon += 1.0
+        lat += 0.5
+        if len(grid) >= 6:
+            # Paire de chiffres 3 : cases (A-X)
+            lon += (ord(grid[4]) - ord('A')) * (2 / 24) - (2 / 24) * 12
+            lat += (ord(grid[5]) - ord('A')) * (1 / 24) - (1 / 24) * 12
+            # Centre de la case 6 caractères
+            lon += 1 / 24
+            lat += 0.5 / 24
+        return round(lat, 4), round(lon, 4)
+    except Exception:
+        return None, None
+
+
+def _wsjtx_extract_locator(msg):
+    """Extrait le locator Maidenhead depuis un message FT8.
+    Ex: 'CQ W6GY DM04' → 'DM04'
+        'CQ DX K1JT FN20' → 'FN20'
+    """
+    import re
+    LOCATOR_RE = re.compile(r'^[A-R]{2}\d{2}([A-X]{2})?$')
+    parts = msg.strip().upper().split()
+    for p in reversed(parts):   # le locator est souvent le dernier token
+        if LOCATOR_RE.match(p):
+            return p
+    return None
+
+
+def _wsjtx_extract_callsign_from_message(msg):
+    """Extrait le callsign DX depuis un message FT8/FT4.
+    Formats supportés :
+      CQ CALL LOC       → CALL
+      CQ DX CALL LOC    → CALL
+      CQ EU CALL LOC    → CALL (modificateurs régionaux)
+      CALL1 CALL2 ...   → CALL2 (stations m'appelant)
+    """
+    import re
+    msg = msg.strip().upper()
+    parts = msg.split()
+    if not parts:
+        return None
+
+    # Pattern callsign valide (pas un locator)
+    CALL_RE  = re.compile(r'^[A-Z0-9]{1,3}[0-9][A-Z]{1,5}(/[A-Z0-9]+)?$')
+    LOCATOR  = re.compile(r'^[A-Z]{2}\d{2}([A-Z]{2})?$')
+    MODIFIER = re.compile(r'^(DX|NA|SA|EU|AS|AF|OC|AN|[A-Z]{1,2})$')
+
+    def is_call(s):
+        return bool(CALL_RE.match(s)) and not LOCATOR.match(s)
+
+    if parts[0] == 'CQ':
+        # Parcourir les tokens après CQ — ignorer les modificateurs et locators
+        for tok in parts[1:]:
+            if LOCATOR.match(tok):
+                continue
+            if MODIFIER.match(tok) and not is_call(tok):
+                continue
+            if is_call(tok):
+                return tok
+        return None
+
+    # Stations qui m'appellent : "MY_CALL THEIRCALL ..."
+    # Le 2ème token est souvent l'appelant
+    if len(parts) >= 2 and is_call(parts[1]):
+        return parts[1]
+
+    return None
+
+
+def _wsjtx_inject_spot(decode, dial_freq_hz, wsjtx_mode):
+    """Transforme un décodage WSJT-X en spot et l'injecte dans spots_buffer."""
+    msg = decode.get("message", "").strip()
+    if not msg or decode.get("low_conf"):
+        return
+
+    # Injecter uniquement :
+    # 1. CQ — stations qui cherchent un correspondant
+    # 2. Stations qui m'appellent directement (contiennent MY_CALL)
+    msg_up = msg.upper()
+    is_cq         = msg_up.startswith("CQ")
+    is_calling_me = MY_CALL.upper() in msg_up
+    if not is_cq and not is_calling_me:
+        return
+
+    dx_call = _wsjtx_extract_callsign_from_message(msg)
+    if not dx_call or len(dx_call) < 3:
+        return
+
+    # Fréquence : VFO + offset delta_f
+    freq_hz  = (dial_freq_hz or 0) + decode.get("delta_f", 0)
+    freq_khz = freq_hz / 1000.0
+    freq_str = f"{freq_khz:.1f}"
+
+    # Bande et mode
+    band, mode = get_band_and_mode_smart(freq_khz / 1000.0, wsjtx_mode or decode.get("mode", "FT8"))
+
+    # Infos géographiques — priorité au locator Maidenhead du message
+    info    = get_country_info(dx_call)
+    country = info.get("c", "Unknown")
+    locator = _wsjtx_extract_locator(msg)
+    locator_used = False
+
+    if locator:
+        loc_lat, loc_lon = _maidenhead_to_latlon(locator)
+        if loc_lat is not None and loc_lon is not None:
+            lat, lon = loc_lat, loc_lon
+            locator_used = True
+        else:
+            lat = info.get("lat", 0.0)
+            lon = info.get("lon", 0.0)
+    else:
+        lat = info.get("lat", 0.0)
+        lon = info.get("lon", 0.0)
+
+    if not lat and not lon:
+        return   # Pas de données géo
+
+    dist_km = 0.0
+    try:
+        dist_km = calculate_distance(user_lat, user_lon, lat, lon)
+    except Exception:
+        pass
+
+    spd_score = calculate_spd_score(dx_call, band, mode, msg, country, dist_km)
+    color     = BAND_COLORS.get(band, "#00f3ff")
+
+    snr = decode.get("snr", 0)
+    now = time.time()
+
+    spot_obj = {
+        "timestamp":   now,
+        "time":        time.strftime("%H:%M"),
+        "freq":        freq_str,
+        "dx_call":     dx_call,
+        "band":        band,
+        "mode":        mode,
+        "country":     country,
+        "lat":         lat,
+        "lon":         lon,
+        "score":       spd_score,
+        "is_wanted":   spd_score >= SPD_THRESHOLD,
+        "is_rare":     is_rare_prefix(dx_call),
+        "via_eme":     False,
+        "color":       color,
+        "type":        "VHF" if band in VHF_BANDS else "HF",
+        "distance_km": dist_km,
+        "spot_id":     f"{dx_call}-wsjtx-{int(now)}",
+        "source":      "WSJTX",
+        "locator":     locator or "",
+        "locator_used": locator_used,
+        "calling_me":  is_calling_me,
+        "snr":         snr,
+        "comment":     f"SNR {snr:+d}dB via WSJT-X",
+    }
+
+    # Déduplication : même call dans les 30 dernières secondes (2 périodes FT8)
+    # Vérifie les 50 derniers spots pour couvrir les sessions actives
+    with threading.Lock():
+        for s in list(wsjtx_spots)[-50:]:
+            if s.get("dx_call") == dx_call and (now - s.get("timestamp", 0)) < 30:
+                return
+
+    spots_buffer.append(spot_obj)
+    wsjtx_spots.append(spot_obj)
+    # Mettre à jour l'activité watchlist
+    _dx = spot_obj.get("dx_call", "").upper()
+    if _dx and _dx in watchlist:
+        with wl_activity_lock:
+            wl_activity[_dx] = spot_obj.get("timestamp", time.time())
+
+    with wsjtx_lock:
+        wsjtx_state["session_spots"] += 1
+
+    tag = " [⚡ CALLING ME]" if is_calling_me else ""
+    loc_tag = f" [{locator}→precise]" if locator_used else " [country centroid]"
+    logger.info(f"WSJTX SPOT{tag}: {dx_call} ({country}) {band} {mode} SNR{snr:+d}dB {freq_str}kHz{loc_tag}")
+
+
+def wsjtx_worker():
+    """Thread UDP — écoute les messages WSJT-X et les traite."""
+    threading.current_thread().name = "WSJTXWorker"
+    log = logging.getLogger(__name__)
+
+    if not WSJTX_ENABLED:
+        log.info("WSJTXWorker désactivé (WSJTX_ENABLED=False)")
+        return
+
+    sock = None
+    while True:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(("0.0.0.0", WSJTX_UDP_PORT))
+            sock.settimeout(30.0)
+            log.info(f"WSJTXWorker en écoute sur UDP:{WSJTX_UDP_PORT}")
+
+            while True:
+                try:
+                    data, addr = sock.recvfrom(65535)
+                except socket.timeout:
+                    # Vérifier si connexion perdue
+                    with wsjtx_lock:
+                        if wsjtx_state["connected"] and (time.time() - wsjtx_state["last_seen"]) > 60:
+                            wsjtx_state["connected"] = False
+                            log.info("WSJTXWorker: WSJT-X déconnecté (timeout 60s)")
+                    continue
+
+                result = _wsjtx_parse_header(data)
+                if result is None:
+                    continue
+
+                _, schema, msg_type, wsjtx_id, offset = result
+                now = time.time()
+
+                with wsjtx_lock:
+                    wsjtx_state["last_seen"] = now
+
+                if msg_type == MSG_HEARTBEAT:
+                    hb = _wsjtx_parse_heartbeat(data, offset)
+                    with wsjtx_lock:
+                        wsjtx_state["connected"] = True
+                        wsjtx_state["version"]   = hb.get("version", "")
+                    log.info(f"WSJTXWorker: Heartbeat reçu — WSJT-X {hb.get('version','')}")
+
+                elif msg_type == MSG_STATUS:
+                    st = _wsjtx_parse_status(data, offset)
+                    with wsjtx_lock:
+                        wsjtx_state["connected"]  = True
+                        wsjtx_state["dial_freq"]  = st["dial_freq"]
+                        wsjtx_state["mode"]       = st["mode"]
+                        wsjtx_state["dx_call"]    = st["dx_call"]
+                        wsjtx_state["tx_enabled"] = st["tx_enabled"]
+                        wsjtx_state["decoding"]   = st["decoding"]
+
+                elif msg_type == MSG_DECODE:
+                    dec = _wsjtx_parse_decode(data, offset)
+                    with wsjtx_lock:
+                        wsjtx_state["last_decode"] = dec
+                        dial_freq = wsjtx_state["dial_freq"]
+                        wsjtx_mode = wsjtx_state["mode"]
+                    _wsjtx_inject_spot(dec, dial_freq, wsjtx_mode)
+
+                elif msg_type == MSG_QSOLOG:
+                    qso = _wsjtx_parse_qsolog(data, offset)
+                    log.info(f"WSJTXWorker: QSO loggé — {qso.get('dx_call','?')} {qso.get('mode','?')}")
+
+                elif msg_type == MSG_CLOSE:
+                    with wsjtx_lock:
+                        wsjtx_state["connected"] = False
+                    log.info("WSJTXWorker: WSJT-X fermé (MSG_CLOSE)")
+
+        except OSError as e:
+            log.warning(f"WSJTXWorker socket error: {e}")
+            if sock:
+                try: sock.close()
+                except: pass
+            time.sleep(10)
+        except Exception as e:
+            log.error(f"WSJTXWorker erreur inattendue: {e}", exc_info=True)
+            time.sleep(15)
+
+
+# ── API WSJT-X ──────────────────────────────────────────────
+
+@app.route("/api/wsjtx/status")
+def api_wsjtx_status():
+    """Retourne l'état actuel de WSJT-X."""
+    with wsjtx_lock:
+        st = dict(wsjtx_state)
+    # Fréquence en MHz pour lisibilité
+    if st["dial_freq"]:
+        st["dial_mhz"] = round(st["dial_freq"] / 1_000_000, 6)
+    st["enabled"] = WSJTX_ENABLED
+    return jsonify(st)
+
+
+@app.route("/api/wsjtx/spots")
+def api_wsjtx_spots():
+    """Retourne les derniers spots WSJT-X (max 50)."""
+    now = time.time()
+    spots = [
+        s for s in wsjtx_spots
+        if (now - s.get("timestamp", 0)) < WSJTX_SPOT_LIFETIME
+    ]
+    spots.sort(key=lambda s: s.get("timestamp", 0), reverse=True)
+    return jsonify({"spots": spots[:50], "count": len(spots)})
+
 
 def briefing_refresh_worker():
     logger = logging.getLogger(__name__)
@@ -4019,6 +4567,7 @@ if __name__ == "__main__":
 
     logger.info(f"\n--- {APP_VERSION} ---")
     load_lotw_cache()
+    load_wl_activity()
     logger.info(f"QTH de départ: {user_qra} ({user_lat:.2f}, {user_lon:.2f})")
 
     threading.Thread(target=telnet_worker, daemon=True).start()
@@ -4026,6 +4575,7 @@ if __name__ == "__main__":
     threading.Thread(target=solar_worker, daemon=True).start()
     threading.Thread(target=history_maintenance_worker, daemon=True).start()
     threading.Thread(target=briefing_refresh_worker, daemon=True).start()
+    threading.Thread(target=wsjtx_worker, daemon=True).start()
 
     logger.info("Tous les Workers ont été démarrés. Lancement du serveur Flask...")
     app.run(host='0.0.0.0', port=WEB_PORT, debug=True, use_reloader=False)

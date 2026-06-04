@@ -1,6 +1,6 @@
-# 📡 Radio Spot Watcher DX — v9.2
+# 📡 Radio Spot Watcher DX — v9.4
 
-> Désormais badgée **NEURAL DX WATCHER v9.2** dans l'interface.
+> Désormais badgée **NEURAL DX WATCHER v9.4** dans l'interface.
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -135,6 +135,45 @@ Aucune dépendance cloud.
 
 ### 🗂️ Historique des versions
 
+### v9.4 — Intégration WSJT-X + Clustering 6m + corrections
+
+**Intégration WSJT-X UDP**
+
+- Réception du flux UDP WSJT-X en temps réel (port 2237)
+- Parser binaire complet du protocole Qt : Heartbeat, Status, Decode, QSOLog
+- Filtrage : CQ uniquement + stations appelant directement MY_CALL
+- Extraction du **locator Maidenhead** depuis le message FT8 (`CQ W6GY DM04` → coordonnées précises)
+- Conversion Maidenhead → lat/lon pour positionnement exact sur la carte (précision ±1°)
+- Déduplication 30s (2 périodes FT8) sur 50 spots — évite les doublons sans perdre les CQ répétés
+- Spots WSJT-X identifiés par `source: WSJTX`, badge orange `WSJT` + SNR dans les tableaux
+- Toggle global `📡 WSJT-X ●` dans le header — active/désactive dans tous les tableaux simultanément
+- Persisté en localStorage
+- Endpoints `/api/wsjtx/status` et `/api/wsjtx/spots`
+- Compatible Log4OM : WSJT-X → Pi (2237) pour décodages + Log4OM local (127.0.0.1:2237) pour QSOs
+
+**Clustering géographique 6m — Option C**
+
+- Algorithme de clustering géo rayon 400km sur toutes les cartes 6m
+- 5 niveaux de couleur alignés sur la légende carte :
+  - 🔵 Bleu (1 spot) → 🔵 Cyan (2) → 🟡 Jaune (3-4) → 🟠 Orange (5-7) → 🔴 Rouge (8+)
+- Halo de zone Leaflet proportionnel (150km à 500km)
+- Appliqué sur : heat dots cockpit, carte Leaflet cockpit, carte mode SMART
+
+**Purge Watchlist corrigée**
+
+- Nouveau fichier `data/wl_activity.json` — persiste la date du dernier spot par call entre redémarrages
+- Sauvegarde automatique toutes les 30 minutes
+- Les boutons 7j/14j/30j/60j filtrent maintenant correctement les calls vraiment inactifs
+- Seuls les calls inactifs depuis X jours apparaissent cochés (logique inversée corrigée)
+
+**Corrections diverses**
+
+- Palette VOACAP corrigée : rouge/orange/jaune/vert/cyan/bleu selon probabilité
+- Click sur un call dans le tableau HF → pré-remplit le pavé Spot Manuel
+- Extraction callsign FT8 réécrite : gère `CQ DX`, `CQ EU`, locators, modificateurs
+
+> v9.3 était une version de travail non publiée.
+
 ### v9.2 — Thème Cockpit unifié
 
 **Thème visuel unique pour tous les modes**
@@ -155,7 +194,7 @@ Aucune dépendance cloud.
 
 **Rebranding**
 
-- L'application devient **NEURAL DX WATCHER v9.2** (titre de page et en-tête)
+- L'application devient **NEURAL DX WATCHER v9.4** (titre de page et en-tête)
 
 **Nouveau sélecteur de modes (3 modes dans le header)**
 

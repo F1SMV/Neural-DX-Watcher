@@ -1,6 +1,6 @@
-# 📡 Radio Spot Watcher DX — v9.2
+# 📡 Radio Spot Watcher DX — v9.4
 
-> Now badged **NEURAL DX WATCHER v9.2** in the interface.
+> Now badged **NEURAL DX WATCHER v9.4** in the interface.
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -135,6 +135,41 @@ No cloud dependency.
 
 ## 🗂️ Version History
 
+### v9.4 — WSJT-X Integration + 6m Clustering + fixes
+
+**WSJT-X UDP Integration**
+
+- Real-time WSJT-X UDP stream reception (port 2237)
+- Full Qt binary protocol parser: Heartbeat, Status, Decode, QSOLog
+- Filter: CQ only + stations calling MY_CALL directly
+- **Maidenhead locator** extraction from FT8 message (`CQ W6GY DM04` → precise coordinates)
+- Maidenhead → lat/lon conversion for accurate map positioning (±1° precision)
+- 30s deduplication (2 FT8 periods) over 50 spots
+- WSJTX spots identified by orange `WSJT` badge + SNR in all tables
+- Global `📡 WSJT-X ●` toggle in header — persisted in localStorage
+- Compatible with Log4OM: WSJT-X → Pi (2237) for decodes + Log4OM local (127.0.0.1:2237) for QSOs
+
+**6m Geographic Clustering — Option C**
+
+- Geo clustering algorithm, 400km radius, applied to all 6m maps
+- 5 color levels aligned with map legend:
+  - 🔵 Blue (1 spot) → 🔵 Cyan (2) → 🟡 Yellow (3-4) → 🟠 Orange (5-7) → 🔴 Red (8+)
+- Proportional Leaflet zone halo (150km to 500km)
+
+**Watchlist Purge fixed**
+
+- New `data/wl_activity.json` file — persists last spot date per call across restarts
+- Auto-save every 30 minutes
+- 7/14/30/60-day buttons now correctly filter truly inactive calls
+
+**Various fixes**
+
+- VOACAP palette fixed: red/orange/yellow/green/cyan/blue by probability
+- Click on a call in HF table → pre-fills Spot Manuel panel
+- FT8 callsign extraction rewritten: handles `CQ DX`, `CQ EU`, locators, modifiers
+
+> v9.3 was an unpublished work-in-progress version.
+
 ### v9.2 — Unified Cockpit Theme
 
 **Single visual theme across all modes**
@@ -155,7 +190,7 @@ No cloud dependency.
 
 **Rebranding**
 
-- The application becomes **NEURAL DX WATCHER v9.2** (page title and header)
+- The application becomes **NEURAL DX WATCHER v9.4** (page title and header)
 
 **New mode selector (3 modes in the header)**
 

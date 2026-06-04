@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>📡 NEURAL DX v9.2</title>
+<title>📡 NEURAL DX v9.4</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230e0e0e'/><text y='.9em' font-size='80' x='10'>📡</text></svg>"/>
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -504,6 +504,30 @@
         }
         .spot-table td, .wl-table td {
             border-bottom: 1px solid rgba(0,243,255,0.04);
+        }
+        tr.spot-row-wsjtx td {
+            background: rgba(251,146,60,0.07) !important;
+            border-left: 3px solid #fb923c;
+        }
+        tr.spot-row-wsjtx:hover td {
+            background: rgba(251,146,60,0.12) !important;
+        }
+        .wsjtx-badge {
+            display: inline-block;
+            font-size: 0.62em;
+            padding: 1px 5px;
+            border-radius: 3px;
+            background: rgba(251,146,60,0.2);
+            border: 1px solid rgba(251,146,60,0.5);
+            color: #fb923c;
+            margin-left: 4px;
+            vertical-align: middle;
+            font-family: monospace;
+        }
+        .snr-badge {
+            font-size: 0.72em;
+            color: #fb923c;
+            margin-left: 4px;
         }
         .spot-table tr:hover td {
             background: rgba(0,243,255,0.025);
@@ -1582,12 +1606,12 @@
         .ck-spot-meta { font-size: 0.65em; color: #3a4560; }
         .ck-spot-score { font-size: 0.68em; font-family: monospace; }
         /* DX Feed */
-        #ck-feed-rows { font-family: 'Share Tech Mono', monospace; font-size: 0.78em; }
+        #ck-feed-rows { font-family: 'Share Tech Mono', monospace; font-size: 0.88em; }
         .ck-feed-row {
             display: grid;
-            grid-template-columns: 38px 72px 65px 40px 1fr;
-            gap: 0 5px;
-            padding: 3px 10px;
+            grid-template-columns: 42px 80px 72px 44px 1fr;
+            gap: 0 6px;
+            padding: 5px 12px;
             border-bottom: 1px solid rgba(255,255,255,0.02);
             align-items: center;
             transition: background .1s;
@@ -1603,9 +1627,9 @@
         .ck-fi { color: #2a3550; font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ck-feed-hdr {
             display: grid;
-            grid-template-columns: 38px 72px 65px 40px 1fr;
-            gap: 0 5px;
-            padding: 5px 10px;
+            grid-template-columns: 42px 80px 72px 44px 1fr;
+            gap: 0 6px;
+            padding: 6px 12px;
             font-size: 0.6em;
             color: #1e2840;
             text-transform: uppercase;
@@ -3794,7 +3818,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V9.2</div>
+    <div id="title">📡 NEURAL DX WATCHER V9.4</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -3838,6 +3862,12 @@
       </select>
       <button id="synth-toggle-button" onclick="toggleVoiceSynth()" title="Activer/Désactiver la synthèse vocale">🔊 VOICE ON</button>
       <button class="icon-button" onclick="toggleTheme()" title="Changer de thème">🔆</button>
+      <button id="wsjtx-global-toggle" onclick="toggleWsjtxGlobal()"
+        style="padding:4px 10px;font-size:.68em;cursor:pointer;border-radius:4px;
+               background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.5);
+               color:#fb923c;font-family:'Share Tech Mono',monospace;letter-spacing:.5px;
+               transition:all .2s;"
+        title="Afficher/masquer les décodages WSJT-X dans tous les tableaux">📡 WSJT-X ●</button>
     </div>
   </div>
 </div>
@@ -4051,10 +4081,17 @@
   <div class="ck-col" id="ck-col3">
 
     <!-- DX Spot Feed -->
-    <div class="ck-panel" data-panel-id="ck-dx-feed" style="flex:1;min-height:0;display:flex;flex-direction:column;">
+    <div class="ck-panel" data-panel-id="ck-dx-feed" style="flex:1;min-height:320px;display:flex;flex-direction:column;">
       <div class="ck-title">
         <span>DX SPOT FEED · 6 m · 20 MIN</span>
-        <span class="ck-live">LIVE</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="wsjtx-toggle" onclick="toggleWsjtxFilter()"
+            style="padding:2px 9px;font-size:.6em;cursor:pointer;border-radius:3px;
+                   background:rgba(251,146,60,.18);border:1px solid rgba(251,146,60,.5);
+                   color:#fb923c;font-family:monospace;letter-spacing:.5px;"
+            title="Afficher/masquer les spots WSJT-X">WSJT-X ●</button>
+          <span class="ck-live">LIVE</span>
+        </div>
       </div>
       <div style="overflow-y:auto;flex:1;">
         <div class="ck-feed-hdr">
@@ -4064,11 +4101,7 @@
       </div>
     </div>
 
-    <!-- Opportunités DXCC -->
-    <div class="ck-panel" data-panel-id="ck-opportunities" style="max-height:200px;display:flex;flex-direction:column;">
-      <div class="ck-title">🎯 OPPORTUNITÉS DXCC</div>
-      <div id="cockpit-opp-list" style="overflow-y:auto;flex:1;"></div>
-    </div>
+    <!-- Opportunités DXCC supprimées de col3 cockpit v9.3 -->
 
     <!-- Spot Manuel -->
     <div class="ck-panel" data-panel-id="ck-manual-spot">
@@ -4885,11 +4918,12 @@
                 map6m.invalidateSize();
             }
 
-            const spots6m = allSpots.filter(s =>
+            let spots6m = allSpots.filter(s =>
                 (s.band||'').toLowerCase() === '6m' &&
                 s.lat && s.lon && !isNaN(s.lat) && !isNaN(s.lon)
-            ).sort((a,b) => (b.distance_km||0) - (a.distance_km||0))
-                .slice(0, 25);
+            );
+            if (!wsjtxGlobalOn) spots6m = spots6m.filter(s => s.source !== 'WSJTX');
+            spots6m = spots6m.sort((a,b) => (b.distance_km||0) - (a.distance_km||0)).slice(0, 25);
 
             // Badge OPEN : > 5 spots 6m actifs
             const badge = document.getElementById('open-badge');
@@ -4905,14 +4939,21 @@
                 } else {
                     tbody.innerHTML = spots6m.map(s => {
                         const isBeacon = /\/b$/i.test((s.dx_call||'').trim());
+                        const isWsjtx = s.source === 'WSJTX';
                         const bcn = isBeacon ? ' <span class="beacon-badge">BCN</span>' : '';
                         const wl = isWanted(s.dx_call) ? ' <span style="color:#ffeb3b;font-size:.8em;">★</span>' : '';
-                        return '<tr>' +
-                            '<td><a href="https://qrz.com/db/' + s.dx_call + '" target="_blank" style="color:var(--accent);">' + s.dx_call + '</a>' + bcn + wl + '</td>' +
+                        const wsjtxTag = isWsjtx ? ' <span class="wsjtx-badge">WSJT</span>' : '';
+                        const snrTxt = isWsjtx && s.snr != null ? '<span class="snr-badge">SNR'+(s.snr>=0?'+':'')+s.snr+'dB</span>' : '';
+                        const rowStyle = isWsjtx ? 'style="background:rgba(251,146,60,0.07);border-left:3px solid #fb923c;"' : '';
+                        const rowClick = isWsjtx
+                            ? ' onclick="prefillSpotManuel(\''+s.dx_call+'\',\''+s.freq+'\',\''+((s.mode||'')+(s.snr!=null?' SNR'+(s.snr>=0?'+':'')+s.snr+'dB':''))+'\')" style="cursor:pointer;background:rgba(251,146,60,0.07);border-left:3px solid #fb923c;"'
+                            : (rowStyle ? ' ' + rowStyle : '');
+                        return '<tr' + rowClick + '>' +
+                            '<td><a href="https://qrz.com/db/' + s.dx_call + '" target="_blank" style="color:'+(isWsjtx?'#fb923c':'var(--accent)')+';">' + s.dx_call + '</a>' + bcn + wl + wsjtxTag + snrTxt + '</td>' +
                             '<td>' + s.freq + '</td>' +
                             '<td>' + (s.mode||'') + '</td>' +
                             '<td style="color:' + (s.distance_km>8000?'#00ff80':s.distance_km>3000?'#ffcc00':'#aaa') + '">' + (s.distance_km ? Math.round(s.distance_km) : '—') + '</td>' +
-                            '<td>' + (s.score||'') + '</td>' +
+                            '<td>' + (isWsjtx ? '—' : (s.score||'')) + '</td>' +
                             '<td style="color:#555;">' + (s.time||'') + '</td>' +
                         '</tr>';
                     }).join('');
@@ -4922,16 +4963,25 @@
             // Carte
             if (map6m && markers6m) {
                 markers6m.clearLayers();
-                spots6m.forEach(s => {
-                    const col = s.distance_km > 8000 ? '#00ff80' : s.distance_km > 3000 ? '#ffcc00' : '#00f3ff';
-                    const icon = L.divIcon({
-                        className: 'dx-marker-point',
-                        html: '<div style="width:10px;height:10px;background:' + col + ';border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px ' + col + ';"></div>',
-                        iconSize: [14,14], iconAnchor: [7,7]
-                    });
-                    const m = L.marker([s.lat, s.lon], {icon});
-                    m.bindPopup('<b>' + s.dx_call + '</b><br>' + s.freq + ' · ' + (s.mode||'') + '<br>' + (s.distance_km?Math.round(s.distance_km)+' km':''));
-                    markers6m.addLayer(m);
+                const clusters6m = geo6mCluster(spots6m, 800);
+                clusters6m.forEach(cl => {
+                    // Halo de zone
+                    if (cl.count >= 2) {
+                        L.circle([cl.lat, cl.lon], {
+                            radius: cl.count >= 8 ? 450000 : cl.count >= 5 ? 300000 : cl.count >= 3 ? 200000 : 120000,
+                            color: cl.color, fillColor: cl.color,
+                            fillOpacity: 0.07, weight: 1, opacity: 0.25,
+                            interactive: false
+                        }).addTo(markers6m);
+                    }
+                    // Marker cluster
+                    const popup = '<b>' + cl.spots.map(s => s.dx_call).join(', ') + '</b>' +
+                        '<br><span style="color:' + cl.color + '">' + cl.count + ' spots</span>';
+                    L.circleMarker([cl.lat, cl.lon], {
+                        radius: cl.radius * 0.7,
+                        color: '#fff', weight: 1.5,
+                        fillColor: cl.color, fillOpacity: 0.9
+                    }).bindPopup(popup).addTo(markers6m);
                 });
                 if (spots6m.length) {
                     try { map6m.fitBounds(markers6m.getBounds().pad(0.2)); } catch(e) {}
@@ -5555,24 +5605,48 @@
             initCockpit6mMap();
             if (!cockpit6mMap || !cockpit6mLayer) return;
             cockpit6mLayer.clearLayers();
-            const mapped = (spots6m || []).filter(s => Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon))).slice(0, 24);
-            mapped.forEach((s, idx) => {
-                const dist = Number(s.distance_km) || 0;
-                const col = dist >= 9000 ? '#6dfc6d' : dist >= 4500 ? '#ffb020' : '#22d3ee';
-                const radius = dist >= 9000 ? 13 : dist >= 4500 ? 10 : 8;
-                const circle = L.circleMarker([s.lat, s.lon], {
-                    radius,
-                    color: '#ffe14d',
-                    weight: 1.5,
-                    fillColor: col,
-                    fillOpacity: 0.88,
+            const mapped = (spots6m || []).filter(s =>
+                Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon))
+            );
+            if (!mapped.length) { cockpit6mMap.setView(userLatLng, 2); return; }
+
+            // Option C — clusters + halos pulsants
+            const clusters = geo6mCluster(mapped, 800);
+            clusters.forEach(cl => {
+                // Halo de fond (zone d'ouverture)
+                if (cl.count >= 2) {
+                    L.circle([cl.lat, cl.lon], {
+                        radius: cl.count >= 8 ? 500000 : cl.count >= 5 ? 380000 : cl.count >= 3 ? 250000 : 150000,
+                        color: cl.color, fillColor: cl.color,
+                        fillOpacity: 0.06, weight: 1, opacity: 0.3,
+                        interactive: false
+                    }).addTo(cockpit6mLayer);
+                }
+                // Marker central avec taille et couleur selon le score
+                const popup = '<b>' + cl.spots.map(s => s.dx_call).join(', ') + '</b>' +
+                    '<br><span style="color:' + cl.color + ';font-weight:bold;">' + cl.count + ' spots · ' + cl.label + '</span>' +
+                    '<br>' + cl.spots.map(s => (s.freq||'') + ' ' + (s.mode||'')).join('<br>');
+                L.circleMarker([cl.lat, cl.lon], {
+                    radius: cl.radius,
+                    color: '#fff', weight: 1.5,
+                    fillColor: cl.color,
+                    fillOpacity: 0.92,
                     opacity: 0.95
-                }).bindPopup('<b>' + (s.dx_call || 'DX') + '</b><br>' + (s.freq || '') + ' · ' + (s.mode || '') + '<br>' + (dist ? Math.round(dist) + ' km' : ''));
-                cockpit6mLayer.addLayer(circle);
+                }).bindPopup(popup).addTo(cockpit6mLayer);
+
+                // Spots individuels en petits points
+                cl.spots.forEach(s => {
+                    if (Math.abs(Number(s.lat) - cl.lat) > 0.1 || Math.abs(Number(s.lon) - cl.lon) > 0.1) {
+                        L.circleMarker([Number(s.lat), Number(s.lon)], {
+                            radius: 4, color: cl.color, weight: 1,
+                            fillColor: cl.color, fillOpacity: 0.6, opacity: 0.7
+                        }).bindTooltip(s.dx_call + ' · ' + (s.mode||'')).addTo(cockpit6mLayer);
+                    }
+                });
             });
+
             try {
-                if (mapped.length) cockpit6mMap.fitBounds(cockpit6mLayer.getBounds().pad(0.20));
-                else cockpit6mMap.setView(userLatLng, 2);
+                cockpit6mMap.fitBounds(cockpit6mLayer.getBounds().pad(0.25));
                 cockpit6mMap.invalidateSize();
                 setTimeout(() => { try { cockpit6mMap.invalidateSize(); } catch(e){} }, 180);
             } catch(e) {}
@@ -5618,7 +5692,8 @@
                 .filter(s => (s.band || '').toLowerCase() === '6m')
                 .filter(s => {
                     const ts = spotTsMs(s);
-                    return ts ? (now - ts) <= 20 * 60 * 1000 && (now - ts) >= -2 * 60 * 1000 : false;
+                    // Accepter spots jusqu'à 30 min (+ tolérance -5 min pour WSJTX)
+                    return ts ? (now - ts) <= 30 * 60 * 1000 && (now - ts) >= -5 * 60 * 1000 : true;
                 })
                 .sort((a,b) => (spotTsMs(b) || 0) - (spotTsMs(a) || 0))
                 .slice(0, 80);
@@ -5626,22 +5701,38 @@
                 rows.innerHTML = '<div style="padding:18px;text-align:center;color:#6f84a6;font-size:1.05em;">Aucun spot 6 m sur les 20 dernières minutes</div>';
                 return;
             }
-            rows.innerHTML = latest.map((s, i) => {
+            // Filtre WSJTX optionnel
+            const displayed = wsjtxFilterOn ? latest : latest.filter(s => s.source !== 'WSJTX');
+
+            rows.innerHTML = displayed.map((s, i) => {
+                const isWsjtx = s.source === 'WSJTX';
                 const smart = calcSmartScore(s);
                 const col = smartScoreColor(smart.total);
                 const isWL = isWanted(s.dx_call);
                 const isNew = s.lotw_dxcc_new;
                 const cc = isNew ? 'ck-fc ck-new-dxcc' : isWL ? 'ck-fc ck-wl' : 'ck-fc';
-                const bg = 'background:linear-gradient(90deg,' + hexToRgba(col, 0.20) + ', rgba(15,23,42,0.62) 68%);border-left:4px solid ' + col + ';';
+                // Fond distinct : orange pour WSJTX, gradient score pour cluster
+                const bg = isWsjtx
+                    ? 'background:linear-gradient(90deg,rgba(251,146,60,0.14),rgba(15,23,42,0.62) 70%);border-left:4px solid #fb923c;'
+                    : 'background:linear-gradient(90deg,' + hexToRgba(col, 0.20) + ', rgba(15,23,42,0.62) 68%);border-left:4px solid ' + col + ';';
                 const modeCol = modeColor(s.mode);
                 const distTxt = s.distance_km ? Math.round(s.distance_km) + 'km' : '—';
                 const infoCol = infoDistanceColor(s.distance_km);
-                return '<div class="ck-feed-row' + (i===0?' ck-new':'') + '" style="' + bg + '">' +
+                const snrTxt = isWsjtx && s.snr != null ? ' SNR' + (s.snr >= 0 ? '+' : '') + s.snr + 'dB' : '';
+                const clickAttr = isWsjtx
+                    ? 'onclick="prefillSpotManuel(\''+s.dx_call+'\',\''+s.freq+'\',\''+((s.mode||'')+(s.snr!=null?' SNR'+(s.snr>=0?'+':'')+s.snr+'dB':''))+'\')" style="cursor:pointer;' + bg + '"'
+                    : 'style="' + bg + '"';
+                return '<div class="ck-feed-row' + (i===0?' ck-new':'') + '" ' + clickAttr + '>' +
                     '<span class="ck-ft">' + (s.time||'') + '</span>' +
-                    '<span class="' + cc + '" style="color:' + col + '">' + (s.dx_call||'') + '</span>' +
+                    '<span class="' + cc + '" style="color:' + (isWsjtx ? '#fb923c' : col) + ';font-weight:' + (isWsjtx?'900':'700') + '">' + (s.dx_call||'') + '</span>' +
                     '<span class="ck-ff">' + (s.freq||'') + '</span>' +
                     '<span style="color:#e84393;font-size:1.08em;font-weight:800;">6m</span>' +
-                    '<span class="ck-fi"><span style="color:' + modeCol + ';font-weight:900;">' + (s.mode||'') + '</span> <span style="color:' + infoCol + ';">' + distTxt + '</span> <span style="color:' + col + ';font-weight:800;">SPD ' + smart.total + '</span></span>' +
+                    '<span class="ck-fi">' +
+                        (isWsjtx ? '<span style="color:#fb923c;font-size:.75em;font-weight:900;margin-right:4px;">WSJT</span>' : '') +
+                        '<span style="color:' + modeCol + ';font-weight:900;">' + (s.mode||'') + '</span>' +
+                        ' <span style="color:' + infoCol + ';">' + distTxt + '</span>' +
+                        (isWsjtx ? '<span style="color:#fb923c;">' + snrTxt + '</span>' : ' <span style="color:' + col + ';font-weight:800;">SPD ' + smart.total + '</span>') +
+                    '</span>' +
                 '</div>';
             }).join('');
         }
@@ -5706,26 +5797,124 @@
         }
 
 
+        // ── OPTION C : Clustering géo 6m ─────────────────
+        // Regroupe les spots dans un rayon R km et calcule un score de confiance
+        // Appliquer la heatmap calculée côté serveur sur la carte cockpit
+        window.applyServerHeatmap = function(cells) {
+            if (!cockpit6mMap || !cockpit6mLayer) return;
+            cockpit6mLayer.clearLayers();
+            cells.forEach(cl => {
+                // Halo de zone
+                L.circle([cl.lat, cl.lon], {
+                    radius: (cl.halo_km || 200) * 1000,
+                    color: cl.color, fillColor: cl.color,
+                    fillOpacity: cl.intensity * 0.08,
+                    weight: 1.5, opacity: cl.intensity * 0.4,
+                    interactive: false
+                }).addTo(cockpit6mLayer);
+                // Marker central
+                const popup = '<b style="color:' + cl.color + '">' + cl.level.toUpperCase() + ' · ' + cl.density + ' stations</b>' +
+                    (cl.wsjtx_count ? '<br><span style="color:#fb923c">' + cl.wsjtx_count + ' via WSJT-X</span>' : '') +
+                    '<br>' + (cl.calls || []).join(', ') +
+                    (cl.locator ? '<br>📍 ' + cl.locator : '');
+                L.circleMarker([cl.lat, cl.lon], {
+                    radius: 6 + cl.density * 1.5,
+                    color: '#fff', weight: 1.5,
+                    fillColor: cl.color,
+                    fillOpacity: 0.92
+                }).bindPopup(popup).addTo(cockpit6mLayer);
+            });
+            try { if (cells.length) cockpit6mMap.fitBounds(cockpit6mLayer.getBounds().pad(0.2)); } catch(e) {}
+        };
+
+        function geo6mCluster(spots, radiusKm) {
+            radiusKm = radiusKm || 800;
+            const valid = (spots || []).filter(s =>
+                Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon))
+            );
+            const clusters = [];
+            const used = new Set();
+
+            valid.forEach((s, i) => {
+                if (used.has(i)) return;
+                const cluster = { spots: [s], lat: Number(s.lat), lon: Number(s.lon) };
+                used.add(i);
+                valid.forEach((t, j) => {
+                    if (used.has(j)) return;
+                    const dlat = (Number(t.lat) - cluster.lat) * 111;
+                    const dlon = (Number(t.lon) - cluster.lon) * 111 * Math.cos(cluster.lat * Math.PI / 180);
+                    const dist = Math.sqrt(dlat*dlat + dlon*dlon);
+                    if (dist <= radiusKm) {
+                        cluster.spots.push(t);
+                        used.add(j);
+                    }
+                });
+                // Centroïde
+                cluster.lat = cluster.spots.reduce((a, s) => a + Number(s.lat), 0) / cluster.spots.length;
+                cluster.lon = cluster.spots.reduce((a, s) => a + Number(s.lon), 0) / cluster.spots.length;
+                cluster.count = cluster.spots.length;
+                // Score de confiance → aligné sur la légende carte (rouge=HIGH, bleu=LOW)
+                if (cluster.count >= 8) {
+                    cluster.color  = '#ef4444';   // rouge — ouverture intense
+                    cluster.glow   = '0 0 22px #ef4444, 0 0 44px #ef444444';
+                    cluster.radius = 24;
+                    cluster.speed  = '0.7s';
+                    cluster.label  = '🔴 INTENSE';
+                } else if (cluster.count >= 5) {
+                    cluster.color  = '#ff8f00';   // orange — ouverture confirmée
+                    cluster.glow   = '0 0 18px #ff8f00, 0 0 36px #ff8f0044';
+                    cluster.radius = 20;
+                    cluster.speed  = '1s';
+                    cluster.label  = 'OPEN';
+                } else if (cluster.count >= 3) {
+                    cluster.color  = '#ffd84d';   // jaune — probable
+                    cluster.glow   = '0 0 14px #ffd84d, 0 0 28px #ffd84d44';
+                    cluster.radius = 16;
+                    cluster.speed  = '1.5s';
+                    cluster.label  = 'ACTIVE';
+                } else if (cluster.count >= 2) {
+                    cluster.color  = '#22d3ee';   // cyan — activité détectée
+                    cluster.glow   = '0 0 10px #22d3ee, 0 0 20px #22d3ee44';
+                    cluster.radius = 12;
+                    cluster.speed  = '2s';
+                    cluster.label  = 'SPOTTED';
+                } else {
+                    cluster.color  = '#004cff';   // bleu — signal unique
+                    cluster.glow   = '0 0 8px #004cff88';
+                    cluster.radius = 9;
+                    cluster.speed  = '2.5s';
+                    cluster.label  = '';
+                }
+                clusters.push(cluster);
+            });
+            return clusters;
+        }
+
         function render6mHeatLayer(mappedSpots) {
             const layer = document.querySelector('.ck6m-heat-layer');
             const shell = document.querySelector('.ck6m-world-shell');
             if (!layer || !shell) return;
-            const valid = (mappedSpots || [])
-                .filter(s => s && Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon)))
-                .slice(0, 12);
+            const valid = (mappedSpots || []).filter(s =>
+                s && Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon))
+            );
             layer.innerHTML = '';
             shell.classList.toggle('heat-active', valid.length > 0);
             if (!valid.length) return;
-            layer.innerHTML = valid.map(s => {
-                const lat = Math.max(-85, Math.min(85, Number(s.lat)));
-                const lon = Math.max(-180, Math.min(180, Number(s.lon)));
+
+            // Option C — clustering géo 800km
+            const clusters = geo6mCluster(valid, 800);
+            layer.innerHTML = clusters.map(cl => {
+                const lat = Math.max(-85, Math.min(85, cl.lat));
+                const lon = Math.max(-180, Math.min(180, cl.lon));
                 const x = ((lon + 180) / 360) * 100;
                 const y = ((90 - lat) / 180) * 100;
-                const spd = Math.max(0, Math.min(100, Number(s.spd || s.score || 50)));
-                const km = Math.max(0, Number(s.distance_km) || 0);
-                const size = Math.max(6, Math.min(14, 6 + spd / 14 + km / 3500));
-                const title = String(s.dx_call || 'DX').replace(/"/g, '&quot;');
-                return '<span class="ck6m-heat-dot" title="' + title + '" style="--x:' + x.toFixed(2) + '%;--y:' + y.toFixed(2) + '%;--sz:' + size.toFixed(1) + '%"></span>';
+                // Taille proportionnelle au nombre de spots (5% à 11%)
+                const sz = Math.min(11, 5 + cl.count * 1.2);
+                const title = cl.spots.map(s => s.dx_call).join(', ') + ' (' + cl.count + ' spots)';
+                return '<span class="ck6m-heat-dot" title="' + title + '" ' +
+                    'style="--x:' + x.toFixed(2) + '%;--y:' + y.toFixed(2) + '%;--sz:' + sz.toFixed(1) + '%;' +
+                    'background:' + cl.color + ';box-shadow:' + cl.glow + ';' +
+                    'animation-duration:' + cl.speed + ';"></span>';
             }).join('');
         }
 
@@ -5986,6 +6175,11 @@
             const cockpitSpots = lastAllSpots.length ? lastAllSpots : lastRawSpotsHF;
             // 6m gauge
             render6mGauge(cockpitSpots, stats.recent_by_band || {});
+            // Heatmap précise via API serveur (Haversine)
+            fetch('/api/cockpit6/heatmap?window=900&radius=180')
+                .then(r => r.json())
+                .then(hm => { if (hm.ok && hm.cells && window.applyServerHeatmap) applyServerHeatmap(hm.cells); })
+                .catch(() => {});
             // Smart spots
             renderCockpitSmartSpots(lastRawSpotsHF);
             // DX Feed
@@ -5994,6 +6188,35 @@
             updateCockpitHeatmap(cockpitSpots);
         }
 
+
+        // Pré-remplir le pavé spot manuel depuis un spot WSJTX
+        async function prefillSpotManuel(call, freq, comment) {
+            // Remplir les champs
+            const elCall    = document.getElementById('ck-spot-call') || document.getElementById('spot-call');
+            const elFreq    = document.getElementById('ck-spot-freq') || document.getElementById('spot-freq');
+            const elComment = document.getElementById('ck-spot-comment') || document.getElementById('spot-comment');
+            const elStatus  = document.getElementById('ck-spot-st');
+
+            if (elCall)    { elCall.value    = call.toUpperCase(); elCall.focus(); }
+            if (elFreq)    { elFreq.value    = freq; }
+            if (elComment) { elComment.value = comment || ''; }
+            if (elStatus)  { elStatus.textContent = '✏️ Pré-rempli depuis WSJT-X — vérifiez et envoyez'; elStatus.className = ''; }
+
+            // Scroll vers le pavé spot manuel si nécessaire
+            const panel = document.getElementById('ck-spotter') || document.getElementById('spotter-panel');
+            if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Flash visuel sur les champs
+            [elCall, elFreq, elComment].forEach(el => {
+                if (!el) return;
+                el.style.borderColor = '#fb923c';
+                el.style.boxShadow = '0 0 8px rgba(251,146,60,0.4)';
+                setTimeout(() => {
+                    el.style.borderColor = '';
+                    el.style.boxShadow = '';
+                }, 1500);
+            });
+        }
 
         async function sendCockpitSpot() {
             const elCall = document.getElementById('ck-spot-call');
@@ -6043,6 +6266,32 @@
         // Stocker les spots HF bruts pour le mode smart
         let lastRawSpotsHF = [];
         let lastAllSpots = [];
+        // WSJTX global toggle — persisté localStorage
+        let wsjtxGlobalOn = localStorage.getItem('wsjtxOn') !== '0';
+
+        function _applyWsjtxBtn(el, on) {
+            if (!el) return;
+            el.style.background    = on ? 'rgba(251,146,60,.15)' : 'rgba(30,40,60,.5)';
+            el.style.borderColor   = on ? 'rgba(251,146,60,.5)'  : 'rgba(80,100,130,.3)';
+            el.style.color         = on ? '#fb923c' : '#445';
+            el.textContent         = on ? '📡 WSJT-X ●' : '📡 WSJT-X ○';
+        }
+
+        function toggleWsjtxGlobal() {
+            wsjtxGlobalOn = !wsjtxGlobalOn;
+            localStorage.setItem('wsjtxOn', wsjtxGlobalOn ? '1' : '0');
+            _applyWsjtxBtn(document.getElementById('wsjtx-global-toggle'), wsjtxGlobalOn);
+            _applyWsjtxBtn(document.getElementById('wsjtx-toggle'), wsjtxGlobalOn);
+            // Refresh all tables
+            renderDxFeed(lastAllSpots);
+        }
+
+        // Alias pour le toggle local du feed 6m
+        let wsjtxFilterOn = wsjtxGlobalOn;
+        function toggleWsjtxFilter() {
+            toggleWsjtxGlobal();
+            wsjtxFilterOn = wsjtxGlobalOn;
+        }
 
         // ── SCORE COMPOSITE ───────────────────────────
         function calcRarity(spot) {
@@ -6273,19 +6522,26 @@
                         spots.sort((a, b) => parseFreqForSort(b.freq) - parseFreqForSort(a.freq));
                     }
 
+                    // Filtre WSJTX global
+                    if (!wsjtxGlobalOn) {
+                        spots = spots.filter(s => s.source !== 'WSJTX');
+                    }
+
                     spots.forEach(spot => {
                         // Filtre LoTW "nouveaux DXCC uniquement"
                         if (lotwFilterActive[type] && spot.lotw_active) {
                             if (!spot.lotw_dxcc_new) return;
                         }
 
+                        const isWsjtxSpot = spot.source === 'WSJTX';
                         const row = tbody.insertRow();
                         const isWantedCall = isWanted(spot.dx_call);
                         const isBeacon = /\/b$/i.test(spot.dx_call.trim());
                         const callsignClass = isWantedCall ? 'spot-call-watchlist' : isBeacon ? '' : 'spot-call-white-bold';
 
                         if (isWantedCall) row.classList.add('spot-row-watchlist');
-                        if (isBeacon) row.classList.add('spot-row-beacon');
+                        if (isBeacon)     row.classList.add('spot-row-beacon');
+                        if (isWsjtxSpot)  row.classList.add('spot-row-wsjtx');
 
                         // Coloration LoTW
                         let lotwBadge = '';
@@ -6299,17 +6555,26 @@
                             }
                         }
 
+                        const wsjtxExtra = isWsjtxSpot
+                            ? `<span class="wsjtx-badge">WSJT</span><span class="snr-badge">SNR${spot.snr >= 0 ? '+' : ''}${spot.snr}dB</span>`
+                            : '';
+                        // Click sur toute la ligne pour pré-remplir le spot manuel
+                        row.style.cursor = 'pointer';
+                        row.title = 'Cliquer pour pré-remplir le spot manuel';
+                        const _comment = (spot.mode||'') + (spot.snr != null ? ' SNR'+(spot.snr>=0?'+':'')+spot.snr+'dB' : '');
                         row.innerHTML = `
                             <td>${spot.time}</td>
                             <td>${spot.freq}</td>
-                            <td><span class="${callsignClass}"><a href="https://qrz.com/db/${spot.dx_call}" target="_blank" title="Look up on QRZ.com">${spot.dx_call}</a>${lotwBadge}${isBeacon ? '<span class="beacon-badge">BCN</span>' : ''}</span></td>
+                            <td><span class="${callsignClass}"><a href="https://qrz.com/db/${spot.dx_call}" target="_blank" title="Look up on QRZ.com" onclick="event.stopPropagation()">${spot.dx_call}</a>${lotwBadge}${isBeacon ? '<span class="beacon-badge">BCN</span>' : ''}${wsjtxExtra}</span></td>
                             <td><span class="band-tag" style="background-color: ${spot.color};">${spot.band}</span></td>
                             <td>${spot.mode}</td>
-                            <td class="${(spot.score >= SPD_THRESHOLD) ? 'high-spd' : ''}">${spot.score}</td>
+                            <td class="${(spot.score >= SPD_THRESHOLD) ? 'high-spd' : ''}">${isWsjtxSpot ? '—' : spot.score}</td>
                             <td>${spot.distance_km.toFixed(0)}</td>`;
-                        row.querySelector('td:nth-child(3)').onclick = () => {
-                            if (!isWantedCall) addToWatchlist(spot.dx_call);
-                        };
+                        // Ajouter le listener après innerHTML (sinon écrasé)
+                        row.addEventListener('click', (e) => {
+                            if (e.target.tagName === 'A') return;
+                            prefillSpotManuel(spot.dx_call, spot.freq, _comment);
+                        });
                         announceSpot(spot);
                     });
                 }
@@ -6675,6 +6940,9 @@
                  if (cur !== 'smart') localStorage.setItem('prevTheme', cur);
              }
              setMode(currentMode);
+             // Init WSJTX toggle
+             _applyWsjtxBtn(document.getElementById('wsjtx-global-toggle'), wsjtxGlobalOn);
+             _applyWsjtxBtn(document.getElementById('wsjtx-toggle'), wsjtxGlobalOn);
              if (currentMode === 'cockpit') loadCockpitData();
              if (smartMode && !map6m) {
                  setTimeout(init6mMap, 500);
@@ -8219,12 +8487,15 @@ fetch('/api/check_update')
       const col = dist >= 9000 ? '#7dffac' : dist >= 4500 ? '#ffd84d' : '#42e6ff';
       const safeCall = call.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
       const safeMode = mode.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+      // Halo pulsant sans label (évite la superposition)
+      const sz = dist >= 9000 ? 22 : dist >= 4500 ? 18 : 14;
       const icon = L.divIcon({
         className: 'ck6m-clean-marker',
-        html: '<span class="ck6m-clean-dot" style="background:'+col+';box-shadow:0 0 10px '+col+'"></span>' +
-              '<span class="ck6m-clean-label">'+safeCall+(safeMode ? ' · '+safeMode : '')+'</span>',
-        iconSize: [120, 24],
-        iconAnchor: [10, 10]
+        html: '<span style="display:block;width:'+sz+'px;height:'+sz+'px;border-radius:50%;' +
+              'background:'+col+';box-shadow:0 0 '+Math.round(sz*1.2)+'px '+col+',0 0 '+Math.round(sz*2.5)+'px '+col+'44;' +
+              'animation:ck6m-pulse 2s ease-in-out infinite;opacity:.92;"></span>',
+        iconSize: [sz, sz],
+        iconAnchor: [sz/2, sz/2]
       });
       const m = L.marker([Number(s.lat), Number(s.lon)], { icon }).bindPopup(
         '<b>' + safeCall + '</b><br>' + (s.freq || '') + ' · ' + safeMode + '<br>' + (dist ? Math.round(dist) + ' km' : '')
