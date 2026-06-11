@@ -1,6 +1,6 @@
-# 📡 Radio Spot Watcher DX — v9.4
+# 📡 Radio Spot Watcher DX — v9.5
 
-> Désormais badgée **NEURAL DX WATCHER v9.4** dans l'interface.
+> Désormais badgée **NEURAL DX WATCHER v9.5** dans l'interface.
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -135,6 +135,50 @@ Aucune dépendance cloud.
 
 ### 🗂️ Historique des versions
 
+### v9.5 — Géolocalisation fine + Heatmap gaussienne + Envoi direct
+
+**Géolocalisation fine des spots (Option A+B)**
+
+- Table `CALLSIGN_ZONES` : 100+ zones d'appel précises (USA W0-W9/K/N par chiffre de zone, Canada VE1-7, Japon JA0-9, Russie UA0-9, Australie VK1-7, Allemagne DL1-9, Espagne EA1-8, France, Italie)
+- `_callsign_jitter()` : offset déterministe ±1.5° basé sur MD5 du callsign — même call = même position à chaque redémarrage, deux calls dans la même zone → positions légèrement différentes
+- `get_precise_latlon()` : 4 niveaux — préfixe 3ch → 2ch → chiffre de zone US (KF6I → 6 → Californie) → centroïde pays + jitter
+- Résout le bug où tous les USA s'affichaient au même point (37.6, -91.87)
+
+**Heatmap gaussienne 6m (Magic Band cockpit)**
+
+- Remplacement des cercles colorés par distance par une **nappe de chaleur continue** type radar météo
+- Chaque spot émet une gaussienne de ~600km (rayon adaptatif via projection Leaflet)
+- Accumulation dans un buffer Float32, **normalisation relative** par le max mesuré — la zone la plus dense est toujours rouge, quelle que soit la densité absolue
+- Correction gamma 0.65 pour étirer les zones moyennes
+- Palette `CK6M_PALETTE` : bleu → cyan → vert → jaune → orange → rouge
+- Petits points blancs cliquables (popup call/freq/mode/distance) par-dessus la nappe
+- Redessine automatiquement au pan/zoom et sur événement `load` Leaflet (correction carte vide au reload)
+
+**Envoi de spot direct au click**
+
+- Click sur n'importe quelle ligne dans le tableau HF/VHF → spot envoyé immédiatement via `POST /api/spot`
+- Toast de confirmation en bas à droite (vert ✅ ou rouge ❌), format agrandi
+
+**Fréquences FT8 expéditions DX**
+
+- Ajout de 14090 kHz (20m) et 18095 kHz (17m) comme fréquences FT8 — maintenant détectées correctement au lieu de SSB
+- Liste complète : 3573, 5357, 7074, 10136, 14074, 14090, 18100, 18095, 21074, 24915, 28074
+
+**Purge Watchlist v2**
+
+- Nouveau fichier `data/wl_activity.json` — persiste `{last_spot, end_date, added}` par call
+- `_parse_end_date_from_title()` : parse les titres NG3K (`5Z4 · Kenya · → 16 Jun 2026` → `2026-06-16`)
+- Endpoint `/api/watchlist/stale` : inclut uniquement les calls expirés depuis X jours, avec `pre_checked`, `reason`, `end_date`
+- Modal purge : lignes rouges pré-cochées (expéditions terminées), date de fin en orange, raison en grisé
+
+**Corrections diverses**
+
+- Endpoint mort `/api/cockpit6/heatmap` (404) supprimé du JS
+- Déduplication WSJT-X : 120s → 30s, fenêtre 20 → 50 spots
+- Extraction callsign FT8 réécrite : gère `CQ DX`, `CQ EU`, locators, modificateurs
+
+> v9.3 était une version de travail non publiée.
+
 ### v9.4 — Intégration WSJT-X + Clustering 6m + corrections
 
 **Intégration WSJT-X UDP**
@@ -194,7 +238,7 @@ Aucune dépendance cloud.
 
 **Rebranding**
 
-- L'application devient **NEURAL DX WATCHER v9.4** (titre de page et en-tête)
+- L'application devient **NEURAL DX WATCHER v9.5** (titre de page et en-tête)
 
 **Nouveau sélecteur de modes (3 modes dans le header)**
 

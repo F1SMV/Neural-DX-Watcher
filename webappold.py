@@ -704,21 +704,12 @@ def get_band_and_mode_smart(freq_float, comment):
     # FT4 6m (50.318 MHz)
     is_ft4_6m = (band == "6m" and abs(freq_khz - 50318) <= 2)
 
-    # FT8 HF — fréquences standard + expéditions DX (v9.5)
-    FT8_HF_FREQS_KHZ = [
-        3573, 5357, 7074, 10136,
-        14074, 14090,   # 20m standard + expéditions
-        18100, 18095,   # 17m standard + expéditions
-        21074, 24915, 28074,
-    ]
-    is_ft8_hf = any(abs(freq_khz - f) <= 1.0 for f in FT8_HF_FREQS_KHZ)
-
     # PRIORITE
     if is_ft2_hf:
         mode = "FT2"
     elif is_ft4_hf or is_ft4_vhf or is_ft4_6m:
         mode = "FT4"
-    elif is_ft8_vhf or is_ft8_6m or is_ft8_hf:
+    elif is_ft8_vhf or is_ft8_6m:
         mode = "FT8"
 
     # CW
