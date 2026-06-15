@@ -30,6 +30,36 @@ from flask import Flask, render_template, jsonify, request, abort, redirect, url
 from pathlib import Path
 import subprocess
 
+# ── v10.0 modules ──────────────────────────────────────────────────────────────
+try:
+    from predictor import Predictor
+    _PREDICTOR_OK = True
+except ImportError:
+    _PREDICTOR_OK = False
+    class Predictor:
+        def __init__(self, **kw): pass
+        def record_spot(self, *a, **kw): pass
+        def record_session_heartbeat(self, *a, **kw): pass
+        def sync_missing_dxcc(self, *a, **kw): pass
+        def get_predictions(self, **kw): return []
+        def get_stats(self): return {}
+        def cleanup_old_data(self, *a, **kw): pass
+        def invalidate_cache(self): pass
+
+try:
+    from ntfy_alerts import NtfyAlerter
+    _NTFY_OK = True
+except ImportError:
+    _NTFY_OK = False
+    class NtfyAlerter:
+        def __init__(self, **kw): pass
+        def record_presence(self): pass
+        def on_watchlist_spot(self, *a, **kw): pass
+        def on_new_dxcc(self, *a, **kw): pass
+        def on_6m_surge(self, *a, **kw): pass
+        def get_status(self): return {"enabled": False}
+        def _send(self, **kw): pass
+
 META_DIR = Path("data/meta")
 META_SUMMARY = META_DIR / "summary.json"
 LOTW_CACHE_FILE = Path("data/lotw_cache.json")
@@ -55,7 +85,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = "9.5"
+APP_VERSION = "10.0"
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -335,6 +365,10 @@ solar_cache = {"sfi": "N/A", "a": "N/A", "k": "N/A", "kp": None, "kp_time_utc": 
 solar_xml_cache = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><solar><sfi>N/A</sfi><a>N/A</a><k>N/A</k><kp></kp><kp_time_utc></kp_time_utc><updated_utc></updated_utc></solar>"
 # --- END SOLAR CACHE ---
 watchlist    = set()
+
+# ── v10.0 : Predictor & NtfyAlerter ────────────────────────────────────────────
+predictor = Predictor(db_path="data/predictor.sqlite", my_call=MY_CALL)
+alerter   = NtfyAlerter(db_path="data/ntfy_alerts.sqlite")
 wl_activity  = {}        # {call_upper: timestamp_float} — dernier spot vu
 wl_activity_lock = threading.Lock()
 surge_bands = []
@@ -545,6 +579,15 @@ def analyze_surges():
                     surge_bands.append(band)
                 if band not in active_surges:
                     active_surges.append(band)
+                # ── v10.0 : alerte 6m via ntfy ───────────────────────────
+                if band == "6m":
+                    try:
+                        _recent_6m = sum(1 for t in timestamps if t > time.time() - 600)
+                        _top_calls = [s.get("dx_call","") for s in list(spots_buffer)[-20:]
+                                      if s.get("band") == "6m"][:5]
+                        alerter.on_6m_surge(_recent_6m, _top_calls)
+                    except Exception:
+                        pass
             elif band in bands_in_surge:
                 surge_bands.remove(band)
                 logger.info(f"FIN ALERTE SURGE {band}: L'activité a diminué.")
@@ -1046,6 +1089,8 @@ def history_maintenance_worker():
         logger.debug(f"Prochaine rotation dans {seconds_until_next_slot} secondes.")
         time.sleep(seconds_until_next_slot + 5)
         save_wl_activity()   # persister l'activité watchlist toutes les 30 min
+        try: predictor.cleanup_old_data(90)
+        except Exception: pass
 
         with history_lock:
             for band in HISTORY_BANDS:
@@ -1209,6 +1254,29 @@ def telnet_worker():
                             "spot_id": spot_id # Ajout de l'ID
                         }
                         spots_buffer.append(spot_obj)
+
+                        # ── v10.0 : Predictor — collecte SQLite ─────────────
+                        try:
+                            _is_wl = spot_obj.get("dx_call","").upper() in watchlist
+                            predictor.record_spot(spot_obj, is_watchlist=_is_wl)
+                        except Exception as _pe:
+                            logger.debug(f"predictor.record_spot: {_pe}")
+
+                        # ── v10.0 : Alertes ntfy ───────────────────────────
+                        try:
+                            _dx_up = spot_obj.get("dx_call","").upper()
+                            if _dx_up in watchlist:
+                                alerter.on_watchlist_spot(spot_obj)
+                            with lotw_lock:
+                                _dxcc_by_band = lotw_data.get("dxcc_by_band", {})
+                            _band = spot_obj.get("band","")
+                            _cty  = spot_obj.get("country","")
+                            _confirmed_on_band = _dxcc_by_band.get(_band, set())
+                            if _cty and _cty != "Unknown" and _cty not in _confirmed_on_band:
+                                alerter.on_new_dxcc(spot_obj, [_band])
+                        except Exception as _ae:
+                            logger.debug(f"alerter: {_ae}")
+
                         # Mettre à jour l'activité watchlist si le call est suivi
                         _dx = spot_obj.get("dx_call", "").upper()
                         if _dx and _dx in watchlist:
@@ -3696,8 +3764,20 @@ def check_update():
         remote_version = remote_data.get("version", "0.0.0")
         current_version = APP_VERSION.split()[-1]
 
+        # Comparaison sémantique : le bandeau n'apparaît que si GitHub
+        # propose une version STRICTEMENT supérieure à la locale.
+        # Évite les faux positifs quand on tourne sur une version locale
+        # plus récente que le dépôt (ex. v10.0 local vs v9.5 sur GitHub).
+        def _ver_tuple(v):
+            try:
+                return tuple(int(x) for x in v.strip().split("."))
+            except Exception:
+                return (0, 0, 0)
+
+        update_available = _ver_tuple(remote_version) > _ver_tuple(current_version)
+
         result = {
-            "update_available": (remote_version != current_version),
+            "update_available": update_available,
             "current_version": current_version,
             "latest_version": remote_version,
             "release_date": remote_data.get("release_date"),
@@ -4878,6 +4958,97 @@ if SGP4_AVAILABLE:
     logger.info("sgp4 disponible et fonctionnel")
 else:
     logger.warning("sgp4 NON DISPONIBLE — lance: python3 -m pip install sgp4 --break-system-packages")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# v10.0 — NOUVELLES ROUTES
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/presence", methods=["POST"])
+def api_presence():
+    """Heartbeat opérateur — suspend les push ntfy si l'op est sur la page."""
+    try:
+        alerter.record_presence()
+        predictor.record_session_heartbeat()
+    except Exception:
+        pass
+    return jsonify({"ok": True, "ts": time.time()})
+
+
+@app.route("/api/predictions")
+def api_predictions():
+    """Prédictions personnalisées (moteur Es/HF + DXCC manquants)."""
+    try:
+        with solar_lock:
+            sfi = float(solar_cache.get("sfi") or 120)
+            kp  = float(solar_cache.get("kp")  or 2)
+    except Exception:
+        sfi, kp = 120, 2
+
+    try:
+        with lotw_lock:
+            dxcc_by_band = lotw_data.get("dxcc_by_band", {})
+            confirmed    = lotw_data.get("confirmed_dxcc", set())
+        if dxcc_by_band:
+            missing = []
+            for band, confirmed_set in dxcc_by_band.items():
+                for s in list(spots_buffer)[-500:]:
+                    cty = s.get("country", "")
+                    if cty and cty != "Unknown" and cty not in confirmed_set:
+                        missing.append({"dxcc": cty, "band": band,
+                                        "mode": s.get("mode", "")})
+            if missing:
+                predictor.sync_missing_dxcc(missing)
+                predictor.invalidate_cache()
+    except Exception:
+        pass
+
+    preds = predictor.get_predictions(sfi=sfi, kp=kp)
+    return jsonify({"predictions": preds, "ts": time.time()})
+
+
+@app.route("/api/predictor/stats")
+def api_predictor_stats():
+    return jsonify(predictor.get_stats())
+
+
+@app.route("/api/ntfy/status")
+def api_ntfy_status():
+    return jsonify(alerter.get_status())
+
+
+@app.route("/api/ntfy/test", methods=["POST"])
+def api_ntfy_test():
+    try:
+        alerter._send(
+            title   = "🔔 NEURAL DX — Test OK",
+            message = f"Les alertes push fonctionnent · {MY_CALL} v{APP_VERSION}",
+            priority= "default",
+            tags    = ["white_check_mark"],
+        )
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/spot_history")
+def api_spot_history():
+    """Historique compact pour les sparklines DX Feed."""
+    minutes = min(int(request.args.get("minutes", 60)), 180)
+    cutoff  = time.time() - minutes * 60
+    result  = {}
+    with spot_history_lock:
+        for entry in spot_history:
+            ts = entry.get("ts", 0)
+            if ts < cutoff:
+                continue
+            dx = entry.get("dx", "")
+            if not dx:
+                continue
+            if dx not in result:
+                result[dx] = []
+            result[dx].append(int(ts))
+    return jsonify({"window_min": minutes, "calls": result, "ts": time.time()})
+
 
 if __name__ == "__main__":
     load_cty_dat()

@@ -1,6 +1,5 @@
-# 📡 Radio Spot Watcher DX — v9.5
+# 📡 Neural DX Watcher — v10.0
 
-> Now badged **NEURAL DX WATCHER v9.5** in the interface.
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -11,13 +10,14 @@ Built to **observe**, **understand** and **step back** — not to generate visua
 
 ## 🧭 Overview
 
-**Radio Spot Watcher DX** is a local web application that:
+**Neural DX Watcher** is a local web application that:
 
 - connects to one or more **DX Clusters (Telnet)**
 - displays **real-time spots** (HF / VHF / UHF)
 - integrates **solar indices** (SFI, A, Kp…)
 - maintains a **usable memory** of activity
 - offers **multiple reading levels**, from live monitoring to strategic analysis
+- **predicts** probable openings based on your activity and missing DXCCs
 
 > The goal is not to see a lot,  
 > but to **see clearly**.
@@ -127,7 +127,7 @@ The application will be available at `http://localhost:8000`
 - Frontend: HTML / CSS / JavaScript
 - Cluster: Telnet DX Cluster
 - Analysis: dedicated Python scripts
-- Storage: memory + local JSON files
+- Storage: memory + local JSON files + **SQLite** (v10.0)
 
 No cloud dependency.
 
@@ -135,47 +135,132 @@ No cloud dependency.
 
 ## 🗂️ Version History
 
+### v10.0 — Predictive Engine · Sparklines · Push Alerts (optional)
+
+#### 🔮 Personal Predictive Engine (`predictor.py`)
+
+A new personal intelligence layer: the application learns from your activity and anticipates the openings that matter to you.
+
+**Layer 1 — SQLite collection** (`data/predictor.sqlite`)
+- `spot_log` table: every received spot is recorded (call, DXCC, band, mode, SPD score, timestamp)
+- `es_events` table: every 6m spot generates a sporadic-E event (month, UTC hour, direction prefix)
+- `sessions` table: operator sessions tracked via browser heartbeat
+- `missing_dxcc` table: missing DXCCs synchronized from the LoTW cache
+- Automatic purge of data older than 90 days
+
+**Layer 2 — Probabilistic scoring**
+- Seasonal/hourly Es patterns: base probabilities by month × UTC hour (peak May–July, 07z–18z)
+- Directional boost: some Es paths are historically more frequent (EU→EU strong, EU→JA moderate…)
+- Band factor: 6m = SFI-independent (Es), HF = weighted by SFI and Kp
+- Local history bonus: recorded events reinforce the score for the same time slots
+- Missing DXCC cross-reference: only openings toward entities still needed are surfaced
+
+**Layer 3 — Predictions displayed in COCKPIT mode**
+- New **🔮 PERSONAL PREDICTIONS** panel in COCKPIT column 1
+- TOP 5 most probable windows over the next 24 hours
+- Each prediction: UTC time, band, target DXCC, % score, color bar, explanatory tip
+- 10-minute cache, auto-recalculated on every switch to cockpit mode
+- Example: *"Strong probability (68%) of 6m opening toward JT1 between 14h–17z — JT1 missing in FT8"*
+
+**New backend routes**
+- `GET /api/predictions` — personalized predictions (cross-referenced with LoTW if active)
+- `GET /api/predictor/stats` — collection stats (logged spots, Es events, sessions)
+- `POST /api/presence` — operator heartbeat (suppresses push alerts while you're on the page)
+
+#### 📊 Sparklines in the DX Feed
+
+Next to each callsign in the COCKPIT **DX Spot Feed**:
+- Inline 40×14 px canvas, **6 bars of 10 minutes** covering the last hour
+- At a glance: *"just arrived"* vs *"calling for 40 minutes"*
+- Cyan intensity proportional to spot count in each time bucket
+- Data from `/api/spot_history` — no additional collection, existing RAM history reused
+- Auto-injected by MutationObserver: always up to date without page reload
+
+#### 🔔 Smart push alerts (optional — disabled by default)
+
+Alert infrastructure available, disabled until `NTFY_URL` is configured.
+
+**3 alert types:**
+1. **Watchlist spotted** — a tracked call appears on the cluster
+2. **NEW DXCC** — a missing LoTW entity is active on a needed band
+3. **6m opening** — surge detected (> N spots / 10 min)
+
+**Built-in anti-spam:**
+- 15-minute cooldown per call/type stored in SQLite
+- **Presence filter**: if you're on the page (heartbeat < 45s), no alert is sent
+
+**PUSH badge** in the DX Feed title — shows status (active / inactive), click for details.
+
+**ntfy.sh configuration (if desired):**
+```bash
+# Create a topic on ntfy.sh (free, no account required)
+export NTFY_URL="https://ntfy.sh/neuraldx-f1smv-XXXXXX"
+
+# On your phone: install the ntfy.sh app, subscribe to the same topic
+# Test from the app:
+curl -s -X POST http://localhost:8000/api/ntfy/test
+```
+
+Self-hosting on the Pi is possible (single Go binary, ~20 MB RAM).
+
+**New routes:**
+- `GET /api/ntfy/status` — status, cooldowns, recent alerts
+- `POST /api/ntfy/test` — send a test notification
+
+#### 🎨 Unified design system (v9.6 → integrated v10.0)
+
+The COCKPIT visual language is now **the design of the entire application**:
+- HUD background with 32px grid and CRT scanlines as fixed layers
+- Glassmorphism on all CLASSIC and SMART panels (`backdrop-filter: blur(18px)`)
+- `.panel-header` titles styled as ck-title with glowing dot and cyan gradient band
+- Mode buttons with distinct glow states (cyan / purple / orange)
+- Header: frosted glass + title glow, translucent ticker
+- Tables: cyan-glow headers, hover rows
+- Scrollbars: cyan→orange gradient
+- Structural fix: `#header-row2` was rendered outside `#header` since v9.x
+
+#### 🔧 HF Propagation panel corrected
+
+The COCKPIT **HF PROPAGATION** panel was displaying incorrect VHF/UHF data:
+- Corrected bands: `80m / 40m / 20m / 17m / 15m / 12m / 10m` (instead of `50MHz / 70MHz / 144MHz / 432MHz`)
+- X axis: 24 columns 00z→23z (instead of 6 slots 06z→21z)
+- Palette: red→green matching the classic panel
+- "Now" line: white dashed line + ▼ triangle
+- Inline legend: 0-20 / 20-40 / 40-60 / 60-80 / 80+
+- Diurnal model: 80m/40m favored at night, 10m/12m/15m SFI-dependent
+
+---
+
 ### v9.5 — Fine Geolocation + Gaussian Heatmap + Direct Spot Send
 
 **Fine geolocation of spots (Option A+B)**
 
 - `CALLSIGN_ZONES` table: 100+ precise call districts (USA W0-W9/K/N by zone digit, Canada VE1-7, Japan JA0-9, Russia UA0-9, Australia VK1-7, Germany DL1-9, Spain EA1-8, France, Italy)
-- `_callsign_jitter()`: deterministic ±1.5° offset based on callsign MD5 — same call = same position on every restart
-- `get_precise_latlon()`: 4 levels — 3-char prefix → 2-char → US zone digit (KF6I → 6 → California) → country centroid + jitter
+- `_callsign_jitter()`: deterministic ±1.5° offset based on callsign MD5
+- `get_precise_latlon()`: 4 levels — 3-char prefix → 2-char → US zone digit → country centroid + jitter
 - Fixes the bug where all USA spots appeared at the same point (37.6, -91.87)
 
 **6m Gaussian Heatmap (Magic Band cockpit)**
 
 - Replaces distance-colored circles with a **continuous heat layer** (weather radar style)
 - Each spot emits a ~600km Gaussian (adaptive radius via Leaflet projection)
-- Accumulation in Float32 buffer, **relative normalization** by measured max — densest zone is always red
-- Gamma 0.65 correction to stretch mid-range zones
-- Palette: blue → cyan → green → yellow → orange → red
-- Small white clickable dots (popup call/freq/mode/distance) over the heat layer
-- Auto-redraws on pan/zoom and Leaflet `load` event (fixes blank map on reload)
+- Relative normalization by measured max — densest zone is always red
+- Gamma 0.65 correction, palette: blue → cyan → green → yellow → orange → red
+- Auto-redraws on pan/zoom and Leaflet `load` event
 
 **Direct spot send on click**
 
 - Click any row in HF/VHF table → spot sent immediately via `POST /api/spot`
-- Confirmation toast bottom-right (green ✅ or red ❌), enlarged format
+- Confirmation toast bottom-right (green ✅ or red ❌)
 
 **FT8 DXpedition frequencies**
 
-- Added 14090 kHz (20m) and 18095 kHz (17m) as FT8 frequencies — now correctly detected instead of SSB
-- Full list: 3573, 5357, 7074, 10136, 14074, 14090, 18100, 18095, 21074, 24915, 28074
+- Added 14090 kHz (20m) and 18095 kHz (17m) as FT8 frequencies
 
 **Watchlist Purge v2**
 
 - New `data/wl_activity.json` — persists `{last_spot, end_date, added}` per call
-- `_parse_end_date_from_title()`: parses NG3K titles (`5Z4 · Kenya · → 16 Jun 2026` → `2026-06-16`)
-- `/api/watchlist/stale`: returns only calls expired since X days, with `pre_checked`, `reason`, `end_date`
-- Purge modal: red pre-checked rows (ended expeditions), end date in orange, reason in grey
-
-**Various fixes**
-
-- Dead endpoint `/api/cockpit6/heatmap` (404) removed from JS
-- WSJT-X deduplication: 120s → 30s, window 20 → 50 spots
-- FT8 callsign extraction rewritten: handles `CQ DX`, `CQ EU`, locators, modifiers
+- Purge modal: red pre-checked rows (ended expeditions), end date in orange
 
 > v9.3 was an unpublished work-in-progress version.
 
@@ -185,302 +270,88 @@ No cloud dependency.
 
 - Real-time WSJT-X UDP stream reception (port 2237)
 - Full Qt binary protocol parser: Heartbeat, Status, Decode, QSOLog
-- Filter: CQ only + stations calling MY_CALL directly
-- **Maidenhead locator** extraction from FT8 message (`CQ W6GY DM04` → precise coordinates)
-- Maidenhead → lat/lon conversion for accurate map positioning (±1° precision)
-- 30s deduplication (2 FT8 periods) over 50 spots
-- WSJTX spots identified by orange `WSJT` badge + SNR in all tables
-- Global `📡 WSJT-X ●` toggle in header — persisted in localStorage
-- Compatible with Log4OM: WSJT-X → Pi (2237) for decodes + Log4OM local (127.0.0.1:2237) for QSOs
+- Maidenhead locator extraction from FT8 messages for precise positioning
+- 30s deduplication, orange `WSJT` badge + SNR in all tables
+- Compatible with Log4OM
 
-**6m Geographic Clustering — Option C**
+**6m Geographic Clustering**
 
-- Geo clustering algorithm, 400km radius, applied to all 6m maps
-- 5 color levels aligned with map legend:
-  - 🔵 Blue (1 spot) → 🔵 Cyan (2) → 🟡 Yellow (3-4) → 🟠 Orange (5-7) → 🔴 Red (8+)
-- Proportional Leaflet zone halo (150km to 500km)
-
-**Watchlist Purge fixed**
-
-- New `data/wl_activity.json` file — persists last spot date per call across restarts
-- Auto-save every 30 minutes
-- 7/14/30/60-day buttons now correctly filter truly inactive calls
-
-**Various fixes**
-
-- VOACAP palette fixed: red/orange/yellow/green/cyan/blue by probability
-- Click on a call in HF table → pre-fills Spot Manuel panel
-- FT8 callsign extraction rewritten: handles `CQ DX`, `CQ EU`, locators, modifiers
-
-> v9.3 was an unpublished work-in-progress version.
+- 400km radius geo clustering, 5 color levels, proportional Leaflet zone halos
 
 ### v9.2 — Unified Cockpit Theme
 
-**Single visual theme across all modes**
-
-- The **Cockpit** theme (`#050810`, dark gradient panels, cyan accents) becomes the application-wide default
-- Theme selector (light/dark/matrix/softtech) removed — visual identity is now unified and consistent
-- ⚡ CLASSIC and 🧠 SMART modes adopt the Cockpit styling while keeping their respective layouts
-
-**Global harmonization**
-
-- Inputs and selects: terminal style (near-black background, subtle cyan border, glow on focus)
-- Buttons: subtle cyan border, colored hover
-- Tables: cyan-tinted separators and row hovers
-- Scrollbars: thin (5px), cyan thumb
-- Smart panel: borders and gradients unified with Cockpit mode
+- **Cockpit** theme becomes the application-wide default
+- Inputs, buttons, tables, scrollbars harmonized across all modes
 
 ### v9.0 — NEURAL DX & COCKPIT 6 m mode
 
-**Rebranding**
+**3-mode selector**: ⚡ CLASSIC / 🧠 SMART / 🎛 COCKPIT 6 m
 
-- The application becomes **NEURAL DX WATCHER v9.5** (page title and header)
+**COCKPIT 6 m mode**: dense dark radio cockpit interface, 3-column layout with E-Layer map, Opening Strength gauge, VOACAP forecast, scored Top Spots, DX Feed, DXCC Opportunities, Manual Spot.
 
-**New mode selector (3 modes in the header)**
+### v8.2 — LoTW persistence + 6m Magic Band panel
 
-The 🧠 toggle is replaced by three exclusive buttons:
-
-- ⚡ **CLASSIC** — classic layout (former BASIC mode)
-- 🧠 **SMART** — intelligent analysis / scored Top Spots (former SMART mode)
-- 🎛 **COCKPIT 6 m** — new full-screen dashboard dedicated to the 6 m band
-
-The active mode is persisted in localStorage.
-
-**COCKPIT 6 m mode — full rewrite**
-
-A dense, dark "radio cockpit" interface (cyan/orange neon), laid out in 3 columns, hiding the classic dashboard. Panels:
-
-- 📌 **6 m SUMMARY / 24H** — 24h spots, unique DXCC, SFI, K-index
-- ☀️ **SOLAR & GEOMAGNETIC DATA** — SFI, A-index, K-index
-- 📊 **BAND CONDITIONS · HF** — band status
-- ⚡ **MAGIC BAND 6 m · DX ACTIVITY HEATMAP** — full-frame "broadcast" panel:
-  - **E-Layer Hotspots** world map (Leaflet) with animated scan and HIGH/LOW legend
-  - circular **Opening Strength** gauge (CLOSED → OPEN, 0–100 %)
-  - **E-Layer Hotspots** list by zone (Europe, East Coast NA, Japan, Australia)
-  - animated 🔴 **OPEN** badge when an opening is detected
-- 📡 **HF PROPAGATION · VOACAP** — forecast with zone selector (EU / NA / AS / OC)
-- 🧠 **INTELLIGENT 6 m TOP SPOTS** — dedicated scored 6 m selection
-- **DX SPOT FEED · 6 m · 20 MIN** — feed of the latest 6 m spots
-- 🎯 **DXCC OPPORTUNITIES** — LoTW cross-check
-- 📡 **MANUAL SPOT** — direct send to the cluster
-
-**Misc**
-
-- Refined 6 m detection and visual harmonization with the rest of the app
-- Cockpit layout patches (responsive ≤ 1250 px, VOACAP readability)
-
-### v8.2 — LoTW persistence + 6m Magic Band panel + fixes
-
-**LoTW — persistence across restarts**
-
-- LoTW cache saved to `data/lotw_cache.json` after each sync
-- Automatic reload at startup — no need to re-sync manually
-- DXCC opportunities available immediately after a restart
-- Deduplication fixed: same callsign (with or without /P /MM suffix) no longer appears multiple times
-
-**⚡ DX 6M · MAGIC BAND panel** (SMART mode only)
-
-- Dedicated 6m band panel, visible only in Smart mode
-- Leaflet mini-map 320px with color-coded markers by distance (green >8,000 km, yellow >3,000 km)
-- Table of top 25 spots, sorted by descending distance
-- Animated 🔴 OPEN badge when 5+ active spots detected (automatic opening detection)
-- Watchlist and beacon indicators on each spot
-- Drag & drop enabled
-
-**6m mode detection improved**
-
-- 50.313 MHz → FT8 (instead of SSB)
-- 50.318 MHz → FT4 (instead of SSB)
-
-**Various fixes**
-
-- DXCC Opportunities panel aligned with 4-column CSS grid
-- Missing bands displayed on a dedicated line (↳ missing: ...)
-- 6m table font and colors harmonized with DX WANTED panel
+- LoTW cache saved to disk, auto-reloaded at startup
+- 6m Magic Band panel in SMART mode with Leaflet mini-map and 🔴 OPEN badge
 
 ### v8.1 — Smart Mode improvements + World redesign
 
-**TOP SPOTS panel — improvements**
-
-- Drag & drop enabled on the Smart Mode panel
-- Bilingual badge legend (FR/EN) displayed below the panel title
-- New **Rarity** column with 4 levels:
-  - 🔴 **MOST WANTED** — New DXCC + distance > 10,000 km
-  - 🟡 **WANTED** — Watchlist or missing DXCC + distance > 8,000 km
-  - 🔵 **TRACKING** — Call in watchlist
-  - ⚡ **EXOTIC DX** — Distance > 10,000 km not in watchlist (animated orange badge)
-
-**World page full redesign**
-
-- Full-screen map — no more fixed sidebar
-- Floating semi-transparent HUD with backdrop-filter
-- Live stats: total zones / confirmed / suspect
-- Greyline integrated directly in World
-- Tooltips on propagation circles (band, spots, UTC time)
-- Topbar consistent with the rest of the application
-- Collapsible "How to read" section
+- Rarity column: 🔴 MOST WANTED / 🟡 WANTED / 🔵 TRACKING / ⚡ EXOTIC DX
+- World page: full-screen map, floating HUD, integrated greyline
 
 ### v8.0 — Smart Mode 🧠
 
-**BASIC / SMART toggle in the header**
+- BASIC / SMART toggle
+- TOP SPOTS composite score: New DXCC (+40), Watchlist (+30), Missing band (+10), SFI (+20), SPD (+30), 10k+km (+15)
 
-- 🧠 slider in the header — switches between BASIC mode (standard display) and SMART mode (intelligent analysis)
-- Dedicated visual theme: background `#070B1A`, surfaces `#10172A`, cyan accent `#22D3EE` and violet `#8B5CF6`
-- State persisted in localStorage — mode is remembered between sessions
+### v7.7 — Responsive
 
-**"TOP SPOTS · SMART MODE" panel**
+- Mobile-optimized header, tables, maps, bandmap, purge modal
 
-In SMART mode, the HF table is replaced by a selection of the **15 best spots** ranked by composite score:
+### v7.6 — Greyline on Map page
 
-- 🔴 **+40 pts** — New DXCC never worked (LoTW cross-reference)
-- 🟣 **+30 pts** — Call in the watchlist
-- 🟢 **+10 pts** — Confirmed LoTW DXCC, missing band
-- 🔵 **+20 pts** — Favorable propagation (SFI > 70)
-- ⚡ **+30 pts** — Native SPD score (spot reliability)
-- 📡 **+15 pts** — Distance > 10,000 km (long-range DX)
+### v7.5 — Easy Watchlist cleanup
 
-Each spot displays: callsign, colored badges, frequency / band / mode / time / distance, visual score bar.
-
-### v7.7 version responsive 
-
-### v7.6 add greyline on map page
-
-### v7.5 Easy cleaning of the "watching list" pad to always have a top-notch shortlist
-
-### v7.4 landing page is fixed, now responsive, satellite page fixed, more functional
-
-### v7.3 - bug fix in analysis.html
+### v7.4 — Landing page fixed, responsive
 
 ### v7.2 — Satellite Tracker
 
-- New **Satellite Tracker** page: real-time tracking of amateur satellites (AO-73, AO-91, ISS, RS-44, SO-50, FO-29, PO-101…)
-- Positions computed locally via **sgp4** from AMSAT TLE data
-- **Leaflet** map with per-satellite coverage footprint
-- Elevation / azimuth / altitude table updated in real time
-- **Next passes** panel (24h UTC): AOS, TCA, LOS, duration, max elevation
-- Independent multi-satellite selection for pass display
-- Manual keps update from CelesTrak
-- AMSAT catalogue management: add/remove tracked satellites
+- Real-time tracking (AO-73, AO-91, ISS, RS-44, SO-50, FO-29, PO-101…)
+- Local sgp4 computation, Leaflet map, next passes panel (AOS/TCA/LOS)
 
-### v7.1
+### v7.1 — LoTW DXCC Opportunities
 
-**LoTW — DXCC Opportunities**
+- Automatic cross-reference with upcoming expeditions (21-day horizon)
+- Briefing page rebuilt: drag & drop panels, rewritten NG3K parser
 
-- Automatic cross-reference of the LoTW log with upcoming DX expeditions (21-day horizon)
-- **🎯 DXCC OPPORTUNITIES — 21 DAYS** section in the LoTW panel, sorted by priority:
-  - 🔴 NEW DXCC — country never worked
-  - 🟡 UNCONFIRMED — worked but no LoTW QSL yet
-  - 🔵 MISSING BAND — confirmed but some bands still to complete
-- J-X countdown before each expedition ends
-- Automatic date extraction from briefing text
+### v7.0 — LoTW Integration & Bandmap
 
-**Briefing page fully rebuilt**
-
-- Single unified layout for all sources (no more three redundant sections)
-- **Drag & drop panels**: freely reorganizable, order saved in localStorage
-- NG3K parser rewritten for structured plain-text format — expired expeditions filtered automatically
-- Structured title: `Callsign · DXCC · → end date`
-- Callsigns highlighted in cyan throughout summaries
-- Relative timestamps (2 hours ago, 3 days ago…)
-- Fixed `datetime.utcnow()` deprecation warning (Python 3.12)
-
-### v7.0 — LoTW Integration & Bandmap Improvements
-
-**LoTW (Logbook of the World) Integration**
-
-- Secure login from the web interface — credentials never stored on disk
-- Full log import: all uploaded QSOs + confirmed QSLs
-- DXCC resolution via `cty.dat` (no dependency on optional ADIF field)
-- Statistics: total QSOs, confirmed QSLs, confirmed DXCC per band (visual bar chart)
-- **In HF and VHF spot tables**: red background + NEW badge = DXCC never worked / green + ✓ = already confirmed
-- **★ NEW DXCC button** in HF and VHF panels to filter new DXCC only
-- **In the watchlist**: NEW DXCC or ✓ LoTW badge on each callsign
-- Loading spinner during synchronization (30–60s for a large log)
-
-**Bandmap**
-
-- Zoom increased to 100× for busy bands (e.g. 20m)
-- Pin label color by mode: CW (green), SSB (blue), FT8 (purple), FT4 (pink), FT2 (mauve), RTTY (orange), PSK31 (yellow), JT65 (cyan)
-- Mode legend displayed in the controls bar
-- Frequency axis: only real amateur radio band edges shown
-- Mouse pan (click + drag) available even at zoom 1×
-- All settings persisted via localStorage
+- Secure web login, full log import, DXCC stats per band
+- NEW / ✓ badges in spot tables, bandmap zoom 100×, mode colors
 
 ### v6.9
 
-- VOACAP panel: local HF propagation prediction (no cloud dependency)
-- Endpoint `/api/voacap?zone=EU` — MUF/LUF/REL calculation from SFI and Kp
-- Zones: EU / NA / SA / AS / OC / AF
-- Colored grid of bands × UTC hours, VOACAP style
-- Preferred zone saved in localStorage
-
-### v6.8
-
-- Color palette for the bandmap background (8 themes, persisted)
-- Zoom up to 100× on the bandmap
-- Pin colors based on spotted mode
-
-### v6.7
-
-- GitHub update check reduced to once every 24 hours (anti rate-limiting)
-- WL button to show only watchlist stations in the bandmap
-- HF / VHF 2m / UHF 70cm / QO-100 group filters in the bandmap
-- Fixed display bug on the Analysis page
-
-### v6.6
-
-- Bandmap: zoom and SPD density sliders
-- Auto-recentering on the selected callsign
+- Local VOACAP HF propagation prediction, no cloud dependency
 
 ### v6.5
 
-- Replaced `telnetlib` with `Telnetlib3` (suggestion by F5UGQ)
-- Optional AI Vocal Brief button in the Solar Indices panel (Perplexity API, ~€0.01/call)
+- Optional AI Vocal Brief (Perplexity API)
 
 ### v6.4
 
-- Bandmap added to the home page with band and mode filtering
-
-### v6.3
-
-- Frequency-based sorting in HF and VHF DX panels
-- Update notification banner
-
-### v6.2
-
-- Optional callsign addition to the watchlist from the dashboard
-- FT2 mode support
-
-### v6.1
-
-- New DXpedition Briefing page
-- Updated maps on the Index page
+- Bandmap added to home page
 
 ### v6.0 — Stable Release
 
-- Finalization of the World page
-- Clear separation between Map and World
-- Stabilized clustering
-- Automatic refresh
-- Clarified UX
-- User state persistence
-
-> Jump from v5.7 to v6.0 due to several unpublished trial versions.
-
-### v5.7 — Work-in-progress versions
-
-- World page prototypes
-- Scoring adjustments
-- Structural fixes
+- World page finalized, clustering stabilized, UX clarified
 
 ### v5.6
 
-- Experimental introduction of World
-- WATCHLIST · Tracking panel
+- Experimental World page, WATCHLIST · Tracking panel
 
 ### v5.2
 
-- Introduction of META ANALYSIS
+- META ANALYSIS introduced
 
 ---
 

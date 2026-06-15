@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>📡 NEURAL DX v10.0</title>
+<title>📡 NEURAL DX v9.5</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230e0e0e'/><text y='.9em' font-size='80' x='10'>📡</text></svg>"/>
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -3941,53 +3941,7 @@
             filter: drop-shadow(0 0 8px rgba(255,216,77,.70)) !important;
         }
 
-
-        /* ── SPARKLINES DX FEED v10.0 ── */
-        .ck-sparkline {
-            display: inline-block;
-            vertical-align: middle;
-            margin-left: 6px;
-            opacity: 0.85;
-            flex-shrink: 0;
-        }
-
-        /* ── WIDGET PRÉDICTIONS v10.0 ── */
-        #ck-predictions-panel { min-height: 120px; }
-        .pred-item {
-            display: flex; align-items: center; gap: 8px;
-            padding: 6px 10px;
-            border-bottom: 1px solid rgba(34,211,238,.06);
-            font-size: .78em; font-family: 'Share Tech Mono', monospace;
-            cursor: default;
-            transition: background .15s;
-        }
-        .pred-item:last-child { border-bottom: none; }
-        .pred-item:hover { background: rgba(34,211,238,.05); }
-        .pred-score {
-            display: inline-block; width: 34px; text-align: right;
-            font-weight: 900; font-size: .85em; flex-shrink: 0;
-        }
-        .pred-bar {
-            height: 6px; border-radius: 3px; flex-shrink: 0;
-            transition: width .4s;
-        }
-        .pred-label { color: #dff9ff; flex: 1; }
-        .pred-tip { font-size: .70em; color: #6f86a8; margin-top: 2px; }
-
-        /* ── NTFY STATUS BADGE ── */
-        #ntfy-badge {
-            display: inline-flex; align-items: center; gap: 4px;
-            font-size: .6em; padding: 2px 7px;
-            border-radius: 4px; border: 1px solid rgba(34,197,94,.35);
-            background: rgba(34,197,94,.10); color: #86efac;
-            font-family: monospace; cursor: pointer;
-        }
-        #ntfy-badge.disabled {
-            border-color: rgba(100,116,139,.3); background: rgba(100,116,139,.08); color: #64748b;
-        }
-        #ntfy-badge::before { content: "●"; font-size: .8em; }
-
-        </style>
+</style>
 </head>
 <body>
 
@@ -4157,7 +4111,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V10.0</div>
+    <div id="title">📡 NEURAL DX WATCHER V9.5</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -4236,18 +4190,6 @@
         <div id="ck-voacap-meta" style="font-size:.58em;color:#2a3550;text-align:right;margin-top:3px;font-family:monospace;"></div>
       </div>
     </div>
-
-    <!-- Prédictions personnalisées v10.0 -->
-    <div class="ck-panel" data-panel-id="ck-predictions" id="ck-predictions-panel">
-      <div class="ck-title" style="justify-content:space-between;">
-        <span>🔮 PRÉDICTIONS PERSONNALISÉES</span>
-        <span id="ck-pred-count" style="font-size:.7em;color:#6f86a8;font-weight:400;font-family:monospace;"></span>
-      </div>
-      <div id="ck-pred-list" style="padding:4px 0;">
-        <div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Chargement…</div>
-      </div>
-    </div>
-
     <!-- Stats 24h -->
     <div id="ck-stats-row" data-panel-id="ck-stats">
       <div class="ck-stats-drag-handle ck-title">📌 SYNTHÈSE 6 m / 24H</div>
@@ -4434,7 +4376,6 @@
     <div class="ck-panel" data-panel-id="ck-dx-feed" style="flex:1;min-height:320px;display:flex;flex-direction:column;">
       <div class="ck-title">
         <span>DX SPOT FEED · 6 m · 20 MIN</span>
-          <span id="ntfy-badge" class="disabled" onclick="openNtfyStatus()" title="Statut alertes push ntfy">PUSH</span>
         <div style="display:flex;align-items:center;gap:8px;">
           <button id="wsjtx-toggle" onclick="toggleWsjtxFilter()"
             style="padding:2px 9px;font-size:.6em;cursor:pointer;border-radius:3px;
@@ -9140,199 +9081,6 @@ fetch('/api/check_update')
     };
   })();
 
-</script>
-
-
-<script>
-/* ═══════════════════════════════════════════════════════════════════════════
-   NEURAL DX WATCHER v10.0 — Client JS
-   · Sparklines DX Feed
-   · Widget Prédictions personnalisées
-   · Présence heartbeat → ntfy filtre
-   · Status badge ntfy
-   ═══════════════════════════════════════════════════════════════════════════ */
-(function () {
-
-  /* ── Historique spots en RAM (call → [timestamps ms]) ─────────────────── */
-  const _sparkHistory = {};   // { "JA1AA": [ts_ms, ...], ... }
-  let   _sparkLoaded  = false;
-
-  async function loadSparkHistory() {
-    try {
-      const r = await fetch('/api/spot_history?minutes=60');
-      if (!r.ok) return;
-      const d = await r.json();
-      Object.assign(_sparkHistory, {});
-      for (const [call, tsList] of Object.entries(d.calls || {})) {
-        _sparkHistory[call.toUpperCase()] = tsList.map(t => t * 1000);
-      }
-      _sparkLoaded = true;
-    } catch(e) { /* silencieux */ }
-  }
-
-  /* ── Sparkline canvas (6 buckets × 10 min = 1h) ──────────────────────── */
-  function buildSparklineCanvas(call) {
-    const tsList = _sparkHistory[call.toUpperCase()] || [];
-    const buckets = Array(6).fill(0);
-    const now = Date.now();
-    tsList.forEach(ts => {
-      const age_ms = now - ts;
-      if (age_ms < 0 || age_ms > 3_600_000) return;
-      const b = Math.min(5, Math.floor(age_ms / 600_000));
-      buckets[5 - b]++;   // bucket 5 = plus récent
-    });
-    const max = Math.max(...buckets, 1);
-    const canvas = document.createElement('canvas');
-    canvas.width = 40; canvas.height = 14;
-    canvas.className = 'ck-sparkline';
-    canvas.title = tsList.length + ' spots sur 1h';
-    const ctx = canvas.getContext('2d');
-    buckets.forEach((v, i) => {
-      const barH = Math.max(1, Math.round((v / max) * 11));
-      ctx.fillStyle = v > 0
-        ? `rgba(34,211,238,${0.35 + (v / max) * 0.65})`
-        : 'rgba(255,255,255,0.06)';
-      ctx.fillRect(i * 7, 14 - barH, 5, barH);
-    });
-    return canvas;
-  }
-
-  /* ── Injection sparklines dans ck-feed-rows après rendu ──────────────── */
-  function injectSparklines() {
-    if (!_sparkLoaded) return;
-    const rows = document.querySelectorAll('#ck-feed-rows .ck-feed-row');
-    rows.forEach(row => {
-      if (row.querySelector('.ck-sparkline')) return; // déjà injecté
-      // Le call est dans le deuxième span (.ck-fc)
-      const callEl = row.querySelector('.ck-fc');
-      if (!callEl) return;
-      const call = callEl.textContent.trim().toUpperCase();
-      if (!call) return;
-      const canvas = buildSparklineCanvas(call);
-      callEl.parentNode.insertBefore(canvas, callEl.nextSibling);
-    });
-  }
-
-  /* Observer mutations sur ck-feed-rows pour injecter après chaque rendu */
-  document.addEventListener('DOMContentLoaded', () => {
-    const feedEl = document.getElementById('ck-feed-rows');
-    if (feedEl) {
-      const obs = new MutationObserver(() => setTimeout(injectSparklines, 50));
-      obs.observe(feedEl, { childList: true, subtree: false });
-    }
-  });
-
-  /* ── Widget Prédictions ─────────────────────────────────────────────── */
-  async function loadPredictions() {
-    try {
-      const r = await fetch('/api/predictions');
-      if (!r.ok) return;
-      const d = await r.json();
-      const preds = d.predictions || [];
-      const el = document.getElementById('ck-pred-list');
-      const cnt = document.getElementById('ck-pred-count');
-      if (!el) return;
-      if (cnt) cnt.textContent = preds.length ? preds.length + ' ouvertures probables' : '';
-
-      if (!preds.length) {
-        el.innerHTML = '<div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Aucune prédiction — enrichissez LoTW pour personnaliser</div>';
-        return;
-      }
-
-      el.innerHTML = preds.map(p => {
-        const pct = Math.round(p.score * 100);
-        const barColor = pct >= 60 ? '#22c55e' : pct >= 35 ? '#fb923c' : '#6f86a8';
-        const barW     = Math.max(6, Math.round(pct * 0.9));
-        return `<div class="pred-item" title="${p.tip}">
-          <span class="pred-score" style="color:${barColor};">${pct}%</span>
-          <div class="pred-bar" style="width:${barW}px;background:${barColor};"></div>
-          <div style="flex:1;min-width:0;">
-            <div class="pred-label">${p.label}</div>
-            <div class="pred-tip">${p.tip.substring(0,80)}…</div>
-          </div>
-        </div>`;
-      }).join('');
-    } catch(e) { /* silencieux */ }
-  }
-
-  /* ── Présence heartbeat (toutes les 30s) ──────────────────────────────── */
-  async function sendPresenceHeartbeat() {
-    try {
-      await fetch('/api/presence', { method: 'POST' });
-    } catch(e) {}
-  }
-
-  /* ── Status badge ntfy ───────────────────────────────────────────────── */
-  async function updateNtfyBadge() {
-    try {
-      const r = await fetch('/api/ntfy/status');
-      if (!r.ok) return;
-      const d = await r.json();
-      const badge = document.getElementById('ntfy-badge');
-      if (!badge) return;
-      if (d.enabled) {
-        badge.classList.remove('disabled');
-        badge.title = `Push ntfy actif · Cooldown ${d.cooldown_s}s · ${d.recent_alerts.length} récentes`;
-      } else {
-        badge.classList.add('disabled');
-        badge.title = 'Push ntfy non configuré (définir NTFY_URL)';
-      }
-    } catch(e) {}
-  }
-
-  window.openNtfyStatus = async function() {
-    const r = await fetch('/api/ntfy/status').catch(()=>null);
-    if (!r || !r.ok) { alert('Statut ntfy non disponible'); return; }
-    const d = await r.json();
-    const recent = (d.recent_alerts || []).slice(0,8)
-      .map(a => `• ${a.key.padEnd(30)} ${new Date(a.ts*1000).toUTCString().slice(17,25)} UTC (×${a.count})`)
-      .join('\n') || '— aucune alerte récente';
-    alert(
-      `🔔 ALERTES PUSH ntfy\n\n` +
-      `Statut : ${d.enabled ? '✓ ACTIF' : '✗ DÉSACTIVÉ (NTFY_URL manquant)'}\n` +
-      `URL    : ${d.url || '—'}\n` +
-      `Cooldown : ${d.cooldown_s}s\n` +
-      `Seuil ouverture 6m : ${d.surge_threshold} spots/10min\n` +
-      `Opérateur présent : ${d.operator_present ? 'oui (push suspendus)' : 'non'}\n\n` +
-      `Dernières alertes :\n${recent}`
-    );
-  };
-
-  /* ── Init & polling ──────────────────────────────────────────────────── */
-  document.addEventListener('DOMContentLoaded', () => {
-    // Sparkline history : charger au boot puis toutes les 5 min
-    loadSparkHistory();
-    setInterval(loadSparkHistory, 300_000);
-
-    // Prédictions : charger au boot puis toutes les 10 min
-    loadPredictions();
-    setInterval(loadPredictions, 600_000);
-
-    // Ntfy badge : update toutes les 2 min
-    updateNtfyBadge();
-    setInterval(updateNtfyBadge, 120_000);
-
-    // Présence heartbeat : toutes les 30s (démarre 5s après boot pour ne pas bloquer)
-    setTimeout(() => {
-      sendPresenceHeartbeat();
-      setInterval(sendPresenceHeartbeat, 30_000);
-    }, 5_000);
-  });
-
-  // Reload prédictions quand on passe en mode cockpit
-  const _prevSetMode = window.setMode;
-  if (typeof _prevSetMode === 'function') {
-    window.setMode = function(mode) {
-      const r = _prevSetMode.apply(this, arguments);
-      if (mode === 'cockpit') {
-        setTimeout(loadPredictions, 300);
-        setTimeout(loadSparkHistory, 200);
-      }
-      return r;
-    };
-  }
-
-})();
 </script>
 
 </body>
