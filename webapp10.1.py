@@ -4699,9 +4699,7 @@ def _azel(r_eci, lat, lon, alt_km, dt_utc):
          math.sin(lat_rad)*rz)
 
     el = math.degrees(math.asin(z / rng))
-    # SEZ : S pointe au SUD → -s pointe au NORD
-    # az astronomique (N=0°, E=90°, S=180°, W=270°) = atan2(e, -s)
-    az = math.degrees(math.atan2(e, -s)) % 360
+    az = math.degrees(math.atan2(-e, s)) % 360
     return az, el
 
 def _next_passes(tle1, tle2, lat_obs, lon_obs, n_passes=5):
@@ -4764,16 +4762,11 @@ def api_satellite_positions():
     result = []
     for norad_id in active_ids:
         meta = _get_sat_meta(norad_id)
-        tle_name = tles[norad_id][0] if norad_id in tles else meta.get('name', str(norad_id))
-        sat_type = meta.get('type', 'unknown')
-        if sat_type == 'unknown':
-            sat_type = _infer_sat_type(norad_id, tle_name)
-        sat_icon = meta.get('icon', '') or _infer_sat_icon(sat_type, tle_name)
         if norad_id not in tles:
             result.append({'norad': norad_id, 'name': meta.get('name', str(norad_id)),
-                           'type': sat_type,
+                           'type': meta.get('type','unknown'),
                            'color': meta.get('color','#aaa'),
-                           'icon': sat_icon,
+                           'icon': meta.get('icon','🛰️'),
                            'error': 'TLE non disponible'})
             continue
         tle_name, tle1, tle2 = tles[norad_id]
@@ -4785,9 +4778,9 @@ def api_satellite_positions():
                 sat_name = tle_name
             pos.update({'norad': norad_id,
                         'name':  sat_name,
-                        'type':  sat_type,
+                        'type':  meta.get('type','unknown'),
                         'color': meta.get('color','#aaa'),
-                        'icon':  sat_icon})
+                        'icon':  meta.get('icon','🛰️')})
             result.append(pos)
     return jsonify({'positions': result,
                     'observer': {'lat': user_lat, 'lon': user_lon, 'call': MY_CALL},
@@ -4857,49 +4850,6 @@ def api_satellite_footprint(norad_id):
         'footprint_points': points,
     })
 
-def _infer_sat_type(norad_id: int, name: str) -> str:
-    """
-    Infère le type d'un satellite depuis son NORAD ou son nom.
-    L'API AMSAT ne fournit pas de champ type — on déduit depuis
-    les mots-clés dans le nom TLE (AO, SO, RS, FO, JO, TO, CO...)
-    qui sont les préfixes conventionnels des satellites amateurs OSCAR.
-    """
-    # Correspondance NORAD connue en priorité
-    if norad_id in SATELLITES_DEFAULT:
-        return SATELLITES_DEFAULT[norad_id].get('type', 'unknown')
-
-    name_up = name.upper()
-
-    # Noms de satellites de stations spatiales
-    if any(k in name_up for k in ('ISS', 'CSS', 'TIANGONG', 'ZARYA', 'ZVEZDA', 'MIR')):
-        return 'station'
-
-    # Satellites météo
-    if any(k in name_up for k in ('NOAA', 'METOP', 'METEOR', 'GOES', 'FENGYUN', 'METEOSAT')):
-        return 'weather'
-
-    # Satellites amateurs — préfixes OSCAR et noms connus
-    AMATEUR_KEYWORDS = (
-        'AO-', 'AO ', 'SO-', 'SO ', 'FO-', 'FO ', 'JO-', 'JO ', 'TO-', 'TO ',
-        'CO-', 'CO ', 'RS-', 'RS ', 'UO-', 'HO-', 'KO-', 'DO-',
-        'OSCAR', 'AMSAT', 'FUNCUBE', 'FOX-', 'LILACSAT', 'RADFXSAT',
-        'XW-', 'CAS-', 'DIWATA', 'AISAT', 'UVSQ', 'TEVEL',
-        'SAUDISAT 1C', 'PCSAT', 'LAPAN', 'LUCKY-7',
-    )
-    if any(k in name_up for k in AMATEUR_KEYWORDS):
-        return 'amateur'
-
-    return 'unknown'
-
-
-def _infer_sat_icon(sat_type: str, name: str) -> str:
-    """Retourne l'icône emoji selon le type."""
-    if sat_type == 'station': return '🛸'
-    if sat_type == 'weather': return '🌤'
-    if sat_type == 'amateur': return '📻'
-    return '🛰️'
-
-
 @app.route('/api/satellites/catalog')
 def api_satellites_catalog():
     """Retourne tous les satellites disponibles dans le cache TLE."""
@@ -4908,18 +4858,13 @@ def api_satellites_catalog():
     catalog = []
     for norad_id, (name, tle1, tle2) in sorted(tles.items(), key=lambda x: x[1][0]):
         meta = _get_sat_meta(norad_id)
-        # Utiliser le type de la config si connu, sinon inférer depuis le nom
-        sat_type = meta.get('type', 'unknown')
-        if sat_type == 'unknown':
-            sat_type = _infer_sat_type(norad_id, name)
-        sat_icon = meta.get('icon', '') or _infer_sat_icon(sat_type, name)
         catalog.append({
             'norad':  norad_id,
             'name':   name,
             'active': norad_id in active_ids,
-            'type':   sat_type,
+            'type':   meta.get('type', 'unknown'),
             'color':  meta.get('color', '#aaaaaa'),
-            'icon':   sat_icon,
+            'icon':   meta.get('icon', '🛰️'),
         })
     return jsonify({'catalog': catalog, 'total': len(catalog)})
 
@@ -5006,73 +4951,6 @@ def api_tle_status():
     found = {nid: nid in tles for nid in SATELLITES_OF_INTEREST}
     return jsonify({'total_tles': len(tles), 'satellites': found,
                     'cache_age_s': int(time.time() - _tle_cache_ts)})
-
-
-# Cache fréquences SatNOGS en mémoire {norad_id: (ts, [transmitters])}
-_freq_cache: dict = {}
-_FREQ_CACHE_TTL = 6 * 3600  # 6h — les fréquences changent rarement
-
-
-@app.route('/api/satellites/frequencies/<int:norad_id>')
-def api_satellite_frequencies(norad_id):
-    """
-    Fréquences uplink/downlink d'un satellite depuis SatNOGS DB.
-    Mise en cache 6h en mémoire pour ne pas surcharger l'API publique.
-    Retourne les transmetteurs actifs triés par type (FM, Linear, APRS…).
-    """
-    now = time.time()
-    cached_ts, cached_data = _freq_cache.get(norad_id, (0, None))
-
-    if cached_data is not None and (now - cached_ts) < _FREQ_CACHE_TTL:
-        return jsonify({'ok': True, 'norad': norad_id,
-                        'transmitters': cached_data, 'source': 'cache'})
-
-    try:
-        import urllib.request
-        url = f"https://db.satnogs.org/api/transmitters/?format=json&satellite__norad_cat_id={norad_id}&alive=true"
-        req = urllib.request.Request(url, headers={'User-Agent': f'NeuralDXWatcher/{APP_VERSION}'})
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            raw = json.loads(resp.read().decode())
-
-        transmitters = []
-        for t in raw:
-            mode = t.get('mode', '') or ''
-            uplink   = t.get('uplink_low') or t.get('uplink_high')
-            downlink = t.get('downlink_low') or t.get('downlink_high')
-            if not downlink and not uplink:
-                continue
-            def fmt_mhz(hz):
-                if not hz:
-                    return None
-                return round(hz / 1e6, 4)
-
-            entry = {
-                'description': t.get('description', '') or mode or 'Transponder',
-                'mode':        mode,
-                'type':        t.get('type', ''),
-                'uplink_mhz':   fmt_mhz(uplink),
-                'downlink_mhz': fmt_mhz(downlink),
-                'invert':      t.get('invert', False),
-                'baud':        t.get('baud'),
-            }
-            transmitters.append(entry)
-
-        # Trier : downlink seul en dernier, FM avant Linear avant les autres
-        order = {'FM': 0, 'AFSK': 1, 'FSK': 2, 'Linear': 3, 'CW': 4}
-        transmitters.sort(key=lambda x: order.get(x['mode'], 9))
-
-        _freq_cache[norad_id] = (now, transmitters)
-        return jsonify({'ok': True, 'norad': norad_id,
-                        'transmitters': transmitters, 'source': 'satnogs'})
-
-    except Exception as e:
-        logger.debug(f"api_satellite_frequencies {norad_id}: {e}")
-        # Si SatNOGS injoignable, retourner cache expiré si disponible
-        if cached_data is not None:
-            return jsonify({'ok': True, 'norad': norad_id,
-                            'transmitters': cached_data, 'source': 'cache_expired'})
-        return jsonify({'ok': False, 'norad': norad_id,
-                        'transmitters': [], 'error': str(e)})
 
 
 # Log statut sgp4
@@ -5187,59 +5065,6 @@ if __name__ == "__main__":
     threading.Thread(target=history_maintenance_worker, daemon=True).start()
     threading.Thread(target=briefing_refresh_worker, daemon=True).start()
     threading.Thread(target=wsjtx_worker, daemon=True).start()
-
-    def _freq_preload_worker():
-        """
-        Pré-charge les fréquences SatNOGS pour tous les satellites actifs
-        au démarrage, en arrière-plan non-bloquant.
-        Délai initial 15s pour laisser le serveur démarrer proprement,
-        puis 2s entre chaque satellite pour ne pas surcharger l'API.
-        Résultat : quand l'utilisateur clique sur un satellite, le cache
-        est déjà chaud → affichage immédiat au lieu d'attendre 2-8s.
-        """
-        import time as _time, urllib.request as _req, json as _json
-        _time.sleep(15)  # attendre que Flask soit prêt
-        active_ids = _get_active_sat_ids()
-        logger.info(f"Freq preload: démarrage pour {len(active_ids)} satellites")
-        for norad_id in active_ids:
-            try:
-                now = _time.time()
-                # Sauter si déjà en cache valide
-                cached_ts, cached_data = _freq_cache.get(norad_id, (0, None))
-                if cached_data is not None and (now - cached_ts) < _FREQ_CACHE_TTL:
-                    continue
-                url = (f"https://db.satnogs.org/api/transmitters/"
-                       f"?format=json&satellite__norad_cat_id={norad_id}&alive=true")
-                request = _req.Request(url, headers={'User-Agent': f'NeuralDXWatcher/{APP_VERSION}'})
-                with _req.urlopen(request, timeout=8) as resp:
-                    raw = _json.loads(resp.read().decode())
-                transmitters = []
-                for t in raw:
-                    uplink   = t.get('uplink_low') or t.get('uplink_high')
-                    downlink = t.get('downlink_low') or t.get('downlink_high')
-                    if not downlink and not uplink:
-                        continue
-                    def fmt_mhz(hz):
-                        return round(hz / 1e6, 4) if hz else None
-                    transmitters.append({
-                        'description': t.get('description', '') or t.get('mode', '') or 'Transponder',
-                        'mode':        t.get('mode', ''),
-                        'type':        t.get('type', ''),
-                        'uplink_mhz':   fmt_mhz(uplink),
-                        'downlink_mhz': fmt_mhz(downlink),
-                        'invert':      t.get('invert', False),
-                        'baud':        t.get('baud'),
-                    })
-                order = {'FM': 0, 'AFSK': 1, 'FSK': 2, 'Linear': 3, 'CW': 4}
-                transmitters.sort(key=lambda x: order.get(x['mode'], 9))
-                _freq_cache[norad_id] = (_time.time(), transmitters)
-                logger.debug(f"Freq preload: NORAD {norad_id} → {len(transmitters)} transmetteurs")
-            except Exception as ex:
-                logger.debug(f"Freq preload NORAD {norad_id}: {ex}")
-            _time.sleep(2)  # 2s entre chaque requête SatNOGS
-        logger.info("Freq preload: terminé")
-
-    threading.Thread(target=_freq_preload_worker, daemon=True).start()
 
     logger.info("Tous les Workers ont été démarrés. Lancement du serveur Flask...")
     app.run(host='0.0.0.0', port=WEB_PORT, debug=True, use_reloader=False)

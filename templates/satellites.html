@@ -98,6 +98,20 @@
             vertical-align:middle;margin-right:4px;}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
         .refreshing{animation:pulse .6s ease-in-out infinite;}
+
+        /* Fréquences dans le popup satellite */
+        .sat-popup { max-width: 280px; }
+        .sat-freq-block { margin-top: 8px; border-top: 1px solid #1a4a5a; padding-top: 7px; }
+        .sat-freq-title { color: #00f3ff; font-size: .75em; font-weight: bold;
+            text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+        .sat-freq-row { display: flex; justify-content: space-between; align-items: baseline;
+            padding: 3px 0; border-bottom: 1px solid #0d2030; font-size: .78em; gap: 6px; }
+        .sat-freq-row:last-child { border-bottom: none; }
+        .sat-freq-desc { color: #aaa; flex: 1; font-size: .88em; }
+        .sat-freq-dl { color: #00ff80; font-weight: bold; white-space: nowrap; }
+        .sat-freq-ul { color: #fb923c; font-weight: bold; white-space: nowrap; }
+        .sat-freq-mode { color: #555; font-size: .82em; white-space: nowrap; }
+        .sat-freq-none { color: #333; font-style: italic; font-size: .78em; padding: 3px 0; }
     </style>
 </head>
 <body>
@@ -280,40 +294,123 @@ async function loadFootprint(norad) {
     } catch(e) {}
 }
 
+// NORAD du dernier popup construit — permet de ne pas reconstruire
+// le popup à chaque refresh de position (toutes les 10s)
+let _lastPopupNorad = null;
+
 function updateMap() {
     if(!selectedNorad) return;
     const s = positions.find(p => p.norad === selectedNorad);
     if(!s || s.error || s.lat === undefined) return;
 
-    const col = s.color || '#00f3ff';
+    const col  = s.color || '#00f3ff';
     const glow = s.visible ? `drop-shadow(0 0 6px ${col})` : 'none';
     const icon = L.divIcon({
         html: `<span style="font-size:20px;filter:${glow}">${s.icon||'🛰️'}</span>`,
         className:'sat-marker-icon', iconSize:[24,24], iconAnchor:[12,12]
     });
-    const popup = `<div class="sat-popup">
-        <b>${s.name}</b><br>
-        Az: ${s.az}° · El: ${s.el}° (UTC)<br>
-        Alt: ${s.alt_km} km<br>
-        Lat: ${s.lat}° · Lon: ${s.lon}°<br>
-        ${s.visible
-            ? `<span style="color:#00ff80">▲ VISIBLE — El ${s.el}°</span>`
-            : `<span style="color:#555">▽ Sous horizon</span>`}
-    </div>`;
+
+    const freqBlockId = `sat-freq-${s.norad}`;
 
     if(satMarker) {
+        // Mise à jour position + icône à chaque refresh (10s)
         satMarker.setLatLng([s.lat, s.lon]);
         satMarker.setIcon(icon);
+
+        // Mettre à jour uniquement les champs dynamiques dans le popup
+        // SANS reconstruire le HTML entier (préserve le bloc fréquences)
+        const popupEl = satMarker.getPopup()?.getElement();
+        if(popupEl && _lastPopupNorad === s.norad) {
+            const dynEl = popupEl.querySelector('.sat-pos-dynamic');
+            if(dynEl) {
+                dynEl.innerHTML =
+                    `Az: ${s.az}° · El: ${s.el}°<br>` +
+                    `Alt: ${s.alt_km} km · Lat: ${s.lat}° · Lon: ${s.lon}°<br>` +
+                    (s.visible
+                        ? `<span style="color:#00ff80">▲ VISIBLE — El ${s.el}°</span>`
+                        : `<span style="color:#555">▽ Sous horizon</span>`);
+            }
+            return; // Ne pas reconstruire le popup
+        }
+
+        // Satellite changé ou premier affichage : reconstruire le popup complet
+        const popup = _buildSatPopup(s, freqBlockId);
         satMarker.setPopupContent(popup);
     } else {
+        const popup = _buildSatPopup(s, freqBlockId);
         satMarker = L.marker([s.lat, s.lon], {icon})
-            .bindPopup(popup).addTo(satMap);
+            .bindPopup(popup, {maxWidth: 290}).addTo(satMap);
     }
-    // Recentrer si le satellite est loin du centre visible
-    const mapBounds = satMap.getBounds();
-    if(!mapBounds.contains([s.lat, s.lon])) {
+
+    _lastPopupNorad = s.norad;
+
+    // Charger les fréquences une fois le DOM du popup prêt
+    satMarker.once('popupopen', () => {
+        loadSatFrequencies(s.norad, freqBlockId);
+    });
+    satMarker.openPopup();
+
+    // Recentrer si le satellite est hors vue
+    if(!satMap.getBounds().contains([s.lat, s.lon])) {
         satMap.panTo([s.lat, s.lon], {animate: true, duration: 1});
     }
+}
+
+function _buildSatPopup(s, freqBlockId) {
+    return `<div class="sat-popup">
+        <b>${s.name}</b><br>
+        <span class="sat-pos-dynamic">
+            Az: ${s.az}° · El: ${s.el}°<br>
+            Alt: ${s.alt_km} km · Lat: ${s.lat}° · Lon: ${s.lon}°<br>
+            ${s.visible
+                ? `<span style="color:#00ff80">▲ VISIBLE — El ${s.el}°</span>`
+                : `<span style="color:#555">▽ Sous horizon</span>`}
+        </span>
+        <div class="sat-freq-block" id="${freqBlockId}">
+            <div class="sat-freq-title">📡 Fréquences</div>
+            <div style="color:#555;font-size:.75em;"><span class="spinner"></span>Chargement…</div>
+        </div>
+    </div>`;
+}
+
+// Cache local des fréquences pour éviter les requêtes répétées
+const _freqCache = {};
+
+async function loadSatFrequencies(norad, blockId) {
+    // Si en cache local (session), utiliser directement
+    if(_freqCache[norad]) {
+        renderFrequencies(blockId, _freqCache[norad]);
+        return;
+    }
+    try {
+        const r = await fetch(`/api/satellites/frequencies/${norad}`);
+        const d = await r.json();
+        _freqCache[norad] = d.transmitters || [];
+        renderFrequencies(blockId, _freqCache[norad]);
+    } catch(e) {
+        const el = document.getElementById(blockId);
+        if(el) el.innerHTML = '<div class="sat-freq-title">📡 Fréquences</div><div class="sat-freq-none">Données indisponibles</div>';
+    }
+}
+
+function renderFrequencies(blockId, transmitters) {
+    const el = document.getElementById(blockId);
+    if(!el) return;
+
+    if(!transmitters || !transmitters.length) {
+        el.innerHTML = '<div class="sat-freq-title">📡 Fréquences</div><div class="sat-freq-none">Aucune fréquence connue</div>';
+        return;
+    }
+
+    const rows = transmitters.map(t => {
+        const dl = t.downlink_mhz ? `<span class="sat-freq-dl">↓ ${t.downlink_mhz} MHz</span>` : '';
+        const ul = t.uplink_mhz   ? `<span class="sat-freq-ul">↑ ${t.uplink_mhz} MHz</span>`   : '';
+        const mode = t.mode ? `<span class="sat-freq-mode">${t.mode}${t.invert ? ' ⇅' : ''}</span>` : '';
+        const desc = t.description !== t.mode ? `<span class="sat-freq-desc">${t.description}</span>` : '';
+        return `<div class="sat-freq-row">${desc}${dl}${ul}${mode}</div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="sat-freq-title">📡 Fréquences (${transmitters.length})</div>${rows}`;
 }
 
 function renderSatButtons() {

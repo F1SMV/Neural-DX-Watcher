@@ -1,5 +1,4 @@
-# 📡 Neural DX Watcher — v10.0
-
+# 📡 Neural DX Watcher — v10.1
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -28,78 +27,55 @@ Built to **observe**, **understand** and **step back** — not to generate visua
 
 ### 1️⃣ **Index** Page — Real-time & Operator Tracking
 
-Immediate observation page.
-
-Displays:
-- live spot stream
-- active bands
-- wanted DX (*wanted*)
-- solar indices
-- **activity surge** alerts
-
+Displays the live spot stream, active bands, wanted DX, solar indices, and activity surge alerts.  
 👉 **Goal: know what's happening right now.**
 
 ---
 
 ### 📡 **WATCHLIST · Tracking** Panel
 
-A feature introduced to answer a simple need:
-
 > *"I wasn't at my desk — what did I miss?"*
 
-- based on the watchlist
-- uses an in-memory history
-- shows the latest spots per callsign
-
-Philosophy:
-- ❌ not a raw log
-- ❌ not a massive data dump
-- ✅ a catch-up tool
-- ✅ designed for the human operator
+Based on the watchlist, uses in-memory history, shows the latest spots per callsign.  
+✅ A catch-up tool designed for the human operator.
 
 ---
 
-### 2️⃣ **Map** Page — Observation Map (micro-view)
+### 2️⃣ **Map** Page — Observation Map
 
-Classic map of **individual spots**:
-
-- each point = **one station**
-- immediate geographical representation
-- instant snapshot
-
-👉 **Goal: see where it's happening.**
-
-The **Map** page is an **execution tool**.
+Classic map of individual spots — each point = one station.  
+👉 **Goal: see where it's happening.** The Map page is an **execution tool**.
 
 ---
 
 ### 3️⃣ **Analysis** Page — Deferred META ANALYSIS
 
-A deliberately **non-real-time** tool, based on application log analysis.
-
+A deliberately non-real-time tool, based on application log analysis.  
 👉 **A tool for stepping back**, not a gimmick.
 
 ---
 
 ### 4️⃣ **World** Page — Forecast & Anomalies
 
-The **World** page is **fundamentally different** from the Map page.
-
 | Page | Nature | Question |
 |---|---|---|
 | Map | Raw observation | Who is active right now? |
 | World | Interpreted analysis | Where is propagation abnormally favorable? |
 
-- displays **zones**, not stations
-- spatio-temporal clustering
-- noise filtering
-- controlled refresh rate
-
+Displays zones, not stations. Spatio-temporal clustering, noise filtering.  
 👉 **World decides, Map executes.**
+
+---
 
 ### 5️⃣ **Briefing**
 
-Updated every 12 hours, summarizing essential DX information. Offers the ability to automatically add callsigns to the **Watchlist** on the Index page. You won't miss any expedition — as soon as a callsign is spotted, it will be highlighted in yellow in the DX spots panel.
+Updated every 12 hours with essential DX information. Callsigns can be automatically added to the watchlist. You won't miss any expedition.
+
+---
+
+### 6️⃣ **Satellites**
+
+Real-time tracking of amateur satellites (AO-91, RS-44, SO-50, ISS…). Local sgp4 computation, next passes (AOS/TCA/LOS), uplink/downlink frequencies from SatNOGS.
 
 ---
 
@@ -107,12 +83,13 @@ Updated every 12 hours, summarizing essential DX information. Offers the ability
 
 ![Dashboard Preview](apercu.png)
 
+---
 
 ## 🚀 Installation
 
 ```bash
-git clone https://github.com/f1smv/spot-watcher-dx.git
-cd spot-watcher-dx
+git clone https://github.com/F1SMV/Neural-DX-Watcher.git
+cd Neural-DX-Watcher
 chmod +x start.sh
 ./start.sh
 ```
@@ -127,7 +104,7 @@ The application will be available at `http://localhost:8000`
 - Frontend: HTML / CSS / JavaScript
 - Cluster: Telnet DX Cluster
 - Analysis: dedicated Python scripts
-- Storage: memory + local JSON files + **SQLite** (v10.0)
+- Storage: memory + local JSON files + **SQLite**
 
 No cloud dependency.
 
@@ -135,223 +112,130 @@ No cloud dependency.
 
 ## 🗂️ Version History
 
+### v10.1 — COCKPIT Redesign · Radar Sweep · Improved Satellites · Bug Fixes
+
+#### 🎛 COCKPIT Mode Visual Overhaul
+
+**VHF PROPAGATION · VOACAP Panel**
+- Simplified format: HTML table with 4 bands (50 / 70 / 144 / 432 MHz) × 6 time slots
+- Color-coded cells by percentage (red → orange → yellow → green → blue)
+
+**Radar Sweep Effect** (🆕 ON/OFF toggle button)
+- Animated canvas beam via `requestAnimationFrame`, centered on the **operator's QTH**
+- Concentric radar rings, fading trail, glowing QTH dot
+- Pulsing spots synchronized to the beam — projected from real Leaflet coordinates
+- `⬤ RADAR ON / ○ RADAR OFF` button in the Magic Band panel header
+- State saved in localStorage
+
+**Unified Activity Scale Legend** (🆕)
+- 6 levels: CLOSED → WEAK → FAIR → OPENING → STRONG → HOT
+
+**Cockpit Watchlist Tracking** (🆕)
+- Watchlist panel cloned directly into cockpit column 3
+- Shows the full watchlist sorted by last spot, no filter required
+- Configurable purge selector (15 / 30 / 60 min)
+
+**DX Spot Feed improvements**
+- Calls displayed in **orange** (better readability), watchlist in yellow, new DXCC in red
+- Distance shown **first** in the INFO column (no longer hidden by ellipsis)
+
+**Page scrolling**
+- Mouse wheel now scrolls the entire cockpit page freely (no more internal column scroll traps)
+
+**Opening Strength gauge enlarged** — 132px → 200px
+
+#### 🛰️ Satellites Page — Uplink/Downlink Frequencies
+
+- Map popup enriched with **radio frequencies** for each satellite
+- Source: SatNOGS API (`db.satnogs.org/api/transmitters/`), 6-hour server cache
+- ↓ downlink in green · ↑ uplink in orange · mode (FM / Linear / CW…)
+- Frequencies remain stable — preserved across position refreshes
+- New backend route: `GET /api/satellites/frequencies/<norad_id>`
+
+**Satellite type fix**
+- Amateur satellites appeared as "unknown" in the Az/El table
+- New `_infer_sat_type()` function: AO-, SO-, RS-, OSCAR, FUNCUBE, AMSAT → amateur; NOAA, METOP → weather; ISS, CSS → station
+- Applied in both endpoints: positions and catalog
+
+**Azimuth fix** 🔴 *(critical bug)*
+- Azimuth readings were systematically off by **180°** (e.g. RS-44 showed 118° instead of 298°)
+- Root cause: `atan2(-e, s)` instead of `atan2(e, s)` in the SEZ coordinate formula
+- All azimuth calculations (current position, AOS/LOS passes) are now correct
+
+---
+
 ### v10.0 — Predictive Engine · Sparklines · Push Alerts (optional)
 
 #### 🔮 Personal Predictive Engine (`predictor.py`)
 
-A new personal intelligence layer: the application learns from your activity and anticipates the openings that matter to you.
+**SQLite collection** (`data/predictor.sqlite`): tables `spot_log`, `es_events`, `sessions`, `missing_dxcc`, auto-purge after 90 days.
 
-**Layer 1 — SQLite collection** (`data/predictor.sqlite`)
-- `spot_log` table: every received spot is recorded (call, DXCC, band, mode, SPD score, timestamp)
-- `es_events` table: every 6m spot generates a sporadic-E event (month, UTC hour, direction prefix)
-- `sessions` table: operator sessions tracked via browser heartbeat
-- `missing_dxcc` table: missing DXCCs synchronized from the LoTW cache
-- Automatic purge of data older than 90 days
+**Probabilistic scoring**: seasonal/hourly Es patterns, directional boost, band factor, local history bonus, missing DXCC cross-reference with LoTW.
 
-**Layer 2 — Probabilistic scoring**
-- Seasonal/hourly Es patterns: base probabilities by month × UTC hour (peak May–July, 07z–18z)
-- Directional boost: some Es paths are historically more frequent (EU→EU strong, EU→JA moderate…)
-- Band factor: 6m = SFI-independent (Es), HF = weighted by SFI and Kp
-- Local history bonus: recorded events reinforce the score for the same time slots
-- Missing DXCC cross-reference: only openings toward entities still needed are surfaced
-
-**Layer 3 — Predictions displayed in COCKPIT mode**
-- New **🔮 PERSONAL PREDICTIONS** panel in COCKPIT column 1
-- TOP 5 most probable windows over the next 24 hours
-- Each prediction: UTC time, band, target DXCC, % score, color bar, explanatory tip
-- 10-minute cache, auto-recalculated on every switch to cockpit mode
-- Example: *"Strong probability (68%) of 6m opening toward JT1 between 14h–17z — JT1 missing in FT8"*
-
-**New backend routes**
-- `GET /api/predictions` — personalized predictions (cross-referenced with LoTW if active)
-- `GET /api/predictor/stats` — collection stats (logged spots, Es events, sessions)
-- `POST /api/presence` — operator heartbeat (suppresses push alerts while you're on the page)
+**Cockpit predictions panel**: TOP 5 most probable windows over the next 24 hours.  
+Routes: `/api/predictions`, `/api/predictor/stats`, `POST /api/presence`
 
 #### 📊 Sparklines in the DX Feed
 
-Next to each callsign in the COCKPIT **DX Spot Feed**:
-- Inline 40×14 px canvas, **6 bars of 10 minutes** covering the last hour
-- At a glance: *"just arrived"* vs *"calling for 40 minutes"*
-- Cyan intensity proportional to spot count in each time bucket
-- Data from `/api/spot_history` — no additional collection, existing RAM history reused
-- Auto-injected by MutationObserver: always up to date without page reload
+40×14 px inline canvas · 6 bars of 10 minutes · auto-injected by MutationObserver
 
-#### 🔔 Smart push alerts (optional — disabled by default)
+#### 🔔 Smart Push Alerts (`ntfy.sh`, optional)
 
-Alert infrastructure available, disabled until `NTFY_URL` is configured.
+3 types: watchlist spotted / NEW DXCC / 6m opening · 15-min SQLite cooldown · presence filter  
+Routes: `/api/ntfy/status`, `POST /api/ntfy/test`
 
-**3 alert types:**
-1. **Watchlist spotted** — a tracked call appears on the cluster
-2. **NEW DXCC** — a missing LoTW entity is active on a needed band
-3. **6m opening** — surge detected (> N spots / 10 min)
+#### 🎨 Unified Design System
 
-**Built-in anti-spam:**
-- 15-minute cooldown per call/type stored in SQLite
-- **Presence filter**: if you're on the page (heartbeat < 45s), no alert is sent
-
-**PUSH badge** in the DX Feed title — shows status (active / inactive), click for details.
-
-**ntfy.sh configuration (if desired):**
-```bash
-# Create a topic on ntfy.sh (free, no account required)
-export NTFY_URL="https://ntfy.sh/neuraldx-f1smv-XXXXXX"
-
-# On your phone: install the ntfy.sh app, subscribe to the same topic
-# Test from the app:
-curl -s -X POST http://localhost:8000/api/ntfy/test
-```
-
-Self-hosting on the Pi is possible (single Go binary, ~20 MB RAM).
-
-**New routes:**
-- `GET /api/ntfy/status` — status, cooldowns, recent alerts
-- `POST /api/ntfy/test` — send a test notification
-
-#### 🎨 Unified design system (v9.6 → integrated v10.0)
-
-The COCKPIT visual language is now **the design of the entire application**:
-- HUD background with 32px grid and CRT scanlines as fixed layers
-- Glassmorphism on all CLASSIC and SMART panels (`backdrop-filter: blur(18px)`)
-- `.panel-header` titles styled as ck-title with glowing dot and cyan gradient band
-- Mode buttons with distinct glow states (cyan / purple / orange)
-- Header: frosted glass + title glow, translucent ticker
-- Tables: cyan-glow headers, hover rows
-- Scrollbars: cyan→orange gradient
-- Structural fix: `#header-row2` was rendered outside `#header` since v9.x
-
-#### 🔧 HF Propagation panel corrected
-
-The COCKPIT **HF PROPAGATION** panel was displaying incorrect VHF/UHF data:
-- Corrected bands: `80m / 40m / 20m / 17m / 15m / 12m / 10m` (instead of `50MHz / 70MHz / 144MHz / 432MHz`)
-- X axis: 24 columns 00z→23z (instead of 6 slots 06z→21z)
-- Palette: red→green matching the classic panel
-- "Now" line: white dashed line + ▼ triangle
-- Inline legend: 0-20 / 20-40 / 40-60 / 60-80 / 80+
-- Diurnal model: 80m/40m favored at night, 10m/12m/15m SFI-dependent
+Glassmorphism, CRT scanlines, cyan palette applied across the entire application.
 
 ---
 
-### v9.5 — Fine Geolocation + Gaussian Heatmap + Direct Spot Send
+### v9.5 — Fine Geolocation · Gaussian Heatmap · Direct Spot Send
 
-**Fine geolocation of spots (Option A+B)**
+- 100+ precise call districts (W0-W9, VE1-7, JA0-9, UA0-9…)
+- 6m Gaussian heatmap (weather radar style), adaptive radius
+- Click any table row → spot sent immediately
 
-- `CALLSIGN_ZONES` table: 100+ precise call districts (USA W0-W9/K/N by zone digit, Canada VE1-7, Japan JA0-9, Russia UA0-9, Australia VK1-7, Germany DL1-9, Spain EA1-8, France, Italy)
-- `_callsign_jitter()`: deterministic ±1.5° offset based on callsign MD5
-- `get_precise_latlon()`: 4 levels — 3-char prefix → 2-char → US zone digit → country centroid + jitter
-- Fixes the bug where all USA spots appeared at the same point (37.6, -91.87)
+### v9.4 — WSJT-X Integration + 6m Clustering
 
-**6m Gaussian Heatmap (Magic Band cockpit)**
-
-- Replaces distance-colored circles with a **continuous heat layer** (weather radar style)
-- Each spot emits a ~600km Gaussian (adaptive radius via Leaflet projection)
-- Relative normalization by measured max — densest zone is always red
-- Gamma 0.65 correction, palette: blue → cyan → green → yellow → orange → red
-- Auto-redraws on pan/zoom and Leaflet `load` event
-
-**Direct spot send on click**
-
-- Click any row in HF/VHF table → spot sent immediately via `POST /api/spot`
-- Confirmation toast bottom-right (green ✅ or red ❌)
-
-**FT8 DXpedition frequencies**
-
-- Added 14090 kHz (20m) and 18095 kHz (17m) as FT8 frequencies
-
-**Watchlist Purge v2**
-
-- New `data/wl_activity.json` — persists `{last_spot, end_date, added}` per call
-- Purge modal: red pre-checked rows (ended expeditions), end date in orange
-
-> v9.3 was an unpublished work-in-progress version.
-
-### v9.4 — WSJT-X Integration + 6m Clustering + fixes
-
-**WSJT-X UDP Integration**
-
-- Real-time WSJT-X UDP stream reception (port 2237)
-- Full Qt binary protocol parser: Heartbeat, Status, Decode, QSOLog
-- Maidenhead locator extraction from FT8 messages for precise positioning
-- 30s deduplication, orange `WSJT` badge + SNR in all tables
-- Compatible with Log4OM
-
-**6m Geographic Clustering**
-
-- 400km radius geo clustering, 5 color levels, proportional Leaflet zone halos
+- Full Qt UDP protocol parser, Maidenhead locator → precise lat/lon
+- 400km geographic clustering, 5 color levels
 
 ### v9.2 — Unified Cockpit Theme
 
-- **Cockpit** theme becomes the application-wide default
-- Inputs, buttons, tables, scrollbars harmonized across all modes
+### v9.0 — NEURAL DX & COCKPIT 6 m Mode
 
-### v9.0 — NEURAL DX & COCKPIT 6 m mode
+- 3-mode selector: ⚡ CLASSIC / 🧠 SMART / 🎛 COCKPIT 6 m
+- 3-column cockpit layout, Opening Strength gauge, VOACAP
 
-**3-mode selector**: ⚡ CLASSIC / 🧠 SMART / 🎛 COCKPIT 6 m
+### v8.2 — LoTW Persistence + Magic Band
 
-**COCKPIT 6 m mode**: dense dark radio cockpit interface, 3-column layout with E-Layer map, Opening Strength gauge, VOACAP forecast, scored Top Spots, DX Feed, DXCC Opportunities, Manual Spot.
+### v8.1 — Smart Mode Improvements + World Redesign
 
-### v8.2 — LoTW persistence + 6m Magic Band panel
-
-- LoTW cache saved to disk, auto-reloaded at startup
-- 6m Magic Band panel in SMART mode with Leaflet mini-map and 🔴 OPEN badge
-
-### v8.1 — Smart Mode improvements + World redesign
-
-- Rarity column: 🔴 MOST WANTED / 🟡 WANTED / 🔵 TRACKING / ⚡ EXOTIC DX
-- World page: full-screen map, floating HUD, integrated greyline
+- Rarity column: MOST WANTED / WANTED / TRACKING / EXOTIC DX
+- World: fullscreen map, floating HUD, integrated greyline
 
 ### v8.0 — Smart Mode 🧠
 
-- BASIC / SMART toggle
-- TOP SPOTS composite score: New DXCC (+40), Watchlist (+30), Missing band (+10), SFI (+20), SPD (+30), 10k+km (+15)
+Composite score: New DXCC (+40) · Watchlist (+30) · Missing band (+10) · SFI (+20) · SPD (+30) · 10k+km (+15)
 
-### v7.7 — Responsive
-
-- Mobile-optimized header, tables, maps, bandmap, purge modal
-
-### v7.6 — Greyline on Map page
-
-### v7.5 — Easy Watchlist cleanup
-
-### v7.4 — Landing page fixed, responsive
+### v7.7 — Responsive · v7.6 — Greyline · v7.5 — Watchlist Purge
 
 ### v7.2 — Satellite Tracker
 
-- Real-time tracking (AO-73, AO-91, ISS, RS-44, SO-50, FO-29, PO-101…)
-- Local sgp4 computation, Leaflet map, next passes panel (AOS/TCA/LOS)
+Real-time tracking, local sgp4 computation, next passes AOS/TCA/LOS
 
 ### v7.1 — LoTW DXCC Opportunities
 
-- Automatic cross-reference with upcoming expeditions (21-day horizon)
-- Briefing page rebuilt: drag & drop panels, rewritten NG3K parser
+Automatic cross-reference with upcoming expeditions (21-day horizon), Briefing page rebuilt
 
 ### v7.0 — LoTW Integration & Bandmap
 
-- Secure web login, full log import, DXCC stats per band
-- NEW / ✓ badges in spot tables, bandmap zoom 100×, mode colors
+Secure login, DXCC stats per band, NEW/✓ badges, bandmap zoom 100×
 
-### v6.9
+### v6.9 — Local VOACAP · v6.5 — AI Vocal Brief · v6.4 — Bandmap
 
-- Local VOACAP HF propagation prediction, no cloud dependency
-
-### v6.5
-
-- Optional AI Vocal Brief (Perplexity API)
-
-### v6.4
-
-- Bandmap added to home page
-
-### v6.0 — Stable Release
-
-- World page finalized, clustering stabilized, UX clarified
-
-### v5.6
-
-- Experimental World page, WATCHLIST · Tracking panel
-
-### v5.2
-
-- META ANALYSIS introduced
+### v6.0 — Stable Release · v5.6 — World (experimental) · v5.2 — META ANALYSIS
 
 ---
 

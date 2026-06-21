@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>📡 NEURAL DX v10.0</title>
+<title>📡 NEURAL DX Watcher v10.1</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230e0e0e'/><text y='.9em' font-size='80' x='10'>📡</text></svg>"/>
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -1233,12 +1233,11 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            overflow-y: auto;
+            overflow-y: visible;
             overflow-x: hidden;
             min-width: 0;
         }
-        .ck-col::-webkit-scrollbar { width: 3px; }
-        .ck-col::-webkit-scrollbar-thumb { background: rgba(0,243,255,0.15); border-radius: 3px; }
+        .ck-col::-webkit-scrollbar { display: none; }
         /* Panel cockpit générique */
         .ck-panel {
             background: linear-gradient(160deg, rgba(10,15,28,0.98) 0%, rgba(6,10,20,0.99) 100%);
@@ -2237,11 +2236,8 @@
             scrollbar-color: rgba(34,211,238,.35) transparent;
         }
 
-        body.mode-cockpit .ck-col::-webkit-scrollbar { width: 6px; }
-        body.mode-cockpit .ck-col::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, rgba(34,211,238,.55), rgba(251,146,60,.25));
-            border-radius: 999px;
-        }
+        body.mode-cockpit .ck-col::-webkit-scrollbar { display: none; }
+        body.mode-cockpit .ck-col { scrollbar-width: none; }
 
         body.mode-cockpit #ck-stats-row {
             gap: 12px;
@@ -2740,8 +2736,8 @@
         body.mode-cockpit .ck-smart6-fill { height:100%;border-radius:inherit;box-shadow:0 0 12px currentColor; }
         body.mode-cockpit .ck-smart6-score-val { font-family:Orbitron,monospace;font-size:1em;font-weight:900; }
         body.mode-cockpit .ck-smart6-rarity { text-align:right;font-size:.76em; }
-        body.mode-cockpit .ck-feed-row { grid-template-columns: 48px 112px 78px 44px 1fr !important; min-height:42px !important; }
-        body.mode-cockpit .ck-feed-hdr { grid-template-columns: 48px 112px 78px 44px 1fr !important; }
+        body.mode-cockpit .ck-feed-row { grid-template-columns: 44px 110px 58px 36px 1fr !important; min-height:42px !important; }
+        body.mode-cockpit .ck-feed-hdr { grid-template-columns: 44px 110px 58px 36px 1fr !important; }
         body.mode-cockpit .ck-fc { font-size:1.35em !important; font-weight:900 !important; text-shadow:0 0 12px currentColor; }
         body.mode-cockpit .ck-ff, body.mode-cockpit .ck-fi { font-size:1.02em !important; }
         #ck-voacap-canvas { height: 190px !important; background:#06101f; }
@@ -3303,17 +3299,22 @@
         }
 
         body.mode-cockpit .ck6m-gauge-card .ck-gauge {
-            width: 132px !important;
-            height: 132px !important;
+            width: 200px !important;
+            height: 200px !important;
         }
 
         body.mode-cockpit .ck6m-gauge-card .ck-gauge svg {
-            width: 132px !important;
-            height: 132px !important;
+            width: 200px !important;
+            height: 200px !important;
         }
 
         body.mode-cockpit .ck6m-gauge-card .ck-gauge-pct {
-            font-size: 1.75em !important;
+            font-size: 2.2em !important;
+        }
+
+        body.mode-cockpit .ck6m-gauge-card .ck-gauge-status {
+            font-size: .9em !important;
+            letter-spacing: 2px !important;
         }
 
         body.mode-cockpit #ck-voacap-canvas {
@@ -3941,6 +3942,48 @@
             filter: drop-shadow(0 0 8px rgba(255,216,77,.70)) !important;
         }
 
+        /* ════════════════════════════════════════════════════════════════
+           RADAR SWEEP MODE — overlay pur CSS par-dessus la carte Leaflet
+           existante. Zéro donnée supplémentaire : faisceau décoratif +
+           cercles concentriques tournants, dans l'esprit roadmap v9.5 #6.
+           ════════════════════════════════════════════════════════════════ */
+        body.mode-cockpit.ck-radar-off #ck6m-radar-canvas,
+        body.mode-cockpit.ck-radar-off #ck6m-radar-pulses { display: none !important; }
+
+        /* Points pulsants synchronisés au radar — positionnés en JS via
+           left/top en %, projetés depuis les coordonnées Leaflet réelles. */
+        #ck6m-radar-pulses {
+            position: absolute;
+            inset: 0;
+            z-index: 7;
+            pointer-events: none;
+        }
+        .ck6m-radar-pulse {
+            position: absolute;
+            width: 10px; height: 10px;
+            margin: -5px 0 0 -5px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #fff 0%, #7dd3fc 40%, transparent 75%);
+            opacity: .85;
+            animation: ck6m-pulse-beat 2.2s ease-out infinite;
+        }
+        .ck6m-radar-pulse.level-hot  { background: radial-gradient(circle, #fff 0%, #ff3b30 45%, transparent 75%); }
+        .ck6m-radar-pulse.level-warm { background: radial-gradient(circle, #fff 0%, #ff9500 45%, transparent 75%); }
+        @keyframes ck6m-pulse-beat {
+            0%   { box-shadow: 0 0 0 0 rgba(125,211,252,.55); transform: scale(.9); }
+            60%  { box-shadow: 0 0 0 14px rgba(125,211,252,0); transform: scale(1.15); }
+            100% { box-shadow: 0 0 0 0 rgba(125,211,252,0); transform: scale(.9); }
+        }
+
+        /* ── DX FEED calls en orange (cockpit) ── */
+        body.mode-cockpit .ck-fc,
+        body.mode-cockpit .ck-fc.ck-wl,
+        body.mode-cockpit .ck-fc.ck-new-dxcc {
+            color: #fb923c !important;
+            text-shadow: 0 0 10px rgba(251,146,60,.5) !important;
+        }
+        body.mode-cockpit .ck-fc.ck-wl    { color: #fbbf24 !important; }  /* watchlist = jaune */
+        body.mode-cockpit .ck-fc.ck-new-dxcc { color: #f87171 !important; } /* new dxcc = rouge */
 
         /* ── SPARKLINES DX FEED v10.0 ── */
         .ck-sparkline {
@@ -3950,6 +3993,58 @@
             opacity: 0.85;
             flex-shrink: 0;
         }
+
+        /* ── Échelle d'activité unifiée ── */
+        .ck-activity-scale-body { padding: 4px 2px 2px; }
+        .ck-scale-row {
+            display: flex; align-items: center; gap: 9px;
+            padding: 5px 4px;
+            font-size: .76em;
+            font-family: 'Share Tech Mono', monospace;
+            color: #aebed8;
+        }
+        .ck-scale-dot {
+            width: 13px; height: 13px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        /* ── Watchlist Tracking cockpit (clone) ── */
+        .ck-wl-track-controls {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 2px 8px;
+            font-size: .68em;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .ck-wl-track-label { color: #6f86a8; letter-spacing: .06em; }
+        #ck-wl-track-purge {
+            background: rgba(5,12,24,.78);
+            border: 1px solid rgba(34,211,238,.22);
+            color: #dff9ff;
+            border-radius: 6px;
+            padding: 3px 6px;
+            font-size: .95em;
+            font-family: inherit;
+        }
+        .ck-wl-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 6px;
+            border-radius: 7px;
+            font-size: .78em;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .ck-wl-row:hover { background: rgba(34,211,238,.05); }
+        .ck-wl-call { flex: 0 0 auto; min-width: 64px; font-weight: 800; color: #eafdff; }
+        .ck-wl-time { flex: 1; color: #6f86a8; font-size: .9em; }
+        .ck-wl-age {
+            flex: 0 0 auto; font-weight: 700;
+            padding: 1px 7px; border-radius: 999px;
+            font-size: .85em;
+        }
+        .ck-wl-age.fresh { background: rgba(34,197,94,.18); color: #86efac; }
+        .ck-wl-age.recent { background: rgba(96,165,250,.18); color: #93c5fd; }
+        .ck-wl-age.old { background: rgba(100,116,139,.18); color: #94a3b8; }
 
         /* ── WIDGET PRÉDICTIONS v10.0 ── */
         #ck-predictions-panel { min-height: 120px; }
@@ -4157,7 +4252,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V10.0</div>
+    <div id="title">📡 NEURAL DX WATCHER V10.1</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -4223,7 +4318,7 @@
     <!-- Prévisions VOACAP -->
     <div class="ck-panel" data-panel-id="ck-voacap">
       <div class="ck-title" style="gap:6px;">
-        <span>&#128225; PROPAGATION HF &middot; VOACAP</span>
+        <span>&#128225; PROPAGATION VHF &middot; VOACAP</span>
         <div style="display:flex;gap:3px;margin-left:auto;">
           <button onclick="loadCockpitVoacap('EU')" data-ckzone="EU" style="padding:1px 7px;font-size:.6em;cursor:pointer;border-radius:3px;background:rgba(0,243,255,.15);border:1px solid rgba(0,243,255,.4);color:var(--accent);font-family:monospace;">EU</button>
           <button onclick="loadCockpitVoacap('NA')" data-ckzone="NA" style="padding:1px 7px;font-size:.6em;cursor:pointer;border-radius:3px;background:rgba(0,0,0,.3);border:1px solid #333;color:#556;font-family:monospace;">NA</button>
@@ -4232,8 +4327,16 @@
         </div>
       </div>
       <div style="padding:6px 8px 8px;">
-        <canvas id="ck-voacap-canvas" style="width:100%;display:block;border-radius:4px;"></canvas>
-        <div id="ck-voacap-meta" style="font-size:.58em;color:#2a3550;text-align:right;margin-top:3px;font-family:monospace;"></div>
+        <div id="ck-voacap-title" style="font-size:.62em;color:#6f86a8;margin-bottom:6px;font-family:monospace;">6 m propagation probability · EU</div>
+        <table id="ck-voacap-table" style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:.72em;">
+          <thead>
+            <tr id="ck-voacap-hdr-row">
+              <th style="text-align:left;color:#6f86a8;font-weight:600;padding:2px 4px;"></th>
+            </tr>
+          </thead>
+          <tbody id="ck-voacap-tbody"></tbody>
+        </table>
+        <div id="ck-voacap-meta" style="font-size:.58em;color:#2a3550;text-align:right;margin-top:5px;font-family:monospace;"></div>
       </div>
     </div>
 
@@ -4266,6 +4369,20 @@
       <div class="ck-stat" style="--sc:#22C55E">
         <div class="ck-stat-v" id="ck-kp">—</div>
         <div class="ck-stat-l">K-index</div>
+      </div>
+    </div>
+
+    <!-- Échelle d'activité unifiée — légende statique, cohérente avec les
+         couleurs des hotspots radar et de la heatmap gaussienne. -->
+    <div class="ck-panel" data-panel-id="ck-activity-scale">
+      <div class="ck-title">📊 ÉCHELLE D'ACTIVITÉ (UNIFIÉE)</div>
+      <div class="ck-activity-scale-body">
+        <div class="ck-scale-row"><span class="ck-scale-dot" style="background:#5b6b85;"></span>Fermé / aucun spot</div>
+        <div class="ck-scale-row"><span class="ck-scale-dot" style="background:#2a7fd4;"></span>Faible activité</div>
+        <div class="ck-scale-row"><span class="ck-scale-dot" style="background:#22c55e;"></span>Activité correcte</div>
+        <div class="ck-scale-row"><span class="ck-scale-dot" style="background:#dddd22;"></span>Quelques spots, ouverture</div>
+        <div class="ck-scale-row"><span class="ck-scale-dot" style="background:#ff9500;"></span>Forte ouverture</div>
+        <div class="ck-scale-row"><span class="ck-scale-dot" style="background:#ff3b30;"></span>Bande chaude, nombreux spots</div>
       </div>
     </div>
 
@@ -4316,7 +4433,16 @@
         <div class="ck6m-world-stage">
           <div class="ck6m-stage-header">
             <span>E-LAYER HOTSPOTS</span>
-            <span id="ck-6m-live-label">LIVE</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button id="ck-radar-toggle" onclick="ckToggleRadar()"
+                title="Activer/désactiver le radar sweep"
+                style="padding:2px 9px;font-size:.6em;cursor:pointer;border-radius:4px;
+                       background:rgba(34,211,238,.18);border:1px solid rgba(34,211,238,.5);
+                       color:#22d3ee;font-family:monospace;letter-spacing:.5px;transition:all .2s;">
+                &#11044; RADAR ON
+              </button>
+              <span id="ck-6m-live-label">LIVE</span>
+            </div>
           </div>
 
           <div class="ck6m-world-shell">
@@ -4326,6 +4452,18 @@
 
             <div class="ck6m-map-graticule" aria-hidden="true"></div>
             <div class="ck6m-map-scan"></div>
+
+            <!-- Radar canvas — dessiné par JS comme la heatmap,
+                 z-index 650 pour être au-dessus des markers Leaflet -->
+            <canvas id="ck6m-radar-canvas"
+                    style="position:absolute;inset:0;width:100%;height:100%;
+                           pointer-events:none;z-index:650;display:none;"></canvas>
+
+            <!-- Points pulsants synchronisés au passage du radar — projetés
+                 depuis les vraies coordonnées Leaflet des spots actifs
+                 (ck6mHeatSpots), repositionnés à chaque update/pan/zoom. -->
+            <div id="ck6m-radar-pulses" aria-hidden="true"></div>
+
             <div class="ck6m-map-vignette"></div>
 
             <div class="ck6m-legend">
@@ -4467,6 +4605,28 @@
         <button class="ck-btn" onclick="sendCockpitSpot()">📡 ENVOYER AU CLUSTER</button>
         <div id="ck-spot-st"></div>
         <div id="ck-spot-last" style="font-size:.72em;color:#7dd3fc;text-align:center;min-height:16px;font-family:monospace;"></div>
+      </div>
+    </div>
+
+    <!-- Watchlist Tracking — clone cockpit, IDs préfixés ck- pour zéro
+         collision avec le panel original (resté intact dans le layout
+         classique #main-container plus bas). Affiche directement toute
+         la watchlist triée par dernier spot, sans exiger de filtre. -->
+    <div class="ck-panel" data-panel-id="ck-wl-tracking">
+      <div class="ck-title" style="justify-content:space-between;">
+        <span>📡 WATCHLIST TRACKING</span>
+        <span id="ck-wl-track-count" style="font-size:.62em;color:#6f86a8;font-weight:400;font-family:monospace;"></span>
+      </div>
+      <div class="ck-wl-track-controls">
+        <span class="ck-wl-track-label">PURGE APRÈS</span>
+        <select id="ck-wl-track-purge">
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="60" selected>60 min</option>
+        </select>
+      </div>
+      <div id="ck-wl-track-body">
+        <div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Chargement…</div>
       </div>
     </div>
 
@@ -5940,6 +6100,7 @@
                 zoom: 2,
                 zoomControl: false,
                 attributionControl: false,
+                scrollWheelZoom: false,   /* scroll page non capturé par défaut */
                 layers: [
                     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                         attribution: 'Tiles &copy; Esri',
@@ -5950,8 +6111,8 @@
             cockpit6mLayer = L.layerGroup().addTo(cockpit6mMap);
             cockpit6mUserMarker = addUserMarker(cockpit6mMap, userLatLng[0], userLatLng[1]);
             // Redessiner la heatmap dès que la projection Leaflet est prête
-            cockpit6mMap.once('load', () => { setTimeout(ck6mDrawHeat, 50); });
-            cockpit6mMap.on('move zoom moveend zoomend', ck6mDrawHeat);
+            cockpit6mMap.once('load', () => { setTimeout(ck6mDrawHeat, 50); setTimeout(ck6mDrawRadarPulses, 50); });
+            cockpit6mMap.on('move zoom moveend zoomend', () => { ck6mDrawHeat(); ck6mDrawRadarPulses(); });
             [120, 350, 900].forEach(delay => setTimeout(() => {
                 try { cockpit6mMap.invalidateSize(); } catch(e){}
                 setTimeout(ck6mDrawHeat, 50);
@@ -5986,6 +6147,131 @@
             }
             return P[P.length-1].slice(1);
         }
+
+        /* ── Radar toggle — état initial = ÉTEINT, un clic l'allume ──────────
+           La classe ck-radar-off sur <body> masque le radar (CSS).
+           On persiste le choix en localStorage pour mémoriser entre sessions. */
+        /* ── Radar canvas (requestAnimationFrame) ───────────────────────────────
+           Canvas dédié z-index:650 par-dessus heatmap (z-index:400).
+           Le faisceau est dessiné en JS pur — aucun conflit CSS, pas de
+           overflow:hidden, fonctionne dans tous les contextes de stacking. */
+        let _radarOn = false;
+        let _radarAngle = 0;
+        let _radarRaf = null;
+
+        function ckRadarDraw() {
+            const canvas = document.getElementById('ck6m-radar-canvas');
+            const mapEl  = document.getElementById('ck-6m-map');
+            if (!canvas || !mapEl || !cockpit6mMap) return;
+
+            const W = mapEl.clientWidth, H = mapEl.clientHeight;
+            if (!W || !H) return;
+
+            if (canvas.width !== W || canvas.height !== H) {
+                canvas.width = W; canvas.height = H;
+            }
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, W, H);
+
+            // Centre = QTH projeté en pixel
+            let cx = W / 2, cy = H / 2;
+            try {
+                const pt = cockpit6mMap.latLngToContainerPoint(userLatLng);
+                cx = pt.x; cy = pt.y;
+            } catch(e) {}
+
+            const R = Math.max(W, H) * 0.95;
+
+            // Cercles concentriques
+            ctx.lineWidth = 0.8;
+            [0.25, 0.5, 0.75, 1.0].forEach(f => {
+                ctx.beginPath();
+                ctx.arc(cx, cy, R * f, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(34,211,238,.10)';
+                ctx.stroke();
+            });
+
+            // Trainée derrière le faisceau
+            for (let i = 0; i < 28; i++) {
+                const a0 = _radarAngle - (i + 1) * 0.055;
+                const a1 = _radarAngle - i * 0.055;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, R, a0, a1);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(34,211,238,${((1 - i / 28) * 0.15).toFixed(3)})`;
+                ctx.fill();
+            }
+
+            // Faisceau principal
+            const sw = 0.35; // largeur angulaire ~20° (+25%)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, R, _radarAngle - sw / 2, _radarAngle + sw / 2);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(34,211,238,.52)';
+            ctx.fill();
+
+            // Ligne axiale
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(_radarAngle) * R, cy + Math.sin(_radarAngle) * R);
+            ctx.strokeStyle = 'rgba(34,211,238,.85)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Point QTH
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#22d3ee';
+            ctx.fill();
+
+            _radarAngle = (_radarAngle + 0.013) % (Math.PI * 2); // ~4s/tour
+        }
+
+        function ckRadarLoop() {
+            if (!_radarOn) return;
+            ckRadarDraw();
+            _radarRaf = requestAnimationFrame(ckRadarLoop);
+        }
+
+        function ckRadarApplyState(on) {
+            _radarOn = on;
+            const canvas = document.getElementById('ck6m-radar-canvas');
+            if (canvas) {
+                canvas.style.display = on ? 'block' : 'none';
+                if (!on) {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+            if (on) {
+                document.body.classList.remove('ck-radar-off');
+                cancelAnimationFrame(_radarRaf);
+                _radarRaf = requestAnimationFrame(ckRadarLoop);
+            } else {
+                document.body.classList.add('ck-radar-off');
+                cancelAnimationFrame(_radarRaf);
+            }
+            const btn = document.getElementById('ck-radar-toggle');
+            if (btn) {
+                btn.textContent = on ? '⬤ RADAR ON' : '○ RADAR OFF';
+                btn.style.background = on ? 'rgba(34,211,238,.18)' : 'rgba(100,116,139,.15)';
+                btn.style.borderColor = on ? 'rgba(34,211,238,.5)' : 'rgba(100,116,139,.4)';
+                btn.style.color = on ? '#22d3ee' : '#64748b';
+            }
+            localStorage.setItem('ck_radar', on ? '1' : '0');
+        }
+
+        function ckToggleRadar() { ckRadarApplyState(!_radarOn); }
+
+        // Restaurer l'état sauvegardé (défaut = éteint)
+        (function() {
+            setTimeout(() => ckRadarApplyState(localStorage.getItem('ck_radar') === '1'), 1500);
+        })();
+
+        // Redessiner si la carte bouge/zoom
+        // (appeléaussi depuis initCockpit6mMap map.on move/zoom)
 
         function ck6mEnsureCanvas() {
             const mapEl = document.getElementById('ck-6m-map');
@@ -6093,6 +6379,7 @@
 
             // Dessiner immédiatement si la carte est prête, puis après fitBounds
             ck6mDrawHeat();
+            ck6mDrawRadarPulses();
 
             try {
                 if (mapped.length) cockpit6mMap.fitBounds(cockpit6mLayer.getBounds().pad(0.20));
@@ -6100,10 +6387,62 @@
                 cockpit6mMap.invalidateSize();
                 // Multiples tentatives pour couvrir le délai de rendu Leaflet
                 [150, 400, 900, 1800].forEach(t =>
-                    setTimeout(() => { cockpit6mMap.invalidateSize(); ck6mDrawHeat(); }, t)
+                    setTimeout(() => { cockpit6mMap.invalidateSize(); ck6mDrawHeat(); ck6mDrawRadarPulses(); }, t)
                 );
             } catch(e) {}
         }
+
+        /* ── Points pulsants radar — projection des vraies coordonnées Leaflet ──
+           Repris du même principe que ck6mDrawHeat() : project les spots actifs
+           (ck6mHeatSpots) en position % left/top dans #ck6m-radar-pulses.
+           Un spot < 2 min est "hot" (rouge), < 5 min "warm" (orange), sinon
+           pulse cyan standard — cohérent avec la légende "spots récents". */
+        function ck6mDrawRadarPulses() {
+            const container = document.getElementById('ck6m-radar-pulses');
+            if (!container || !cockpit6mMap) return;
+            const mapEl = document.getElementById('ck-6m-map');
+            const W = mapEl.clientWidth, H = mapEl.clientHeight;
+            if (!W || !H) return;
+
+            const testPt = cockpit6mMap.latLngToContainerPoint([0, 0]);
+            if (!testPt || (testPt.x === 0 && testPt.y === 0 && cockpit6mMap.getZoom() > 1)) return;
+
+            const now = Date.now();
+            const frag = document.createDocumentFragment();
+
+            ck6mHeatSpots.forEach(s => {
+                const pt = cockpit6mMap.latLngToContainerPoint([Number(s.lat), Number(s.lon)]);
+                if (pt.x < -20 || pt.x > W + 20 || pt.y < -20 || pt.y > H + 20) return;
+
+                const ageMs = s.ts ? (now - spotTsMs(s)) : Infinity;
+                const dot = document.createElement('div');
+                dot.className = 'ck6m-radar-pulse' +
+                    (ageMs < 120000 ? ' level-hot' : ageMs < 300000 ? ' level-warm' : '');
+                dot.style.left = (pt.x / W * 100) + '%';
+                dot.style.top  = (pt.y / H * 100) + '%';
+                frag.appendChild(dot);
+            });
+
+            container.innerHTML = '';
+            container.appendChild(frag);
+        }
+
+        // Scroll roue activé seulement quand souris sur la carte Leaflet cockpit
+        // → permet de scroller la page normalement quand la souris est ailleurs
+        // Scroll roue sur le SHELL (conteneur visible), pas sur #ck-6m-map
+        // (qui est position:absolute et ne remonte pas tous les events).
+        // Exécuté en IIFE différée pour être sûr que le DOM est prêt.
+        setTimeout(function() {
+            var shell = document.querySelector('.ck6m-world-shell');
+            if (shell) {
+                shell.addEventListener('mouseenter', function() {
+                    try { if (cockpit6mMap) cockpit6mMap.scrollWheelZoom.enable(); } catch(e){}
+                });
+                shell.addEventListener('mouseleave', function() {
+                    try { if (cockpit6mMap) cockpit6mMap.scrollWheelZoom.disable(); } catch(e){}
+                });
+            }
+        }, 1200);
 
         function build6mActivitySeries(spots6m) {
             const now = Date.now();
@@ -6169,7 +6508,7 @@
                     ? 'background:linear-gradient(90deg,rgba(251,146,60,0.14),rgba(15,23,42,0.62) 70%);border-left:4px solid #fb923c;'
                     : 'background:linear-gradient(90deg,' + hexToRgba(col, 0.20) + ', rgba(15,23,42,0.62) 68%);border-left:4px solid ' + col + ';';
                 const modeCol = modeColor(s.mode);
-                const distTxt = s.distance_km ? Math.round(s.distance_km) + 'km' : '—';
+                const distTxt = s.distance_km ? Math.round(s.distance_km) + ' km' : '—';
                 const infoCol = infoDistanceColor(s.distance_km);
                 const snrTxt = isWsjtx && s.snr != null ? ' SNR' + (s.snr >= 0 ? '+' : '') + s.snr + 'dB' : '';
                 const clickAttr = isWsjtx
@@ -6181,10 +6520,8 @@
                     '<span class="ck-ff">' + (s.freq||'') + '</span>' +
                     '<span style="color:#e84393;font-size:1.08em;font-weight:800;">6m</span>' +
                     '<span class="ck-fi">' +
-                        (isWsjtx ? '<span style="color:#fb923c;font-size:.75em;font-weight:900;margin-right:4px;">WSJT</span>' : '') +
-                        '<span style="color:' + modeCol + ';font-weight:900;">' + (s.mode||'') + '</span>' +
-                        ' <span style="color:' + infoCol + ';">' + distTxt + '</span>' +
-                        (isWsjtx ? '<span style="color:#fb923c;">' + snrTxt + '</span>' : ' <span style="color:' + col + ';font-weight:800;">SPD ' + smart.total + '</span>') +
+                        '<span style="color:' + infoCol + ';font-weight:800;">' + distTxt + '</span>' +
+                        '<span style="color:' + modeCol + ';font-weight:700;margin-left:3px;">' + (s.mode||'') + '</span>' +
                     '</span>' +
                 '</div>';
             }).join('');
@@ -8637,6 +8974,69 @@ document.getElementById('wl-track-limit').onchange = loadWatchlistTracking;
 
 setInterval(loadWatchlistTracking, 30000);
 
+/* ── Watchlist Tracking COCKPIT (clone) ────────────────────────────────
+   Contrairement au panel original (qui exige un filtre pour afficher
+   quoi que ce soit), celui-ci affiche directement toute la watchlist
+   triée par dernier spot — fidèle au mockup "Mission Control". Le
+   backend /api/watchlist/tracking.json retourne déjà tout sans filtre
+   quand q est vide, donc zéro changement backend nécessaire. */
+async function loadCockpitWlTracking() {
+  const body = document.getElementById('ck-wl-track-body');
+  const countEl = document.getElementById('ck-wl-track-count');
+  const purgeSel = document.getElementById('ck-wl-track-purge');
+  if (!body) return;
+
+  const purgeMin = purgeSel ? parseInt(purgeSel.value, 10) : 60;
+
+  try {
+    const r = await fetch('/api/watchlist/tracking.json?limit=1', { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    const calls = data.calls || {};
+
+    // Aplatir : un call → son spot le plus récent (limit=1 déjà côté backend)
+    const entries = Object.entries(calls)
+      .map(([call, spots]) => ({ call, spot: spots[0] || null }))
+      .filter(e => e.spot)
+      .filter(e => e.spot.age_min <= purgeMin)
+      .sort((a, b) => a.spot.age_min - b.spot.age_min);
+
+    if (countEl) countEl.textContent = entries.length ? `${entries.length} actives` : '';
+
+    body.innerHTML = entries.length
+      ? entries.map(e => {
+          const age = e.spot.age_min;
+          const ageCls = age < 5 ? 'fresh' : age < 30 ? 'recent' : 'old';
+          const ageLabel = age < 1 ? '<1m' : `${age}m`;
+          return `<div class="ck-wl-row">
+            <span class="ck-wl-call">${e.call}</span>
+            <span class="ck-wl-time">${e.spot.utc} UTC · ${e.spot.band || ''} ${e.spot.mode || ''}</span>
+            <span class="ck-wl-age ${ageCls}">${ageLabel}</span>
+          </div>`;
+        }).join('')
+      : '<div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Aucune entrée watchlist active.</div>';
+  } catch (e) {
+    body.innerHTML = '<div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Erreur de chargement.</div>';
+  }
+}
+
+// Sécurité : ce script s'exécute en plein milieu du document (pas en fin
+// de body), donc DOMContentLoaded a déjà pu se déclencher. On vérifie
+// document.readyState plutôt que d'attendre un événement qui pourrait
+// ne jamais arriver (même bug déjà rencontré et corrigé ailleurs dans
+// cette codebase — voir onDomReady plus bas dans le fichier).
+function _ckWlInit() {
+  loadCockpitWlTracking();
+  setInterval(loadCockpitWlTracking, 30000);
+  const purgeSel = document.getElementById('ck-wl-track-purge');
+  if (purgeSel) purgeSel.addEventListener('change', loadCockpitWlTracking);
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _ckWlInit);
+} else {
+  _ckWlInit();
+}
+
 </script>
 
 <script>
@@ -8850,153 +9250,63 @@ fetch('/api/check_update')
   }
 
   window.drawCockpitVoacapCanvas = function(zone, solar) {
-    const canvas = document.getElementById('ck-voacap-canvas');
-    const meta   = document.getElementById('ck-voacap-meta');
-    if (!canvas) return;
+    const titleEl = document.getElementById('ck-voacap-title');
+    const hdrRow  = document.getElementById('ck-voacap-hdr-row');
+    const tbody   = document.getElementById('ck-voacap-tbody');
+    const meta    = document.getElementById('ck-voacap-meta');
+    if (!tbody) return;
 
-    // ── Dimensions ──────────────────────────────────────────────────────────
-    const parent = canvas.parentElement || canvas.closest('.ck-panel');
-    const dpr    = window.devicePixelRatio || 1;
-    const bands  = ['80m','40m','20m','17m','15m','12m','10m'];
-    const nH     = 24;          // colonnes 00z → 23z
-
-    // hauteur : 22px titre + 18px header heures + nBands*cellH + 6px padding bas + 22px légende
-    const cellH   = 22;
-    const rowGap  = 3;
-    const labelW  = 30;
-    const hdrH    = 18;
-    const titleH  = 20;
-    const legendH = 22;
-    const padB    = 8;
-    const h = titleH + hdrH + bands.length * (cellH + rowGap) - rowGap + padB + legendH;
-    const wFull = Math.max(260, Math.floor((parent && parent.clientWidth) ? parent.clientWidth - 2 : 340));
-    const w = wFull;
-
-    canvas.width        = Math.floor(w * dpr);
-    canvas.height       = Math.floor(h * dpr);
-    canvas.style.width  = '100%';
-    canvas.style.height = h + 'px';
-
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // ── Fond ────────────────────────────────────────────────────────────────
-    const bg = ctx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, '#061a33'); bg.addColorStop(1, '#020814');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
-
-    // ── Données solaires ────────────────────────────────────────────────────
     const z   = zone || 'EU';
     const sfi = safeNum(solar && (solar.sfi ?? solar.SFI), 120);
     const kp  = safeNum(solar && (solar.kp  ?? solar.k   ?? solar.k_index), 2);
     const zoneOffset = ({EU:.10, NA:.02, AS:-.02, OC:-.08, SA:.04, AF:.06})[z] || 0;
-    // base = probabilité de base 0..1 pour 20m en milieu de journée
     const base = Math.max(0.06, Math.min(0.95, (sfi - 70) / 130 - Math.max(0, kp - 2) * 0.08 + zoneOffset));
 
-    // Pénalités par bande : 80m pénalisé en journée, 10m pénalisé si SFI bas
-    // [80m, 40m, 20m, 17m, 15m, 12m, 10m]
-    const bandPenalty  = [0.30, 0.15, 0.00, 0.02, 0.06, 0.10, 0.14];
-    // 10m/12m/15m dépendent fortement du SFI
-    const sfiFactor    = [0.20, 0.40, 0.80, 0.85, 0.90, 0.95, 1.00];
+    // ── Format VHF/UHF du mockup : 4 bandes × 6 créneaux horaires ──────────
+    const bands = ['50MHz', '70MHz', '144MHz', '432MHz'];
+    const hours = ['06z', '09z', '12z', '15z', '18z', '21z'];
+    // Pénalité par bande : 50MHz favorisé (Es), 432MHz beaucoup plus dépendant
+    // du SFI/troposcatter, quasi jamais d'ouverture longue distance
+    const bandPenalty = [0.00, 0.20, 0.45, 0.65];
+    const sfiFactor    = [1.00, 0.85, 0.55, 0.35];
 
-    // ── Palette couleurs (aligne sur le pavé classique) ──────────────────────
     function relColor(rel) {
-      if (rel >= .80) return [51,  187,   0];
-      if (rel >= .60) return [170, 204,   0];
-      if (rel >= .40) return [221, 136,   0];
-      if (rel >= .20) return [204,  68,   0];
-      return                 [139,   0,   0];
+      if (rel >= .70) return '#cc2222';   // rouge = forte ouverture (comme mockup 85%)
+      if (rel >= .50) return '#dd7700';   // orange
+      if (rel >= .30) return '#cccc00';   // jaune
+      if (rel >= .15) return '#33aa33';   // vert
+      return '#2a4a7a';                    // bleu/gris = faible
     }
 
-    // ── Titre canvas ─────────────────────────────────────────────────────────
-    ctx.font = "11px 'Share Tech Mono', monospace";
-    ctx.fillStyle = '#7dd3fc';
-    ctx.fillText('HF propagation probability · ' + z, 6, 13);
+    // ── Titre ────────────────────────────────────────────────────────────
+    if (titleEl) titleEl.textContent = '6 m propagation probability · ' + z;
 
-    // ── Axe X (heures UTC toutes les 3h) ────────────────────────────────────
-    const gridLeft  = labelW;
-    const gridTop   = titleH + hdrH;
-    const cellW     = (w - gridLeft - 4) / nH;
+    // ── En-tête (heures) ────────────────────────────────────────────────
+    hdrRow.innerHTML = '<th style="text-align:left;color:#6f86a8;font-weight:600;padding:2px 4px;"></th>' +
+      hours.map(h => `<th style="color:#6f86a8;font-weight:600;padding:2px 4px;text-align:center;">${h}</th>`).join('');
 
-    ctx.fillStyle = '#556677'; ctx.font = "9px 'Share Tech Mono', monospace"; ctx.textAlign = 'center';
-    for (let hh = 0; hh < nH; hh += 3) {
-      ctx.fillText(hh + 'z', gridLeft + hh * cellW + cellW * 1.5, titleH + 12);
-    }
-
-    // ── Grille de fond ───────────────────────────────────────────────────────
-    ctx.strokeStyle = 'rgba(125,211,252,.08)'; ctx.lineWidth = .5;
-    for (let hh = 0; hh <= nH; hh += 3) {
-      const x = gridLeft + hh * cellW;
-      ctx.beginPath(); ctx.moveTo(x, titleH + hdrH - 4); ctx.lineTo(x, gridTop + bands.length * (cellH + rowGap) - rowGap); ctx.stroke();
-    }
-
-    // ── Cellules ─────────────────────────────────────────────────────────────
-    const nowH = new Date().getUTCHours();
-
+    // ── Corps du tableau ────────────────────────────────────────────────
+    let rows = '';
     for (let bi = 0; bi < bands.length; bi++) {
-      const y = gridTop + bi * (cellH + rowGap);
-
-      // Label bande
-      ctx.fillStyle = '#8aa6c8'; ctx.font = "bold 9px 'Share Tech Mono', monospace"; ctx.textAlign = 'right';
-      ctx.fillText(bands[bi], labelW - 3, y + cellH * 0.70);
-
-      for (let hh = 0; hh < nH; hh++) {
-        // Diurnal : max autour de 12-14z, nuit pénalisée
-        const diurnal  = Math.max(0, Math.sin((hh - 4) / 19 * Math.PI));
-        // 80m : meilleur la nuit, 10m : meilleur en journée
-        const nightBonus = bi === 0 ? Math.max(0, 1 - diurnal) * 0.45 :
-                           bi === 1 ? Math.max(0, 1 - diurnal) * 0.20 : 0;
+      let cells = `<td style="color:#8aa6c8;font-weight:700;padding:3px 4px;">${bands[bi]}</td>`;
+      for (let hi = 0; hi < hours.length; hi++) {
+        // Diurnal : pic vers 15-21z (cohérent avec mockup où 21z = 85% pour 50MHz)
+        const diurnal = Math.max(0, Math.sin((hi / (hours.length - 1)) * Math.PI / 1.3));
         const sfiScaled = base * sfiFactor[bi];
-        let rel = Math.max(0.02, Math.min(0.97,
-          sfiScaled * (0.45 + diurnal * 0.60) - bandPenalty[bi] + nightBonus
+        const rel = Math.max(0.02, Math.min(0.97,
+          sfiScaled * (0.35 + diurnal * 0.75) - bandPenalty[bi] + diurnal * 0.25
         ));
-
-        const [r, g, b2] = relColor(rel);
-        const x = gridLeft + hh * cellW;
-
-        ctx.fillStyle = `rgba(${r},${g},${b2},0.88)`;
-        ctx.fillRect(x + .5, y + .5, Math.max(1, cellW - 1), cellH - 1);
-
-        // Valeur texte si cellule assez large (≥ 18px)
-        if (cellW >= 18) {
-          ctx.fillStyle = rel >= .40 ? '#000' : '#ccc';
-          ctx.font = "8px 'Share Tech Mono', monospace"; ctx.textAlign = 'center';
-          ctx.fillText(Math.round(rel * 100), x + cellW / 2, y + cellH * 0.72);
-        }
+        const pct = Math.round(rel * 100);
+        const color = relColor(rel);
+        cells += `<td style="padding:3px 2px;text-align:center;">
+          <div style="background:${color};border-radius:4px;padding:4px 2px;color:#fff;font-weight:800;font-size:.92em;text-shadow:0 1px 2px rgba(0,0,0,.4);">${pct}%</div>
+        </td>`;
       }
+      rows += `<tr>${cells}</tr>`;
     }
+    tbody.innerHTML = rows;
 
-    // ── Ligne "now" ──────────────────────────────────────────────────────────
-    const nowX = gridLeft + nowH * cellW + cellW / 2;
-    const gridBottom = gridTop + bands.length * (cellH + rowGap) - rowGap;
-    ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.5;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(nowX, gridTop); ctx.lineTo(nowX, gridBottom); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#fff'; ctx.font = "bold 9px 'Share Tech Mono', monospace"; ctx.textAlign = 'center';
-    ctx.fillText('▼', nowX, gridTop - 2);
-
-    // ── Légende ──────────────────────────────────────────────────────────────
-    const legendY = gridBottom + padB + 10;
-    const swatchW = 22; const swatchH = 10;
-    const swatches = [
-      {label:'0–20', color:[139,0,0]},
-      {label:'20–40', color:[204,68,0]},
-      {label:'40–60', color:[221,136,0]},
-      {label:'60–80', color:[170,204,0]},
-      {label:'80+',   color:[51,187,0]}
-    ];
-    let lx = gridLeft;
-    ctx.font = "8px 'Share Tech Mono', monospace";
-    swatches.forEach(s => {
-      ctx.fillStyle = `rgb(${s.color[0]},${s.color[1]},${s.color[2]})`;
-      ctx.fillRect(lx, legendY - swatchH + 2, swatchW, swatchH);
-      ctx.fillStyle = '#556677'; ctx.textAlign = 'left';
-      ctx.fillText(s.label, lx + swatchW + 2, legendY);
-      lx += swatchW + (s.label.length > 3 ? 38 : 32);
-    });
-
-    // ── Méta ─────────────────────────────────────────────────────────────────
+    // ── Méta ─────────────────────────────────────────────────────────────
     if (meta) meta.textContent = 'Zone ' + z + ' · SFI ' + sfi + ' · Kp ' + kp.toFixed(1) + ' · generated locally';
   };
 
@@ -9153,6 +9463,18 @@ fetch('/api/check_update')
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
 
+  /* ── Helper : exécute immédiatement si le DOM est déjà prêt ──────────────
+     Ce script est chargé en fin de <body>, donc l'événement DOMContentLoaded
+     a déjà eu lieu au moment où ce bloc s'exécute — un addEventListener
+     classique ne se déclencherait jamais. */
+  function onDomReady(fn) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fn);
+    } else {
+      fn();
+    }
+  }
+
   /* ── Historique spots en RAM (call → [timestamps ms]) ─────────────────── */
   const _sparkHistory = {};   // { "JA1AA": [ts_ms, ...], ... }
   let   _sparkLoaded  = false;
@@ -9214,7 +9536,7 @@ fetch('/api/check_update')
   }
 
   /* Observer mutations sur ck-feed-rows pour injecter après chaque rendu */
-  document.addEventListener('DOMContentLoaded', () => {
+  onDomReady(() => {
     const feedEl = document.getElementById('ck-feed-rows');
     if (feedEl) {
       const obs = new MutationObserver(() => setTimeout(injectSparklines, 50));
@@ -9299,7 +9621,7 @@ fetch('/api/check_update')
   };
 
   /* ── Init & polling ──────────────────────────────────────────────────── */
-  document.addEventListener('DOMContentLoaded', () => {
+  onDomReady(() => {
     // Sparkline history : charger au boot puis toutes les 5 min
     loadSparkHistory();
     setInterval(loadSparkHistory, 300_000);

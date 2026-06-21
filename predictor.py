@@ -138,13 +138,42 @@ class Predictor:
     # ──────────────────────────────────────────────────────────────
     def _init_db(self):
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._conn() as conn:
-            conn.executescript(DB_SCHEMA)
+        # Connexion PERSISTANTE unique, réutilisée pour tous les appels.
+        # CORRECTIF : l'ancienne implémentation ouvrait une nouvelle
+        # connexion SQLite physique à CHAQUE appel (record_spot,
+        # get_predictions, etc.). Sur un cluster actif envoyant plusieurs
+        # spots/seconde, ça épuise rapidement les descripteurs de fichiers
+        # et crée une forte contention sur le WAL — cause directe de
+        # l'erreur "unable to open database file" observée en production
+        # sur Raspberry Pi (carte SD, I/O plus lente qu'un SSD).
+        # check_same_thread=False car telnet_worker/maintenance_worker
+        # tournent dans des threads différents ; self._lock protège déjà
+        # tous les accès concurrents à cette connexion partagée.
+        self._db = sqlite3.connect(
+            str(self.db_path), check_same_thread=False, timeout=30
+        )
+        self._db.row_factory = sqlite3.Row
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.execute("PRAGMA synchronous=NORMAL")
+        self._db.executescript(DB_SCHEMA)
+        self._db.commit()
 
     def _conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=10)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """
+        Retourne la connexion persistante partagée. Conservé comme méthode
+        (plutôt qu'un accès direct à self._db) pour ne pas casser le reste
+        du code qui utilise `with self._conn() as conn:` — sqlite3.Connection
+        supporte le protocole context manager nativement (commit/rollback
+        automatique sans fermer la connexion physique).
+        """
+        return self._db
+
+    def close(self):
+        """Fermeture propre à l'arrêt de l'application (optionnel)."""
+        try:
+            self._db.close()
+        except Exception:
+            pass
 
     # ──────────────────────────────────────────────────────────────
     # Brique 1a : Collecte — spots

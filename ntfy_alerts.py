@@ -75,13 +75,32 @@ class NtfyAlerter:
     # ──────────────────────────────────────────────────────────────
     def _init_db(self):
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(str(self._db_path)) as conn:
-            conn.executescript(_ALERT_SCHEMA)
+        # Connexion PERSISTANTE unique, réutilisée pour tous les appels.
+        # CORRECTIF : l'ancienne implémentation ouvrait une nouvelle
+        # connexion SQLite physique à chaque alerte (_can_alert,
+        # _mark_alerted, get_status...). Sur un cluster actif avec
+        # plusieurs spots/seconde, ça épuise les descripteurs de fichiers
+        # et crée une contention WAL — cause de "unable to open database
+        # file" observée en production sur Pi (carte SD).
+        self._db = sqlite3.connect(
+            str(self._db_path), check_same_thread=False, timeout=30
+        )
+        self._db.row_factory = sqlite3.Row
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.execute("PRAGMA synchronous=NORMAL")
+        self._db.executescript(_ALERT_SCHEMA)
+        self._db.commit()
 
     def _conn(self) -> sqlite3.Connection:
-        c = sqlite3.connect(str(self._db_path), check_same_thread=False, timeout=5)
-        c.row_factory = sqlite3.Row
-        return c
+        """Retourne la connexion persistante partagée (voir _init_db)."""
+        return self._db
+
+    def close(self):
+        """Fermeture propre à l'arrêt de l'application (optionnel)."""
+        try:
+            self._db.close()
+        except Exception:
+            pass
 
     # ──────────────────────────────────────────────────────────────
     # Présence opérateur
