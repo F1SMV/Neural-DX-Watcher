@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+    
     <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🛰️ Satellite Tracker — {{ my_call }}</title>
     <link rel="stylesheet" href="/static/base.css">
@@ -377,17 +379,39 @@ function _buildSatPopup(s, freqBlockId) {
 const _freqCache = {};
 
 async function loadSatFrequencies(norad, blockId) {
-    // Si en cache local (session), utiliser directement
-    if(_freqCache[norad]) {
+    // Cache déjà rempli → affichage immédiat
+    if(_freqCache[norad] !== undefined && _freqCache[norad] !== null) {
         renderFrequencies(blockId, _freqCache[norad]);
         return;
     }
+    // Préchargement en cours (null) → attendre max 3s par polling 200ms
+    if(_freqCache[norad] === null) {
+        let waited = 0;
+        const poll = setInterval(() => {
+            waited += 200;
+            if(_freqCache[norad] !== null && _freqCache[norad] !== undefined) {
+                clearInterval(poll);
+                renderFrequencies(blockId, _freqCache[norad]);
+            } else if(waited >= 3000) {
+                clearInterval(poll);
+                // Fallback : charger directement si le preload n'a pas fini
+                _fetchAndRender(norad, blockId);
+            }
+        }, 200);
+        return;
+    }
+    // Pas encore en cache → charger maintenant
+    _fetchAndRender(norad, blockId);
+}
+
+async function _fetchAndRender(norad, blockId) {
     try {
         const r = await fetch(`/api/satellites/frequencies/${norad}`);
         const d = await r.json();
         _freqCache[norad] = d.transmitters || [];
         renderFrequencies(blockId, _freqCache[norad]);
     } catch(e) {
+        _freqCache[norad] = [];
         const el = document.getElementById(blockId);
         if(el) el.innerHTML = '<div class="sat-freq-title">📡 Fréquences</div><div class="sat-freq-none">Données indisponibles</div>';
     }
@@ -475,7 +499,25 @@ async function loadPositions() {
         document.getElementById('map-ts').textContent  = ts;
         const vis = positions.filter(p=>p.visible&&!p.error).length;
         document.getElementById('meta-vis').textContent = `👁 Visibles: ${vis}/${positions.filter(p=>!p.error).length}`;
+
+        // Précharger les fréquences de tous les satellites en parallèle
+        // → quand l'utilisateur clique, _freqCache[norad] est déjà rempli = affichage immédiat
+        _preloadAllFrequencies(positions.filter(p=>!p.error).map(p=>p.norad));
+
     } catch(e) { console.error(e); }
+}
+
+// Précharge silencieuse des fréquences — requêtes parallèles, sans bloquer l'UI
+function _preloadAllFrequencies(norads) {
+    norads.forEach(norad => {
+        if(_freqCache[norad] !== undefined) return; // déjà en cache
+        // Marquer comme "en cours" pour ne pas lancer deux fois
+        _freqCache[norad] = null;
+        fetch(`/api/satellites/frequencies/${norad}`)
+            .then(r => r.json())
+            .then(d => { _freqCache[norad] = d.transmitters || []; })
+            .catch(() => { _freqCache[norad] = []; });
+    });
 }
 
 // ── PASSAGES ──────────────────────────────────

@@ -1,4 +1,4 @@
-# 📡 Neural DX Watcher — v10.1
+# 📡 Neural DX Watcher — v10.2
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -121,6 +121,28 @@ Aucune dépendance cloud.
 ---
 
 ## 🗂️ Historique des versions
+
+### v10.2 — Migration TLE format JSON OMM (CelesTrak)
+
+#### 🛰️ Compatibilité catalogues satellites post-juillet 2026
+
+CelesTrak épuisera les numéros de catalogue à 5 chiffres (limite à 69999) autour du **12 juillet 2026**. À partir de cette date, les nouveaux satellites auront des numéros ≥ 100000 et ne seront plus disponibles au format TLE texte classique.
+
+**Nouvelle architecture de chargement TLE — 3 couches :**
+
+1. **Sources JSON OMM (priorité)** — CelesTrak GP API :
+   - `gp.php?GROUP=amateur&FORMAT=json` → tous les satellites amateurs
+   - `gp.php?GROUP=stations&FORMAT=json` → ISS, CSS Tiangong, etc.
+   - Format OMM : `OBJECT_NAME`, `NORAD_CAT_ID` (entier natif, illimité), `TLE_LINE1`, `TLE_LINE2`
+   - `TLE_LINE1`/`TLE_LINE2` passés directement à `sgp4.twoline2rv()` — aucun changement dans le reste du code
+
+2. **Fallback texte (AMSAT nasa.all)** — complémente le JSON pour les satellites manquants, opérationnel jusqu'en juillet 2026
+
+3. **Log consolidé** — au démarrage : nombre de satellites chargés par source (JSON vs texte)
+
+**Aucun impact utilisateur** — le reste du code (calculs az/el, prédictions, popup fréquences) est inchangé.
+
+---
 
 ### v10.1 — Mode COCKPIT redessiné · Radar sweep · Satellites améliorés · Corrections
 

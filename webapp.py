@@ -1504,7 +1504,7 @@ def get_surge_status():
 @app.route('/analysis.html')
 def analysis_page():
     """Route pour rendre la page d'analyse/AI Insight."""
-    return render_template('analysis.html', my_call=MY_CALL)
+    return render_template('ai_insight.html', my_call=MY_CALL)
 
 @app.route('/analysis')
 def analysis_page_alias():
@@ -4484,8 +4484,28 @@ TLE_CACHE_TTL = 6 * 3600  # 6h
 
 # URL source TLE AMSAT (fichier complet, toujours à jour)
 # Sources TLE par ordre de priorité
+# Sources TLE v10.1 — Format JSON OMM (CelesTrak GP API)
+# Migration obligatoire : les numéros de catalogue > 69999 (prévu ~juillet 2026)
+# ne seront plus disponibles en format TLE texte.
+# Les champs JSON : OBJECT_NAME, NORAD_CAT_ID, TLE_LINE1, TLE_LINE2
+#   → TLE_LINE1/TLE_LINE2 sont directement compatibles avec sgp4.twoline2rv()
+#   → NORAD_CAT_ID est un entier (pas limité à 5 chiffres)
+#
+# Note CelesTrak : rafraîchir max 1x/2h — bloque les IP qui spamment.
+# Notre TLE_CACHE_TTL est déjà à 3600s, donc on est dans les clous.
+
+TLE_JSON_SOURCES = [
+    # Satellites amateurs (AO-91, AO-92, AO-73, RS-44, SO-50, FO-29, etc.)
+    ('CelesTrak-Amateur', 'https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=json'),
+    # Stations spatiales (ISS, CSS Tiangong...)
+    ('CelesTrak-Stations', 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json'),
+]
+
+# Fallback TLE texte (AMSAT nasa.all) — pour les satellites amateurs historiques
+# et en cas d'indisponibilité de CelesTrak.
+# Ce fallback sera obsolète après juillet 2026 pour les nouveaux satellites.
 TLE_SOURCES = [
-    ('AMSAT', 'https://www.amsat.org/amsat/ftp/keps/current/nasa.all'),
+    ('AMSAT-fallback', 'https://www.amsat.org/amsat/ftp/keps/current/nasa.all'),
 ]
 
 def _fetch_url(url):
@@ -4505,16 +4525,69 @@ def _fetch_url(url):
     return ''
 
 def _fetch_all_tles():
-    """Télécharge les TLE depuis les sources disponibles."""
-    combined = ''
-    for name, url in TLE_SOURCES:
+    """
+    Télécharge les TLE depuis les sources JSON OMM (CelesTrak GP API) en priorité,
+    avec fallback sur les sources TLE texte (AMSAT nasa.all).
+
+    Format JSON retourné par CelesTrak :
+      [{"OBJECT_NAME": "AO-91",
+        "NORAD_CAT_ID": 43017,
+        "TLE_LINE1": "1 43017U...",
+        "TLE_LINE2": "2 43017...",
+        ...}, ...]
+
+    TLE_LINE1/TLE_LINE2 sont directement passables à sgp4.twoline2rv() —
+    aucun changement dans le reste du code.
+    NORAD_CAT_ID est un entier Python natif, pas limité à 5 chiffres.
+    Compatible avec les futurs numéros > 99999 (nécessaires à partir de ~juillet 2026).
+    """
+    import json as _json
+    combined_text = ''
+    json_tles = {}  # {norad_id: (name, tle1, tle2)}
+    json_ok = False
+
+    # ── Tentative 1 : sources JSON OMM (CelesTrak GP API) ───────────────────
+    for source_name, url in TLE_JSON_SOURCES:
+        text = _fetch_url(url)
+        if not text:
+            continue
+        try:
+            data = _json.loads(text)
+            if not isinstance(data, list) or not data:
+                logger.warning(f"TLE JSON {source_name}: réponse vide ou invalide")
+                continue
+            count = 0
+            for obj in data:
+                try:
+                    norad = int(obj.get('NORAD_CAT_ID') or obj.get('CCSDS_OMM_VERS', '0'))
+                    if norad <= 0:
+                        continue
+                    name  = obj.get('OBJECT_NAME', str(norad)).strip()
+                    tle1  = obj.get('TLE_LINE1', '').strip()
+                    tle2  = obj.get('TLE_LINE2', '').strip()
+                    if tle1 and tle2 and norad not in json_tles:
+                        json_tles[norad] = (name, tle1, tle2)
+                        count += 1
+                except (ValueError, TypeError):
+                    continue
+            logger.info(f"TLE JSON {source_name}: {count} satellites chargés")
+            json_ok = True
+        except _json.JSONDecodeError as e:
+            logger.warning(f"TLE JSON {source_name}: JSON invalide ({e})")
+
+    # ── Tentative 2 : fallback TLE texte (AMSAT nasa.all) ───────────────────
+    for source_name, url in TLE_SOURCES:
         text = _fetch_url(url)
         if text:
-            logger.info(f"TLE: {name} → {len(text)} chars, {text.count(chr(10))} lignes")
-            combined += text + '\n'
-    if not combined:
-        logger.error("TLE: toutes les sources ont échoué")
-    return combined
+            logger.info(f"TLE texte {source_name}: {text.count(chr(10))} lignes")
+            combined_text += text + '\n'
+
+    if not json_ok and not combined_text:
+        logger.error("TLE: toutes les sources ont échoué (JSON + fallback texte)")
+    elif not json_ok:
+        logger.warning("TLE: sources JSON indisponibles, fallback texte utilisé")
+
+    return json_tles, combined_text
 
 def _parse_tle_text(text):
     """Parse TLE → dict {norad_id: (name, tle1, tle2)}.
@@ -4560,27 +4633,42 @@ def _parse_tle_text(text):
     return result
 
 def _load_tle_cache():
-    """Charge ou rafraîchit le cache TLE — un appel par satellite via gp.php."""
+    """
+    Charge ou rafraîchit le cache TLE.
+    Priorité : JSON OMM (CelesTrak GP API) → fallback texte (AMSAT nasa.all).
+    Le JSON supporte les NORAD > 99999 (requis après ~juillet 2026).
+    """
     global _tle_cache, _tle_cache_ts
     now = time.time()
     if _tle_cache and (now - _tle_cache_ts) < TLE_CACHE_TTL:
         return _tle_cache
 
-    # Télécharger le fichier TLE complet AMSAT
-    text = _fetch_all_tles()
-    all_tles = {}
-    if text:
-        all_tles = _parse_tle_text(text)
-        logger.info(f"AMSAT TLE: {len(all_tles)} satellites parsés")
+    json_tles, fallback_text = _fetch_all_tles()
+
+    # Fusionner : JSON en priorité, puis fallback texte pour les manquants
+    all_tles = dict(json_tles)
+
+    if fallback_text:
+        text_tles = _parse_tle_text(fallback_text)
+        merged = 0
+        for norad, data in text_tles.items():
+            if norad not in all_tles:
+                all_tles[norad] = data
+                merged += 1
+        if merged:
+            logger.info(f"TLE fallback texte: {merged} satellites ajoutés")
 
     if all_tles:
         _tle_cache = all_tles
         _tle_cache_ts = now
+        json_count = len(json_tles)
+        total = len(all_tles)
         active_ids = _get_active_sat_ids()
         found = sum(1 for nid in active_ids if nid in all_tles)
-        logger.info(f"TLE cache: {found}/{len(active_ids)} satellites d'intérêt trouvés")
+        logger.info(f"TLE cache: {total} satellites ({json_count} JSON + {total-json_count} texte), "
+                    f"{found}/{len(active_ids)} satellites d'intérêt trouvés")
     else:
-        logger.error("Impossible de charger les TLE depuis AMSAT")
+        logger.error("TLE cache: aucune donnée disponible, conservation de l'ancien cache")
     return _tle_cache
 
 # Fichier de config satellites actifs
