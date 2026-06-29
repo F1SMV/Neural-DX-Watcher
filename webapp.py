@@ -85,7 +85,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = "10.0"
+APP_VERSION = '10.3'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -558,7 +558,13 @@ def analyze_surges():
 
         bands_in_surge = [s for s in surge_bands if not s.startswith("MSK144:")]
 
-        for band in HF_BANDS + [b for b in VHF_BANDS if b not in ['2m', 'QO-100']]:
+        for band in HF_BANDS + [b for b in VHF_BANDS if b != 'QO-100']:
+            # Seuil adaptatif : 2m nécessite plus de spots pour éviter
+            # les faux positifs (activité locale permanente sur 2m).
+            # Une vraie ouverture Es génère 15+ spots/min — seuil élevé
+            # = seules les vraies ouvertures déclenchent l'alerte.
+            band_threshold = SURGE_THRESHOLD * 2.0 if band == '2m' else SURGE_THRESHOLD
+            band_min_spots = max(MIN_SPOTS_FOR_SURGE, 8) if band == '2m' else MIN_SPOTS_FOR_SURGE
             timestamps = band_history.get(band, deque())
 
             while timestamps and timestamps[0] < current_time - SURGE_WINDOW:
@@ -571,7 +577,7 @@ def analyze_surges():
             avg_rate = count_total / (SURGE_WINDOW / 60.0)
             recent_count = sum(1 for t in timestamps if t > current_time - 60)
 
-            is_surging = (recent_count > (avg_rate * SURGE_THRESHOLD)) and (recent_count >= MIN_SPOTS_FOR_SURGE)
+            is_surging = (recent_count > (avg_rate * band_threshold)) and (recent_count >= band_min_spots)
 
             if is_surging:
                 if band not in bands_in_surge:
@@ -1501,13 +1507,16 @@ def get_surge_status():
     active_surges = analyze_surges()
     return jsonify({"surges": active_surges, "timestamp": time.time()})
 
-@app.route('/analysis.html')
+@app.route('/ai-insight')
+@app.route('/ai_insight')
 def analysis_page():
-    """Route pour rendre la page d'analyse/AI Insight."""
+    """Page AI Insight — anciennement /analysis."""
     return render_template('ai_insight.html', my_call=MY_CALL)
 
+@app.route('/analysis.html')
 @app.route('/analysis')
 def analysis_page_alias():
+    """Rétrocompatibilité — redirige vers /ai-insight."""
     return redirect(url_for('analysis_page'))
 
 # --- NOUVELLE ROUTE STATISTIQUES DXCC 24H ---

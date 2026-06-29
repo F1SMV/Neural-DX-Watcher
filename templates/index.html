@@ -5,7 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>⚡ Neural DX Watcher v10.2</title>
+<title>⚡ Neural DX Watcher v10.3</title>
 
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -3986,7 +3986,7 @@
         body.mode-cockpit .ck-fc.ck-wl    { color: #fbbf24 !important; }  /* watchlist = jaune */
         body.mode-cockpit .ck-fc.ck-new-dxcc { color: #f87171 !important; } /* new dxcc = rouge */
 
-        /* ── SPARKLINES DX FEED v10.2 ── */
+        /* ── SPARKLINES DX FEED v10.3 ── */
         .ck-sparkline {
             display: inline-block;
             vertical-align: middle;
@@ -4047,7 +4047,7 @@
         .ck-wl-age.recent { background: rgba(96,165,250,.18); color: #93c5fd; }
         .ck-wl-age.old { background: rgba(100,116,139,.18); color: #94a3b8; }
 
-        /* ── WIDGET PRÉDICTIONS v10.2 ── */
+        /* ── WIDGET PRÉDICTIONS v10.3 ── */
         #ck-predictions-panel { min-height: 120px; }
         .pred-item {
             display: flex; align-items: center; gap: 8px;
@@ -4253,7 +4253,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V10.2</div>
+    <div id="title">📡 NEURAL DX WATCHER V10.3</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -4275,7 +4275,7 @@
       🔊 Voice ▾
     </button>
     <div id="nav-links">
-      <a class="icon-button" href="analysis.html" title="Visualiser les algorithmes d'analyse">📊 AI INSIGHT</a>
+      <a class="icon-button" href="/ai-insight" title="Visualiser les algorithmes d'analyse">📊 AI INSIGHT</a>
       <a class="icon-button" href="/briefing" title="Briefing DX">📰 BRIEFING</a>
       <a class="icon-button" href="/map" title="DX Activity Map">🗺 MAP</a>
       <a class="icon-button" href="/world" title="World">🌍 WORLD</a>
@@ -4341,7 +4341,7 @@
       </div>
     </div>
 
-    <!-- Prédictions personnalisées v10.2 -->
+    <!-- Prédictions personnalisées v10.3 -->
     <div class="ck-panel" data-panel-id="ck-predictions" id="ck-predictions-panel">
       <div class="ck-title" style="justify-content:space-between;">
         <span>🔮 PRÉDICTIONS PERSONNALISÉES</span>
@@ -9456,7 +9456,7 @@ fetch('/api/check_update')
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEURAL DX WATCHER v10.2 — Client JS
+   NEURAL DX WATCHER v10.3 — Client JS
    · Sparklines DX Feed
    · Widget Prédictions personnalisées
    · Présence heartbeat → ntfy filtre

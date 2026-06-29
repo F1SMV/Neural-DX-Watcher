@@ -1,4 +1,4 @@
-# 📡 Neural DX Watcher — v10.2
+# ⚡ Neural DX Watcher — v10.3
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -56,9 +56,9 @@ Carte classique des spots individuels — chaque point = une station.
 
 ---
 
-### 3️⃣ Page **Analyse** — META ANALYSE différée
+### 3️⃣ Page **AI Insight** — Analyse & META ANALYSE différée
 
-Outil volontairement non temps réel, basé sur l'analyse du log applicatif.  
+Outil d'analyse non temps réel. Accès via `/ai-insight`.  
 👉 **Outil de recul**, pas un gadget.
 
 ---
@@ -106,6 +106,8 @@ chmod +x start.sh
 
 L'application sera accessible sur `http://localhost:8000`
 
+> 💡 Un **Raspberry Pi** est recommandé pour la faible consommation électrique, mais le programme fonctionne sur n'importe quel PC sous Linux.
+
 ---
 
 ## ⚙️ Architecture technique
@@ -122,25 +124,60 @@ Aucune dépendance cloud.
 
 ## 🗂️ Historique des versions
 
-### v10.2 — Migration TLE format JSON OMM (CelesTrak)
+### v10.3 — Détection surge 2m · Navigation AI Insight · Corrections
 
-#### 🛰️ Compatibilité catalogues satellites post-juillet 2026
+#### 📡 Détection surge étendue au 2m
 
-CelesTrak épuisera les numéros de catalogue à 5 chiffres (limite à 69999) autour du **12 juillet 2026**. À partir de cette date, les nouveaux satellites auront des numéros ≥ 100000 et ne seront plus disponibles au format TLE texte classique.
+- Le 2m était **exclu** de la détection de surge (faux positifs redoutés)
+- Désormais inclus avec **double seuil** : taux × 2.0 et minimum 8 spots récents
+- Les vraies ouvertures Es sur 2m déclenchent l'alerte · l'activité locale ordinaire ne la déclenche pas
+
+#### 🔗 Navigation corrigée
+
+- Tous les liens "AI Insight" pointaient encore vers `/analysis` → corrigés vers `/ai-insight`
+- `map-v11.html` supprimé (page de test obsolète, intégrée au cockpit)
+
+---
+
+### v10.2 — Migration TLE format JSON OMM · Favicon · AI Insight · Corrections
+
+#### 🛰️ Migration TLE JSON OMM (CelesTrak)
+
+CelesTrak épuisera les numéros de catalogue à 5 chiffres (limite à 69999) autour du **12 juillet 2026**. Migration préventive vers le format JSON OMM.
 
 **Nouvelle architecture de chargement TLE — 3 couches :**
 
 1. **Sources JSON OMM (priorité)** — CelesTrak GP API :
    - `gp.php?GROUP=amateur&FORMAT=json` → tous les satellites amateurs
    - `gp.php?GROUP=stations&FORMAT=json` → ISS, CSS Tiangong, etc.
-   - Format OMM : `OBJECT_NAME`, `NORAD_CAT_ID` (entier natif, illimité), `TLE_LINE1`, `TLE_LINE2`
-   - `TLE_LINE1`/`TLE_LINE2` passés directement à `sgp4.twoline2rv()` — aucun changement dans le reste du code
+   - `NORAD_CAT_ID` entier natif illimité, `TLE_LINE1`/`TLE_LINE2` compatibles sgp4 sans modification
+2. **Fallback texte (AMSAT nasa.all)** — complémente le JSON pour les satellites manquants
+3. **Log consolidé** — nombre de satellites chargés par source au démarrage
 
-2. **Fallback texte (AMSAT nasa.all)** — complémente le JSON pour les satellites manquants, opérationnel jusqu'en juillet 2026
+#### ⚡ Favicon
 
-3. **Log consolidé** — au démarrage : nombre de satellites chargés par source (JSON vs texte)
+- Icône ⚡ éclair cyan sur fond sombre, SVG inline base64 dans tous les templates
+- Aucun fichier supplémentaire requis
 
-**Aucun impact utilisateur** — le reste du code (calculs az/el, prédictions, popup fréquences) est inchangé.
+#### 🧠 Page renommée : Analysis → AI Insight
+
+- Template renommé `ai_insight.html`, route `/ai-insight`
+- Rétrocompatibilité : `/analysis` et `/analysis.html` redirigent automatiquement
+
+#### 🎨 Améliorations page AI Insight
+
+- Variables CSS manquantes corrigées (`--font-sans`, `--font-display`, `--success`)
+- Long Distance enrichi : distance (km), bande, mode, heure
+- Calls rares **cliquables** → ajout rapide en watchlist
+- Erreur META analyse : `confirm()` remplacé par dialog HTML inline, message d'erreur contextuel (plus de fenêtre popup)
+- Indicateur de dernière mise à jour + spinner de refresh
+- Toggle langue global FR/EN persisté en localStorage
+- Chart.js amélioré : tooltips personnalisés, animation `easeOutQuart`, grille subtile
+
+#### 🔧 Corrections diverses
+
+- Navigation **World** : lien AI Insight ajouté, nom de marque corrigé
+- Version affichée mise à jour partout en V10.2
 
 ---
 
@@ -148,125 +185,45 @@ CelesTrak épuisera les numéros de catalogue à 5 chiffres (limite à 69999) au
 
 #### 🎛 Refonte visuelle du mode COCKPIT
 
-**Pavé PROPAGATION VHF · VOACAP**
-- Format simplifié : tableau HTML 4 bandes (50 / 70 / 144 / 432 MHz) × 6 créneaux horaires
-- Cellules colorées par pourcentage (rouge → orange → jaune → vert → bleu)
+**Pavé PROPAGATION VHF · VOACAP** — tableau HTML 4 bandes (50/70/144/432 MHz) × 6 créneaux, cellules colorées par %
 
 **Effet Radar Sweep** (🆕 bouton toggle ON/OFF)
-- Faisceau animé par canvas `requestAnimationFrame`, centré sur le **QTH de l'opérateur**
-- Cercles concentriques radar, trainée décroissante, point QTH lumineux
-- Points pulsants synchronisés — projetés depuis les vraies coordonnées Leaflet
-- Bouton `⬤ RADAR ON / ○ RADAR OFF` dans le header du pavé Magic Band
+- Faisceau canvas `requestAnimationFrame`, centré sur le QTH de l'opérateur
+- Cercles concentriques, trainée décroissante, point QTH lumineux
 - État mémorisé en localStorage
 
-**Légende d'échelle d'activité unifiée** (🆕)
-- 6 niveaux : FERMÉ → FAIBLE → CORRECT → OUVERTURE → FORTE → HOT
+**Légende d'échelle d'activité unifiée** (🆕) — 6 niveaux : FERMÉ → HOT
 
-**Watchlist Tracking cockpit** (🆕)
-- Clone du pavé Watchlist disponible directement dans la colonne 3 du cockpit
-- Affichage direct trié par dernier spot, sélecteur de purge configurable
+**Watchlist Tracking cockpit** (🆕) — colonne 3, affichage direct sans filtre, purge configurable
 
-**DX Spot Feed amélioré**
-- Calls en **orange** (lisibilité renforcée), watchlist en jaune, new DXCC en rouge
-- Distance en **priorité** dans la colonne INFO
+**DX Spot Feed** — calls orange, watchlist jaune, new DXCC rouge, distance en priorité
 
-**Scroll de page**
-- La molette scrolle librement toute la page cockpit (plus de scroll interne par colonne)
+**Scroll de page** — molette libre sur toute la page cockpit
 
-**Jauge Opening Strength agrandie** — 132px → 200px
+**Jauge Opening Strength** — 132px → 200px
 
-#### 🛰️ Page Satellites — Fréquences uplink/downlink
+#### 🛰️ Page Satellites
 
-- Popup carte enrichi avec les **fréquences radio** de chaque satellite
-- Source : API SatNOGS (`db.satnogs.org/api/transmitters/`), cache serveur 6h
-- ↓ downlink en vert · ↑ uplink en orange · mode (FM / Linear / CW…)
-- Fréquences stables — préservées à chaque rafraîchissement de position
-- Nouvelle route backend : `GET /api/satellites/frequencies/<norad_id>`
-
-**Correction type satellite**
-- Les satellites amateurs apparaissaient comme « inconnu » dans le tableau Az/El
-- Nouvelle fonction `_infer_sat_type()` : AO-, SO-, RS-, OSCAR, FUNCUBE, AMSAT → amateur ; NOAA, METOP → weather ; ISS, CSS → station
-- Appliqué sur les deux endpoints : positions et catalogue
-
-**Correction azimut** 🔴 *(bug sérieux)*
-- L'azimut était systématiquement décalé de **180°** (RS-44 : 118° au lieu de 298°)
-- Cause : `atan2(-e, s)` au lieu de `atan2(e, s)` dans la formule SEZ
-- Tous les calculs (position courante, passages AOS/LOS) sont désormais corrects
+- Fréquences uplink/downlink depuis SatNOGS (cache 6h, préchargement parallèle au démarrage)
+- Type satellite inféré automatiquement (amateur/weather/station)
+- **Correction azimut** 🔴 : `atan2(-e, s)` → `atan2(e, -s)` — décalage de 180° corrigé
 
 ---
 
 ### v10.0 — Moteur prédictif · Sparklines · Alertes push (optionnel)
 
-#### 🔮 Moteur prédictif personnel (`predictor.py`)
-
-**Collecte SQLite** (`data/predictor.sqlite`) : tables `spot_log`, `es_events`, `sessions`, `missing_dxcc`, purge auto 90 jours.
-
-**Scoring probabiliste** : patterns Es saisonniers/horaires, boost directionnel, facteur bande, bonus historique, croisement DXCC manquants LoTW.
-
-**Cockpit · Prédictions** : pavé TOP 5 fenêtres les plus probables sur 24h.  
-Routes : `/api/predictions`, `/api/predictor/stats`, `POST /api/presence`
-
-#### 📊 Sparklines dans le DX Feed
-
-Canvas 40×14 px · 6 barres de 10 min · auto-injectés par MutationObserver
-
-#### 🔔 Alertes push intelligentes (`ntfy.sh`, optionnel)
-
-3 types : watchlist spotté / NEW DXCC / ouverture 6m · Anti-spam 15 min SQLite · filtre présence opérateur  
-Routes : `/api/ntfy/status`, `POST /api/ntfy/test`
-
-#### 🎨 Design système unifié
-
-Glassmorphism, HUD scanlines, palette cyan appliquée à toute l'application.
+**Moteur prédictif** (`predictor.py`) : collecte SQLite, scoring Es saisonnier, TOP 5 prédictions 24h  
+**Sparklines** DX Feed : canvas 40×14px, 6 barres de 10 min  
+**Alertes push** (`ntfy.sh`) : watchlist / NEW DXCC / ouverture 6m, anti-spam 15 min  
+**Design** : glassmorphism, HUD scanlines, palette cyan
 
 ---
 
-### v9.5 — Géolocalisation fine · Heatmap gaussienne · Envoi direct
+### v9.5 — Géolocalisation fine · Heatmap gaussienne · v9.4 — WSJT-X · v9.2 — Thème Cockpit
 
-- 100+ districts précis (USA W0-W9, Canada VE1-7, Japon JA0-9, Russie UA0-9…)
-- Heatmap gaussienne 6m style radar météo
-- Click sur tableau → spot envoyé immédiatement
+### v9.0 — Mode COCKPIT 6 m · v8.x — LoTW · Mode Intelligent · v7.x — Satellites · Briefing · Bandmap
 
-### v9.4 — Intégration WSJT-X + Clustering 6m
-
-- Parser UDP Qt complet, locator Maidenhead → lat/lon précis
-- Clustering géographique 400km, 5 niveaux de couleur
-
-### v9.2 — Thème Cockpit unifié
-
-### v9.0 — NEURAL DX & Mode COCKPIT 6 m
-
-- Sélecteur 3 modes : ⚡ CLASSIC / 🧠 SMART / 🎛 COCKPIT 6 m
-- Interface cockpit 3 colonnes, jauge Opening Strength, VOACAP
-
-### v8.2 — LoTW persistance + Magic Band
-
-### v8.1 — Mode Intelligent amélioré + World relooké
-
-- Rareté : TRÈS RARE / RECHERCHÉ / TRACKING / EXOTIC DX
-- World : plein écran, HUD flottant, greyline intégrée
-
-### v8.0 — Mode Intelligent 🧠
-
-Score composite : Nouveau DXCC (+40) · Watchlist (+30) · Bande manquante (+10) · SFI (+20) · SPD (+30) · 10k+km (+15)
-
-### v7.7 — Responsive · v7.6 — Greyline · v7.5 — Purge Watchlist
-
-### v7.2 — Satellite Tracker
-
-Suivi temps réel, calcul local sgp4, prochains passages AOS/TCA/LOS
-
-### v7.1 — Opportunités DXCC LoTW
-
-Croisement automatique expéditions à venir (21 jours), page Briefing refaite
-
-### v7.0 — Intégration LoTW & Bandmap
-
-Connexion sécurisée, stats DXCC par bande, badges NEW/✓, bandmap zoom 100×
-
-### v6.9 — VOACAP local · v6.5 — Brief vocal IA · v6.4 — Bandmap
-
-### v6.0 — Release stable · v5.6 — World (expérimental) · v5.2 — META ANALYSE
+### v6.x — Release stable · World · META ANALYSE
 
 ---
 
