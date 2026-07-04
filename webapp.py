@@ -165,8 +165,8 @@ BAND_COLORS = {
 RSS_URLS = ["https://www.dx-world.net/feed/"]
 CLUSTERS = [
     ("dxfun.com", 8000),
-    ("cluster.dx.de", 7300),
-    ("telnet.wxc.kr", 23)
+    ("dxc.k0xm.net", 7300),
+    ("dxc.nc7j.com", 7373),
 ]
 CTY_URL = "https://www.country-files.com/cty/cty.dat"
 CTY_FILE = "cty.dat"
