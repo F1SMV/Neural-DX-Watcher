@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v10.3
+# ⚡ Neural DX Watcher — v10.5
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -93,6 +93,40 @@ No cloud dependency.
 ---
 
 ## 🗂️ Version History
+
+### v10.5 — MY SIGNAL (PSK Reporter) · Theory vs Reality · WSJT-X Fixes
+
+> ℹ️ v10.4 was an internal working version, not published on GitHub. Its features are consolidated in v10.5.
+
+#### 📶 MY SIGNAL — PSK Reporter Self-monitoring
+
+New panel showing in real time **who's hearing you, where, with what SNR**, without ever leaving the app.
+
+- Source: PSK Reporter API (`retrieve.pskreporter.info/query` via JSONP)
+- 90-second server cache (respects PSK Reporter usage policy)
+- Display: receiver callsign, mode, frequency, distance, age, color-coded SNR (green ≥-5dB / yellow / red <-15dB)
+- Header summary: number of stations + max distance
+- All bands HF/VHF/UHF · all digital modes (FT8/FT4/WSPR/JT65/JS8/MSK144)
+- Integrated in **all 3 modes**: CLASSIC · SMART · COCKPIT
+- New backend route: `GET /api/my-signal`
+
+#### 🔬 Theory vs Reality — VOACAP × actual spots crossover
+
+The cockpit VOACAP table can now display **3 views** via a header toggle:
+
+- **THEORY**: VOACAP prediction computed from SFI/Kp/zone (original behavior)
+- **REAL**: intensity of spots actually observed over the last 24 hours, per band × slot × zone
+- **Δ DELTA**: actual − theoretical gap — green = outperformance (unpredicted opening: Es, TEP), red = underperformance (dead band despite favorable prediction)
+
+New backend route: `GET /api/reality-check/<zone>` — queries `spot_log` SQLite, relative normalization over the max across all bands/slots, filter by continental zone (EU/NA/AS/OC/AF/SA) via DXCC prefixes. Bilingual orange legend below the table.
+
+#### 🔧 WSJT-X and Cluster Fixes
+
+- `Cluster … closed the connection (EOFError)` log downgraded from WARNING to INFO — this is normal failover, not an anomaly
+- WSJT-X spots filter consolidated: CQ + stations calling me, with anti-self-spot guard
+- MY SIGNAL limit set to 20 stations (from 40)
+
+---
 
 ### v10.3 — 2m Surge Detection · AI Insight Navigation · Fixes
 

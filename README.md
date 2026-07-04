@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v10.3
+# ⚡ Neural DX Watcher — v10.5
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -123,6 +123,40 @@ Aucune dépendance cloud.
 ---
 
 ## 🗂️ Historique des versions
+
+### v10.5 — MY SIGNAL (PSK Reporter) · Theory vs Reality · Corrections WSJT-X
+
+> ℹ️ La v10.4 est une version de travail interne, non publiée sur GitHub. Ses fonctionnalités sont intégrées dans la v10.5.
+
+#### 📶 MY SIGNAL — Self-monitoring PSK Reporter
+
+Nouveau panel affichant en temps réel **qui t'entend, où, avec quel SNR**, sans jamais quitter l'application.
+
+- Source : API PSK Reporter (`retrieve.pskreporter.info/query` en JSONP)
+- Cache serveur 90s (respecte la politique d'usage PSK Reporter)
+- Affichage : indicatif receveur, mode, fréquence, distance, âge, SNR coloré (vert ≥-5dB / jaune / rouge <-15dB)
+- Résumé en tête : nombre de stations + distance max
+- Toutes bandes HF/VHF/UHF · tous modes digitaux (FT8/FT4/WSPR/JT65/JS8/MSK144)
+- Intégré dans les **3 modes** : CLASSIC · SMART · COCKPIT
+- Nouvelle route backend : `GET /api/my-signal`
+
+#### 🔬 Theory vs Reality — Croisement VOACAP × spots réels
+
+Le tableau VOACAP du cockpit peut désormais afficher **3 vues** via un toggle dans le header :
+
+- **THEORY** : prédiction VOACAP calculée depuis SFI/Kp/zone (comportement d'origine)
+- **REAL** : intensité des spots réellement observés sur les 24 dernières heures, par bande × créneau × zone
+- **Δ DELTA** : écart réel − théorique — vert = surperformance (ouverture non prédite : Es, TEP), rouge = sous-performance (bande morte malgré prédiction favorable)
+
+Nouvelle route backend : `GET /api/reality-check/<zone>` — interroge `spot_log` SQLite, normalisation relative sur le max toutes bandes/créneaux confondus, filtre par zone continentale (EU/NA/AS/OC/AF/SA) via préfixes DXCC. Légende bilingue orange sous le tableau.
+
+#### 🔧 Corrections WSJT-X et clusters
+
+- Log `Cluster … a fermé la connexion (EOFError)` rétrogradé de WARNING à INFO — c'est un failover normal, pas une anomalie
+- Filtre spots WSJT-X consolidé : CQ + stations qui m'appellent, garde anti-self-spot
+- Limite MY SIGNAL portée à 20 stations (au lieu de 40)
+
+---
 
 ### v10.3 — Détection surge 2m · Navigation AI Insight · Corrections
 

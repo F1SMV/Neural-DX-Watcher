@@ -12,6 +12,7 @@ import socket
 import threading
 import json
 import os
+import sqlite3
 import urllib.request
 import urllib.parse
 import feedparser
@@ -85,7 +86,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '10.3'
+APP_VERSION = '10.5'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -1198,7 +1199,7 @@ def telnet_worker():
                 try:
                     line = _socket_readline(tn, timeout=2)
                 except EOFError:
-                    logger.warning(f"Cluster {host} a fermé la connexion (EOFError).")
+                    logger.info(f"Cluster {host} a fermé la connexion (EOFError), failover en cours.")
                     break
                 except socket.timeout:
                     line = ""
@@ -3383,6 +3384,8 @@ def _wsjtx_inject_spot(decode, dial_freq_hz, wsjtx_mode):
     dx_call = _wsjtx_extract_callsign_from_message(msg)
     if not dx_call or len(dx_call) < 3:
         return
+    if dx_call.upper() == MY_CALL.upper():
+        return  # ne pas se spotter soi-même
 
     # Fréquence : VFO + offset delta_f
     freq_hz  = (dial_freq_hz or 0) + decode.get("delta_f", 0)
@@ -5170,6 +5173,225 @@ def api_satellite_frequencies(norad_id):
                             'transmitters': cached_data, 'source': 'cache_expired'})
         return jsonify({'ok': False, 'norad': norad_id,
                         'transmitters': [], 'error': str(e)})
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# v10.4 — REALITY CHECK : croisement VOACAP (théorie) vs spots réels
+# Retourne pour chaque bande × créneau 3h, un score d'activité 0-100
+# basé sur les spots reçus dans les 24 dernières heures pour la zone.
+# ═══════════════════════════════════════════════════════════════════════════
+
+_REALITY_ZONE_DXCC = {
+    # Continents mappés vers préfixes DXCC principaux
+    # (détection zone via cty.dat ou préfixe callsign)
+    'EU': {'F','G','I','DL','EA','ON','PA','OZ','SM','OH','OK','SP','HA','HB','LA','LZ','ER','ES','LY','YL','9A','S5','YU','Z3','E7','T7','SV','SP','TA','UR','R','UA'},
+    'NA': {'K','W','N','VE','VA','XE','CO','HP','HR','V3','TG','TI','YS','YN'},
+    'AS': {'JA','JR','JH','JE','JF','JG','JI','JK','JL','JM','JN','JO','JP','JQ','BY','BG','BH','BA','BD','HL','HM','DS','DT','VU','9M','9V','YB','YC','YE','A4','A6','A7','A9','HS','E2','XV','XU','XW','YA','JT'},
+    'OC': {'VK','ZL','FO','FK','H4','P2','V6','V7','T2','T8','KH','KH0','KH2','KH6','KH8','KH9','ZK','ZL7'},
+    'AF': {'ZS','ZR','5T','5U','5V','5Z','6W','7X','9G','9J','9L','9U','9X','CN','D2','D4','ED','ET','J5','SU','S9','ST','TL','TN','TR','TT','TU','TY','TZ','V5','XT','Z2','ZD7','ZD8','ZD9'},
+    'SA': {'CE','CX','HC','HK','LU','OA','PY','PJ','VP8','VP2','ZP','9Y','8P','6Y','V2','J3','J6','J7','J8','FG','FM','FS','FY'},
+}
+
+
+def _reality_dxcc_zone(call: str) -> str:
+    """Retourne la zone continentale (EU/NA/AS/OC/AF/SA) d'un callsign."""
+    if not call:
+        return ''
+    c = call.upper().split('/')[0]
+    # Test préfixes 2-3 chars → 1 char
+    for length in (3, 2, 1):
+        prefix = c[:length]
+        for zone, prefixes in _REALITY_ZONE_DXCC.items():
+            if prefix in prefixes:
+                return zone
+    return ''
+
+
+@app.route('/api/reality-check/<zone>')
+def api_reality_check(zone):
+    """
+    Agrège les spots des dernières 24h par bande × créneau 3h × zone.
+    Retourne un JSON compatible avec le tableau VOACAP : {band: [pct_06z, pct_09z, pct_12z, pct_15z, pct_18z, pct_21z]}
+    Le pourcentage est une **intensité relative** normalisée sur le max toutes bandes confondues.
+    """
+    zone = zone.upper()
+    if zone not in _REALITY_ZONE_DXCC:
+        return jsonify({'ok': False, 'error': f'zone inconnue: {zone}'}), 400
+
+    try:
+        db_path = "data/predictor.sqlite"
+        if not os.path.exists(db_path):
+            return jsonify({'ok': True, 'zone': zone, 'reality': {}, 'source': 'no_db'})
+
+        cutoff = time.time() - 24 * 3600
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        # Vérifier le nom réel de la table et des colonnes
+        try:
+            cur.execute("SELECT ts, band, dx_call FROM spot_log WHERE ts >= ?", (cutoff,))
+            rows = cur.fetchall()
+        except sqlite3.OperationalError:
+            # Schéma différent — retourner vide plutôt que planter
+            conn.close()
+            return jsonify({'ok': True, 'zone': zone, 'reality': {}, 'source': 'schema_mismatch'})
+        conn.close()
+
+        # Créneaux de 3h : 0=00-03z, 1=03-06z, 2=06-09z, ...
+        # Mais le tableau VOACAP affiche : 06z, 09z, 12z, 15z, 18z, 21z
+        # → 6 créneaux commençant à 06z, 09z, 12z, 15z, 18z, 21z
+        slot_starts = [6, 9, 12, 15, 18, 21]
+        bands_wanted = {'50MHz', '70MHz', '144MHz', '432MHz'}
+        bands_map = {'6m': '50MHz', '4m': '70MHz', '2m': '144MHz', '70cm': '432MHz',
+                     '50MHz': '50MHz', '70MHz': '70MHz', '144MHz': '144MHz', '432MHz': '432MHz'}
+
+        # Compter les spots par (band, slot)
+        counts = {b: [0] * 6 for b in ['50MHz', '70MHz', '144MHz', '432MHz']}
+        for ts, band, dx_call in rows:
+            if not band or not dx_call:
+                continue
+            b_norm = bands_map.get(str(band).lower(), bands_map.get(band, band))
+            if b_norm not in counts:
+                continue
+            # Filtrer par zone
+            if _reality_dxcc_zone(dx_call) != zone:
+                continue
+            hour = time.gmtime(ts).tm_hour
+            # Trouver le créneau (06z couvre 06-08, 09z couvre 09-11, etc.)
+            slot_idx = None
+            for i, start in enumerate(slot_starts):
+                if start <= hour < start + 3:
+                    slot_idx = i
+                    break
+            if slot_idx is not None:
+                counts[b_norm][slot_idx] += 1
+
+        # Normaliser : max toutes bandes/créneaux confondus = 100%
+        all_vals = [v for arr in counts.values() for v in arr]
+        max_v = max(all_vals) if all_vals else 0
+        reality = {}
+        for band, arr in counts.items():
+            if max_v > 0:
+                reality[band] = [round(v / max_v * 100) for v in arr]
+            else:
+                reality[band] = [0] * 6
+
+        return jsonify({'ok': True, 'zone': zone, 'reality': reality,
+                        'total_spots': sum(all_vals), 'source': 'spot_log'})
+
+    except Exception as e:
+        logger.debug(f"api_reality_check: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# v10.5 — MY SIGNAL : self-monitoring via PSK Reporter
+# "Qui m'entend, où, avec quel SNR" — sans jamais avoir à ouvrir un site tiers.
+# Source : PSK Reporter API publique (FT8/FT4/WSPR), cache 90s (politique
+# d'usage PSK Reporter : ne pas interroger plus d'1x/minute).
+# ═══════════════════════════════════════════════════════════════════════════
+
+_my_signal_cache = {'ts': 0, 'data': None}
+_MY_SIGNAL_CACHE_TTL = 90  # secondes — respecte la politique PSK Reporter
+
+
+@app.route('/api/my-signal')
+def api_my_signal():
+    """
+    Retourne les stations ayant récemment reçu MY_CALL, via PSK Reporter.
+    Chaque entrée : indicatif receveur, locator, distance, bande, mode, SNR, âge.
+    """
+    now = time.time()
+    if _my_signal_cache['data'] is not None and (now - _my_signal_cache['ts']) < _MY_SIGNAL_CACHE_TTL:
+        return jsonify(_my_signal_cache['data'])
+
+    try:
+        import urllib.request, urllib.parse, re as _re
+
+        # PSK Reporter n'a pas de vraie API JSON pure — le seul endpoint utilisable
+        # côté serveur est JSONP (callback wrapper). On demande un callback nommé
+        # et on retire le wrapper "cb(...)" avant le parsing JSON.
+        params = urllib.parse.urlencode({
+            'senderCallsign': MY_CALL,
+            'flowStartSeconds': '-1800',
+            'callback': 'cb',
+        })
+        url = f"https://retrieve.pskreporter.info/query?{params}"
+        req = urllib.request.Request(url, headers={
+            'User-Agent': f'NeuralDXWatcher/{APP_VERSION} ({MY_CALL})'
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode('utf-8', errors='replace').strip()
+
+        # Retirer le wrapper JSONP : "cb(...)"
+        m = _re.match(r'^\s*cb\s*\((.*)\)\s*;?\s*$', body, _re.DOTALL)
+        payload = m.group(1) if m else body
+        raw = json.loads(payload)
+
+        reports = raw.get('receptionReport', [])
+        if isinstance(reports, dict):
+            reports = [reports]  # PSK Reporter renvoie un objet seul si un seul report
+
+        entries = []
+        for r in reports:
+            try:
+                rx_call = r.get('receiverCallsign', '')
+                rx_loc  = r.get('receiverLocator', '')
+                freq_hz = float(r.get('frequency', 0) or 0)
+                mode    = r.get('mode', '')
+                snr     = r.get('sNR')
+                ts      = int(r.get('flowStartSeconds', 0) or 0)
+                if not rx_call or not ts:
+                    continue
+
+                dist_km = None
+                if rx_loc:
+                    try:
+                        rx_lat, rx_lon = _maidenhead_to_latlon(rx_loc)
+                        dist_km = round(calculate_distance(user_lat, user_lon, rx_lat, rx_lon))
+                    except Exception:
+                        pass
+
+                entries.append({
+                    'call':     rx_call,
+                    'locator':  rx_loc,
+                    'freq_mhz': round(freq_hz / 1e6, 4) if freq_hz else None,
+                    'mode':     mode,
+                    'snr':      int(snr) if snr not in (None, '') else None,
+                    'distance_km': dist_km,
+                    'age_s':    max(0, int(now - ts)),
+                    'ts':       ts,
+                })
+            except (ValueError, TypeError):
+                continue
+
+        # Dédupliquer par call (garder le plus récent), trier par plus récent
+        seen = {}
+        for e in entries:
+            if e['call'] not in seen or e['ts'] > seen[e['call']]['ts']:
+                seen[e['call']] = e
+        entries = sorted(seen.values(), key=lambda x: -x['ts'])[:20]
+
+        result = {
+            'ok': True,
+            'call': MY_CALL,
+            'count': len(entries),
+            'max_distance_km': max((e['distance_km'] for e in entries if e['distance_km']), default=0),
+            'reports': entries,
+            'source': 'pskreporter',
+            'ts': now,
+        }
+        _my_signal_cache['data'] = result
+        _my_signal_cache['ts'] = now
+        return jsonify(result)
+
+    except Exception as e:
+        logger.debug(f"api_my_signal: {e}")
+        # Fallback : cache expiré si dispo, sinon vide
+        if _my_signal_cache['data'] is not None:
+            return jsonify(_my_signal_cache['data'])
+        return jsonify({'ok': False, 'call': MY_CALL, 'reports': [], 'error': str(e)})
 
 
 # Log statut sgp4

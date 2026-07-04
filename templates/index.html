@@ -5,7 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>⚡ Neural DX Watcher v10.3</title>
+<title>⚡ Neural DX Watcher v10.5</title>
 
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -3986,7 +3986,7 @@
         body.mode-cockpit .ck-fc.ck-wl    { color: #fbbf24 !important; }  /* watchlist = jaune */
         body.mode-cockpit .ck-fc.ck-new-dxcc { color: #f87171 !important; } /* new dxcc = rouge */
 
-        /* ── SPARKLINES DX FEED v10.3 ── */
+        /* ── SPARKLINES DX FEED v10.5 ── */
         .ck-sparkline {
             display: inline-block;
             vertical-align: middle;
@@ -4047,7 +4047,28 @@
         .ck-wl-age.recent { background: rgba(96,165,250,.18); color: #93c5fd; }
         .ck-wl-age.old { background: rgba(100,116,139,.18); color: #94a3b8; }
 
-        /* ── WIDGET PRÉDICTIONS v10.3 ── */
+        /* ── MY SIGNAL (PSK Reporter) ── */
+        .ck-mysig-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 6px;
+            border-radius: 7px;
+            font-size: .78em;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .ck-mysig-row:hover { background: rgba(34,211,238,.05); }
+        .ck-mysig-call { flex: 0 0 auto; min-width: 62px; font-weight: 800; color: #eafdff; }
+        .ck-mysig-meta { flex: 1; color: #6f86a8; font-size: .88em; }
+        .ck-mysig-dist { flex: 0 0 auto; color: #a78bfa; font-size: .85em; font-weight: 700; }
+        .ck-mysig-snr {
+            flex: 0 0 auto; font-weight: 700;
+            padding: 1px 7px; border-radius: 999px;
+            font-size: .82em;
+        }
+        .ck-mysig-snr.good { background: rgba(34,197,94,.18); color: #86efac; }
+        .ck-mysig-snr.fair { background: rgba(251,191,36,.18); color: #fcd34d; }
+        .ck-mysig-snr.weak { background: rgba(248,113,113,.18); color: #fca5a5; }
+
+        /* ── WIDGET PRÉDICTIONS v10.5 ── */
         #ck-predictions-panel { min-height: 120px; }
         .pred-item {
             display: flex; align-items: center; gap: 8px;
@@ -4253,7 +4274,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V10.3</div>
+    <div id="title">📡 NEURAL DX WATCHER V10.5</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -4328,7 +4349,14 @@
         </div>
       </div>
       <div style="padding:6px 8px 8px;">
-        <div id="ck-voacap-title" style="font-size:.62em;color:#6f86a8;margin-bottom:6px;font-family:monospace;">6 m propagation probability · EU</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <div id="ck-voacap-title" style="font-size:.62em;color:#6f86a8;font-family:monospace;">6 m propagation probability · EU</div>
+          <div style="display:flex;gap:2px;">
+            <button onclick="setVoacapView('theory')" data-ckview="theory" style="padding:1px 6px;font-size:.55em;cursor:pointer;border-radius:3px;background:rgba(0,243,255,.18);border:1px solid rgba(0,243,255,.5);color:var(--accent);font-family:monospace;" title="Prédiction VOACAP">THEORY</button>
+            <button onclick="setVoacapView('reality')" data-ckview="reality" style="padding:1px 6px;font-size:.55em;cursor:pointer;border-radius:3px;background:rgba(0,0,0,.3);border:1px solid #333;color:#556;font-family:monospace;" title="Spots réels 24h">REAL</button>
+            <button onclick="setVoacapView('delta')" data-ckview="delta" style="padding:1px 6px;font-size:.55em;cursor:pointer;border-radius:3px;background:rgba(0,0,0,.3);border:1px solid #333;color:#556;font-family:monospace;" title="Écart réel − théorique">Δ DELTA</button>
+          </div>
+        </div>
         <table id="ck-voacap-table" style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:.72em;">
           <thead>
             <tr id="ck-voacap-hdr-row">
@@ -4338,10 +4366,15 @@
           <tbody id="ck-voacap-tbody"></tbody>
         </table>
         <div id="ck-voacap-meta" style="font-size:.58em;color:#2a3550;text-align:right;margin-top:5px;font-family:monospace;"></div>
+        <div id="ck-voacap-legend" style="margin-top:8px;padding:6px 8px;background:rgba(251,146,60,.08);border-left:2px solid #fb923c;border-radius:4px;font-size:.68em;font-family:monospace;color:#fb923c;line-height:1.5;">
+          <b>THEORY</b> = prédiction VOACAP (théorique) / VOACAP prediction (theoretical) &nbsp;·&nbsp;
+          <b>REAL</b> = spots réels 24h / actual spots 24h &nbsp;·&nbsp;
+          <b>Δ DELTA</b> = écart réel−théorique / actual−theoretical gap
+        </div>
       </div>
     </div>
 
-    <!-- Prédictions personnalisées v10.3 -->
+    <!-- Prédictions personnalisées v10.5 -->
     <div class="ck-panel" data-panel-id="ck-predictions" id="ck-predictions-panel">
       <div class="ck-title" style="justify-content:space-between;">
         <span>🔮 PRÉDICTIONS PERSONNALISÉES</span>
@@ -4631,6 +4664,19 @@
       </div>
     </div>
 
+    <!-- MY SIGNAL — self-monitoring PSK Reporter. "Qui m'entend, où, avec
+         quel SNR" sans ouvrir un site tiers. Source : retrieve.pskreporter.info,
+         cache backend 90s (politique d'usage PSK Reporter). -->
+    <div class="ck-panel" data-panel-id="ck-my-signal">
+      <div class="ck-title" style="justify-content:space-between;">
+        <span>📶 MY SIGNAL <small style="opacity:.6;font-weight:400;">· PSK Reporter</small></span>
+        <span id="ck-mysig-summary" style="font-size:.62em;color:#6f86a8;font-weight:400;font-family:monospace;"></span>
+      </div>
+      <div id="ck-mysig-body">
+        <div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Chargement…</div>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -4872,6 +4918,19 @@
 </div>
 
 <div class="column" id="col3">
+
+<!-- MY SIGNAL (modes CLASSIC & SMART) — self-monitoring PSK Reporter.
+     IDs préfixés cs- pour éviter toute collision avec le clone cockpit (ck-mysig-*). -->
+<div class="panel" data-panel-id="my-signal" id="my-signal-panel">
+  <div class="panel-header">
+    <span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 📶 MY SIGNAL · PSK Reporter
+    <span id="cs-mysig-summary" style="float:right;font-size:0.75em;color:#6f86a8;font-weight:400;font-family:monospace;"></span>
+  </div>
+  <div id="cs-mysig-body" style="padding:4px 0;">
+    <div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Chargement…</div>
+  </div>
+</div>
+
 <div class="panel" data-panel-id="surge" id="surge-panel">
 <div class="panel-header"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> SURGE ALERTS ⚡</div>
 <div id="surge-container">No active surges...</div>
@@ -9032,10 +9091,71 @@ function _ckWlInit() {
   const purgeSel = document.getElementById('ck-wl-track-purge');
   if (purgeSel) purgeSel.addEventListener('change', loadCockpitWlTracking);
 }
+
+/* ── MY SIGNAL (PSK Reporter self-monitoring) ────────────────────────────
+   "Qui m'entend, où, avec quel SNR" — sans ouvrir un site tiers.
+   Peuple à la fois le panel cockpit (ck-mysig-*) et le panel classic/smart
+   (cs-mysig-*) en un seul fetch. Rafraîchi toutes les 90s (aligné backend). */
+async function loadMySignal() {
+  const targets = [
+    { body: document.getElementById('ck-mysig-body'), summary: document.getElementById('ck-mysig-summary') },
+    { body: document.getElementById('cs-mysig-body'), summary: document.getElementById('cs-mysig-summary') },
+  ].filter(t => t.body);
+  if (!targets.length) return;
+
+  try {
+    const r = await fetch('/api/my-signal', { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+
+    if (!d.ok) {
+      targets.forEach(t => {
+        t.body.innerHTML = '<div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">PSK Reporter indisponible.</div>';
+        if (t.summary) t.summary.textContent = '';
+      });
+      return;
+    }
+
+    const reports = d.reports || [];
+    const summaryTxt = reports.length ? `${reports.length} stations · max ${d.max_distance_km || 0} km` : '';
+    const html = reports.length
+      ? reports.map(e => {
+          const snrCls = e.snr == null ? '' : (e.snr >= -5 ? 'good' : e.snr >= -15 ? 'fair' : 'weak');
+          const snrLabel = e.snr != null ? (e.snr >= 0 ? '+' : '') + e.snr + 'dB' : '—';
+          const ageMin = Math.floor(e.age_s / 60);
+          const ageLabel = ageMin < 1 ? '<1m' : ageMin + 'm';
+          const dist = e.distance_km ? e.distance_km.toLocaleString() + ' km' : '—';
+          return `<div class="ck-mysig-row">
+            <span class="ck-mysig-call">${e.call}</span>
+            <span class="ck-mysig-meta">${e.mode || ''} ${e.freq_mhz ? e.freq_mhz + ' MHz' : ''} · ${ageLabel}</span>
+            <span class="ck-mysig-dist">${dist}</span>
+            <span class="ck-mysig-snr ${snrCls}">${snrLabel}</span>
+          </div>`;
+        }).join('')
+      : '<div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Aucun rapport de réception récent.<br><span style="font-size:.85em;opacity:.7;">Transmettez en FT8/FT4/WSPR pour apparaître ici.</span></div>';
+
+    targets.forEach(t => {
+      t.body.innerHTML = html;
+      if (t.summary) t.summary.textContent = summaryTxt;
+    });
+  } catch (e) {
+    targets.forEach(t => {
+      t.body.innerHTML = '<div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Erreur de chargement.</div>';
+    });
+  }
+}
+
+function _ckMySignalInit() {
+  loadMySignal();
+  setInterval(loadMySignal, 90000);  // aligné sur le cache backend 90s
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', _ckWlInit);
+  document.addEventListener('DOMContentLoaded', _ckMySignalInit);
 } else {
   _ckWlInit();
+  _ckMySignalInit();
 }
 
 </script>
@@ -9250,6 +9370,44 @@ fetch('/api/check_update')
     return Number.isFinite(n) ? n : fb;
   }
 
+  // ── v10.5 : cache de la réalité (spots 24h) ──
+  window._voacapRealityCache = null;
+  window._voacapRealityZone  = null;
+  window._voacapView = localStorage.getItem('ck_voacap_view') || 'theory';
+
+  async function _fetchVoacapReality(zone) {
+    // Cache 60s pour éviter de rappeler le backend à chaque repaint
+    if (window._voacapRealityZone === zone && window._voacapRealityCache
+        && (Date.now() - window._voacapRealityCache._ts) < 60000) {
+      return window._voacapRealityCache;
+    }
+    try {
+      const r = await fetch(`/api/reality-check/${zone}`, {cache:'no-store'});
+      if (!r.ok) return null;
+      const d = await r.json();
+      d._ts = Date.now();
+      window._voacapRealityCache = d;
+      window._voacapRealityZone  = zone;
+      return d;
+    } catch(e) { return null; }
+  }
+
+  window.setVoacapView = function(view) {
+    window._voacapView = view;
+    localStorage.setItem('ck_voacap_view', view);
+    // Style des boutons toggle
+    document.querySelectorAll('[data-ckview]').forEach(btn => {
+      const active = btn.dataset.ckview === view;
+      btn.style.background  = active ? 'rgba(0,243,255,.18)' : 'rgba(0,0,0,.3)';
+      btn.style.borderColor = active ? 'rgba(0,243,255,.55)' : '#333';
+      btn.style.color       = active ? 'var(--accent)' : '#556';
+    });
+    // Repaint sans recharger le solar
+    if (typeof window.loadCockpitVoacap === 'function') {
+      window.loadCockpitVoacap(window.ckVoacapZone || 'EU');
+    }
+  };
+
   window.drawCockpitVoacapCanvas = function(zone, solar) {
     const titleEl = document.getElementById('ck-voacap-title');
     const hdrRow  = document.getElementById('ck-voacap-hdr-row');
@@ -9263,52 +9421,93 @@ fetch('/api/check_update')
     const zoneOffset = ({EU:.10, NA:.02, AS:-.02, OC:-.08, SA:.04, AF:.06})[z] || 0;
     const base = Math.max(0.06, Math.min(0.95, (sfi - 70) / 130 - Math.max(0, kp - 2) * 0.08 + zoneOffset));
 
-    // ── Format VHF/UHF du mockup : 4 bandes × 6 créneaux horaires ──────────
     const bands = ['50MHz', '70MHz', '144MHz', '432MHz'];
     const hours = ['06z', '09z', '12z', '15z', '18z', '21z'];
-    // Pénalité par bande : 50MHz favorisé (Es), 432MHz beaucoup plus dépendant
-    // du SFI/troposcatter, quasi jamais d'ouverture longue distance
     const bandPenalty = [0.00, 0.20, 0.45, 0.65];
     const sfiFactor    = [1.00, 0.85, 0.55, 0.35];
+    const view = window._voacapView || 'theory';
 
-    function relColor(rel) {
-      if (rel >= .70) return '#cc2222';   // rouge = forte ouverture (comme mockup 85%)
-      if (rel >= .50) return '#dd7700';   // orange
-      if (rel >= .30) return '#cccc00';   // jaune
-      if (rel >= .15) return '#33aa33';   // vert
-      return '#2a4a7a';                    // bleu/gris = faible
-    }
-
-    // ── Titre ────────────────────────────────────────────────────────────
-    if (titleEl) titleEl.textContent = '6 m propagation probability · ' + z;
-
-    // ── En-tête (heures) ────────────────────────────────────────────────
-    hdrRow.innerHTML = '<th style="text-align:left;color:#6f86a8;font-weight:600;padding:2px 4px;"></th>' +
-      hours.map(h => `<th style="color:#6f86a8;font-weight:600;padding:2px 4px;text-align:center;">${h}</th>`).join('');
-
-    // ── Corps du tableau ────────────────────────────────────────────────
-    let rows = '';
+    // Calculer les valeurs théoriques (VOACAP)
+    const theory = {};
     for (let bi = 0; bi < bands.length; bi++) {
-      let cells = `<td style="color:#8aa6c8;font-weight:700;padding:3px 4px;">${bands[bi]}</td>`;
+      theory[bands[bi]] = [];
       for (let hi = 0; hi < hours.length; hi++) {
-        // Diurnal : pic vers 15-21z (cohérent avec mockup où 21z = 85% pour 50MHz)
         const diurnal = Math.max(0, Math.sin((hi / (hours.length - 1)) * Math.PI / 1.3));
         const sfiScaled = base * sfiFactor[bi];
         const rel = Math.max(0.02, Math.min(0.97,
           sfiScaled * (0.35 + diurnal * 0.75) - bandPenalty[bi] + diurnal * 0.25
         ));
-        const pct = Math.round(rel * 100);
-        const color = relColor(rel);
+        theory[bands[bi]].push(Math.round(rel * 100));
+      }
+    }
+
+    // Récupérer les valeurs réelles depuis le cache
+    const reality = (window._voacapRealityCache && window._voacapRealityCache.reality) || {};
+
+    function relColor(pct) {
+      if (pct >= 70) return '#cc2222';
+      if (pct >= 50) return '#dd7700';
+      if (pct >= 30) return '#cccc00';
+      if (pct >= 15) return '#33aa33';
+      return '#2a4a7a';
+    }
+    function deltaColor(delta) {
+      // Écart réel - théorique : vert si réel > théorique, rouge si opposé
+      if (delta >= 30)  return '#22c55e';   // très fort surperf
+      if (delta >= 10)  return '#66bb6a';   // léger surperf
+      if (delta > -10)  return '#666666';   // accord
+      if (delta > -30)  return '#ee7744';   // léger sous-perf
+      return '#cc2222';                      // très sous-perf
+    }
+
+    // Titre selon vue
+    const viewLabels = {theory: 'VOACAP prédiction', reality: 'Spots réels 24h', delta: 'Écart réel − théorique'};
+    if (titleEl) titleEl.textContent = viewLabels[view] + ' · ' + z;
+
+    // En-tête
+    hdrRow.innerHTML = '<th style="text-align:left;color:#6f86a8;font-weight:600;padding:2px 4px;"></th>' +
+      hours.map(h => `<th style="color:#6f86a8;font-weight:600;padding:2px 4px;text-align:center;">${h}</th>`).join('');
+
+    // Corps
+    let rows = '';
+    for (let bi = 0; bi < bands.length; bi++) {
+      const band = bands[bi];
+      let cells = `<td style="color:#8aa6c8;font-weight:700;padding:3px 4px;">${band}</td>`;
+      for (let hi = 0; hi < hours.length; hi++) {
+        const th = theory[band][hi];
+        const rl = (reality[band] && reality[band][hi] != null) ? reality[band][hi] : null;
+        let pct, color, label;
+        if (view === 'theory') {
+          pct = th; color = relColor(th); label = th + '%';
+        } else if (view === 'reality') {
+          if (rl == null) { pct = 0; color = '#1a2a3a'; label = '—'; }
+          else { pct = rl; color = relColor(rl); label = rl + '%'; }
+        } else {  // delta
+          if (rl == null) { color = '#1a2a3a'; label = '—'; }
+          else {
+            const delta = rl - th;
+            color = deltaColor(delta);
+            label = (delta >= 0 ? '+' : '') + delta;
+          }
+        }
         cells += `<td style="padding:3px 2px;text-align:center;">
-          <div style="background:${color};border-radius:4px;padding:4px 2px;color:#fff;font-weight:800;font-size:.92em;text-shadow:0 1px 2px rgba(0,0,0,.4);">${pct}%</div>
+          <div style="background:${color};border-radius:4px;padding:4px 2px;color:#fff;font-weight:800;font-size:.92em;text-shadow:0 1px 2px rgba(0,0,0,.4);">${label}</div>
         </td>`;
       }
       rows += `<tr>${cells}</tr>`;
     }
     tbody.innerHTML = rows;
 
-    // ── Méta ─────────────────────────────────────────────────────────────
-    if (meta) meta.textContent = 'Zone ' + z + ' · SFI ' + sfi + ' · Kp ' + kp.toFixed(1) + ' · generated locally';
+    // Méta
+    const totalSpots = window._voacapRealityCache?.total_spots ?? 0;
+    if (meta) {
+      const metaTxt = view === 'theory'
+        ? `Zone ${z} · SFI ${sfi} · Kp ${kp.toFixed(1)} · théorique`
+        : view === 'reality'
+          ? `Zone ${z} · ${totalSpots} spots / 24h`
+          : `Zone ${z} · Δ = réel − théorique (± points)`;
+      meta.textContent = metaTxt;
+    }
   };
 
   window.loadCockpitVoacap = async function(zone) {
@@ -9320,8 +9519,19 @@ fetch('/api/check_update')
       btn.style.borderColor = active ? 'rgba(0,243,255,.55)' : '#333';
       btn.style.color = active ? 'var(--accent)' : '#556';
     });
+    // Sync état bouton view
+    document.querySelectorAll('[data-ckview]').forEach(btn => {
+      const active = btn.dataset.ckview === (window._voacapView || 'theory');
+      btn.style.background  = active ? 'rgba(0,243,255,.18)' : 'rgba(0,0,0,.3)';
+      btn.style.borderColor = active ? 'rgba(0,243,255,.55)' : '#333';
+      btn.style.color       = active ? 'var(--accent)' : '#556';
+    });
     let solar={sfi:142,kp:2};
     try { const r=await fetch('/api/solar.json',{cache:'no-store'}); if(r.ok) solar=await r.json(); } catch(e) {}
+    // Fetch reality si nécessaire (les modes reality/delta en dépendent)
+    if (window._voacapView !== 'theory' || !window._voacapRealityCache) {
+      await _fetchVoacapReality(window.ckVoacapZone);
+    }
     window.drawCockpitVoacapCanvas(window.ckVoacapZone, solar);
   };
 
@@ -9456,7 +9666,7 @@ fetch('/api/check_update')
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEURAL DX WATCHER v10.3 — Client JS
+   NEURAL DX WATCHER v10.5 — Client JS
    · Sparklines DX Feed
    · Widget Prédictions personnalisées
    · Présence heartbeat → ntfy filtre
