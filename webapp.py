@@ -86,7 +86,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '10.5'
+APP_VERSION = '11.0'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -368,7 +368,9 @@ solar_xml_cache = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><solar><sfi>N/A</sf
 watchlist    = set()
 
 # ── v10.0 : Predictor & NtfyAlerter ────────────────────────────────────────────
-predictor = Predictor(db_path="data/predictor.sqlite", my_call=MY_CALL)
+# v11 : cty_path branché sur CTY_FILE déjà utilisé par le reste de l'app
+# pour la résolution DXCC (corrige l'ancien bug _extract_prefix()).
+predictor = Predictor(db_path="data/predictor.sqlite", my_call=MY_CALL, cty_path=CTY_FILE)
 alerter   = NtfyAlerter(db_path="data/ntfy_alerts.sqlite")
 wl_activity  = {}        # {call_upper: timestamp_float} — dernier spot vu
 wl_activity_lock = threading.Lock()
@@ -1098,6 +1100,10 @@ def history_maintenance_worker():
         save_wl_activity()   # persister l'activité watchlist toutes les 30 min
         try: predictor.cleanup_old_data(90)
         except Exception: pass
+        # v11 : vérifier les prédictions échues contre les spots réels reçus
+        # — alimente la fiabilité mesurée affichée dans le panel cockpit.
+        try: predictor.verify_predictions()
+        except Exception as e: logger.debug(f"predictor.verify_predictions: {e}")
 
         with history_lock:
             for band in HISTORY_BANDS:
@@ -4112,13 +4118,22 @@ def lotw_login():
     if '<EOH>' not in raw_all.upper():
         return jsonify({'ok': False, 'error': 'Login ou mot de passe incorrect — vérifiez vos identifiants LoTW'}), 401
 
-    # Sauvegarder en /tmp pour debug (fichier temporaire)
+    # SÉCURITÉ v11 : data/ (privé, non world-readable) au lieu de /tmp,
+    # + permissions restreintes 600. Le nom de fichier fixe fait qu'il est
+    # de toute façon écrasé à chaque synchro LoTW — pas d'accumulation,
+    # et l'utilité diagnostic (inspection ponctuelle) reste préservée.
+    debug_dir = Path("data")
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    debug_all_path = debug_dir / "lotw_debug_all.adi"
+    debug_qsl_path = debug_dir / "lotw_debug_qsl.adi"
     try:
-        with open('/tmp/lotw_debug_all.adi', 'w', encoding='utf-8') as f:
+        with open(debug_all_path, 'w', encoding='utf-8') as f:
             f.write(raw_all)
-        with open('/tmp/lotw_debug_qsl.adi', 'w', encoding='utf-8') as f:
+        with open(debug_qsl_path, 'w', encoding='utf-8') as f:
             f.write(raw_qsl)
-        logger.info(f"LoTW debug: fichiers sauvegardés dans /tmp/lotw_debug_*.adi")
+        os.chmod(debug_all_path, 0o600)
+        os.chmod(debug_qsl_path, 0o600)
+        logger.info(f"LoTW debug: fichiers sauvegardés dans data/lotw_debug_*.adi (privé)")
         logger.info(f"LoTW debug: {len(raw_all)} chars (all), {len(raw_qsl)} chars (qsl)")
     except Exception as e:
         logger.warning(f"LoTW debug save failed: {e}")
@@ -5561,4 +5576,7 @@ if __name__ == "__main__":
     threading.Thread(target=_freq_preload_worker, daemon=True).start()
 
     logger.info("Tous les Workers ont été démarrés. Lancement du serveur Flask...")
-    app.run(host='0.0.0.0', port=WEB_PORT, debug=True, use_reloader=False)
+    # SÉCURITÉ v11 : debug=False — le débogueur Werkzeug interactif expose
+    # une exécution de code arbitraire sur le réseau local si une exception
+    # non gérée survient. Critique même en LAN domestique.
+    app.run(host='0.0.0.0', port=WEB_PORT, debug=False, use_reloader=False)

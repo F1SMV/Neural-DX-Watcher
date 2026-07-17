@@ -5,7 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>⚡ Neural DX Watcher v10.5</title>
+<title>⚡ Neural DX Watcher v11.0</title>
 
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -3986,7 +3986,7 @@
         body.mode-cockpit .ck-fc.ck-wl    { color: #fbbf24 !important; }  /* watchlist = jaune */
         body.mode-cockpit .ck-fc.ck-new-dxcc { color: #f87171 !important; } /* new dxcc = rouge */
 
-        /* ── SPARKLINES DX FEED v10.5 ── */
+        /* ── SPARKLINES DX FEED v11.0 ── */
         .ck-sparkline {
             display: inline-block;
             vertical-align: middle;
@@ -4068,7 +4068,7 @@
         .ck-mysig-snr.fair { background: rgba(251,191,36,.18); color: #fcd34d; }
         .ck-mysig-snr.weak { background: rgba(248,113,113,.18); color: #fca5a5; }
 
-        /* ── WIDGET PRÉDICTIONS v10.5 ── */
+        /* ── WIDGET PRÉDICTIONS v11.0 ── */
         #ck-predictions-panel { min-height: 120px; }
         .pred-item {
             display: flex; align-items: center; gap: 8px;
@@ -4274,7 +4274,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V10.5</div>
+    <div id="title">📡 NEURAL DX WATCHER V11.0</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -4374,12 +4374,13 @@
       </div>
     </div>
 
-    <!-- Prédictions personnalisées v10.5 -->
+    <!-- Prédictions personnalisées v11.0 -->
     <div class="ck-panel" data-panel-id="ck-predictions" id="ck-predictions-panel">
       <div class="ck-title" style="justify-content:space-between;">
         <span>🔮 PRÉDICTIONS PERSONNALISÉES</span>
         <span id="ck-pred-count" style="font-size:.7em;color:#6f86a8;font-weight:400;font-family:monospace;"></span>
       </div>
+      <div id="ck-pred-reliability" style="font-size:.68em;color:#6f86a8;padding:4px 10px 0;font-family:monospace;"></div>
       <div id="ck-pred-list" style="padding:4px 0;">
         <div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Chargement…</div>
       </div>
@@ -9370,7 +9371,7 @@ fetch('/api/check_update')
     return Number.isFinite(n) ? n : fb;
   }
 
-  // ── v10.5 : cache de la réalité (spots 24h) ──
+  // ── v11.0 : cache de la réalité (spots 24h) ──
   window._voacapRealityCache = null;
   window._voacapRealityZone  = null;
   window._voacapView = localStorage.getItem('ck_voacap_view') || 'theory';
@@ -9666,7 +9667,7 @@ fetch('/api/check_update')
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEURAL DX WATCHER v10.5 — Client JS
+   NEURAL DX WATCHER v11.0 — Client JS
    · Sparklines DX Feed
    · Widget Prédictions personnalisées
    · Présence heartbeat → ntfy filtre
@@ -9764,23 +9765,41 @@ fetch('/api/check_update')
       const preds = d.predictions || [];
       const el = document.getElementById('ck-pred-list');
       const cnt = document.getElementById('ck-pred-count');
+      const relEl = document.getElementById('ck-pred-reliability');
       if (!el) return;
       if (cnt) cnt.textContent = preds.length ? preds.length + ' ouvertures probables' : '';
+
+      // Fiabilité mesurée — identique sur toutes les prédictions du lot
+      // (calculée une fois par get_predictions() côté backend).
+      if (relEl) {
+        const rel = preds.length ? preds[0].reliability : null;
+        if (rel && rel.observations > 0) {
+          relEl.innerHTML = `📊 Fiabilité mesurée : <b style="color:${rel.reliability_pct >= 60 ? '#22c55e' : rel.reliability_pct >= 35 ? '#fb923c' : '#f87171'}">${rel.reliability_pct}%</b> sur ${rel.days} jours — ${rel.observations} observation${rel.observations > 1 ? 's' : ''}`;
+        } else {
+          relEl.innerHTML = `📊 Fiabilité mesurée : <i style="opacity:.7">pas encore assez d'historique</i>`;
+        }
+      }
 
       if (!preds.length) {
         el.innerHTML = '<div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Aucune prédiction — enrichissez LoTW pour personnaliser</div>';
         return;
       }
 
+      const modelBadge = { es: ['Es', '#22d3ee'], hf: ['HF', '#fb923c'], tropo: ['Tropo', '#a78bfa'] };
+
       el.innerHTML = preds.map(p => {
         const pct = Math.round(p.score * 100);
         const barColor = pct >= 60 ? '#22c55e' : pct >= 35 ? '#fb923c' : '#6f86a8';
         const barW     = Math.max(6, Math.round(pct * 0.9));
+        const [mLabel, mColor] = modelBadge[p.model] || [p.model || '', '#6f86a8'];
         return `<div class="pred-item" title="${p.tip}">
           <span class="pred-score" style="color:${barColor};">${pct}%</span>
           <div class="pred-bar" style="width:${barW}px;background:${barColor};"></div>
           <div style="flex:1;min-width:0;">
-            <div class="pred-label">${p.label}</div>
+            <div class="pred-label">
+              ${p.label}
+              <span style="font-size:.72em;padding:1px 5px;border-radius:3px;background:${mColor}22;color:${mColor};margin-left:4px;font-weight:700;">${mLabel}</span>
+            </div>
             <div class="pred-tip">${p.tip.substring(0,80)}…</div>
           </div>
         </div>`;
