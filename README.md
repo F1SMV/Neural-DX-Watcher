@@ -1,4 +1,4 @@
-# 📡 Neural DX Watcher — v11.0
+# ⚡ Neural DX Watcher — v11.1
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -151,6 +151,43 @@ Aucune dépendance cloud.
 ---
 
 ## 🗂️ Historique des versions
+
+### v11.1 — Sécurité niveau 2 · Toggle "QUI M'ENTEND" sur les cartes HF & VHF/UHF
+
+#### 🔒 Sécurité niveau 2 — Jeton API local
+
+- Jeton hexadécimal généré automatiquement au premier démarrage, persisté dans `data/api_token.txt` (`chmod 600`)
+- Décorateur `@require_api_token` sur les routes qui modifient un état : `/update_qra`, `/spot`, `/api/spot`, `/watchlist.json` (POST/DELETE uniquement — le `GET` reste ouvert, lu en permanence par les 3 modes), `/api/briefing/refresh`, `/api/lotw/login`, `/api/lotw/logout`, `/api/satellites/config`, `/api/satellites/refresh_tle`, `/api/ntfy/test`
+- Nouvelle route `GET /api/token` distribue le jeton au frontend
+- **Intercepteur `fetch()` global** côté frontend (`index.html`, `satellites.html`, `map.html`, `ai_insight.html`) : toute requête `POST`/`DELETE` reçoit automatiquement l'en-tête `X-API-Token`, sans avoir à patcher chaque appel individuellement
+- Bug corrigé : une fonction enregistrée sous deux routes (`/spot` + `/api/spot`) avec `@require_api_token` dupliqué provoquait une `AssertionError` Flask au démarrage — un seul décorateur, positionné juste au-dessus de `def`, résout le conflit d'endpoint
+
+#### 📶 Toggle "QUI M'ENTEND" — Visualisation de la couverture réelle sur les cartes
+
+Nouvelle fonctionnalité exploitant les données déjà collectées par MY SIGNAL : un bouton **`📶 QUI M'ENTEND`** sur chacune des deux cartes (**DX MAP HF** et **DX MAP VHF/UHF**), permettant de visualiser en un coup d'œil qui reçoit réellement le signal, dans quelle direction, et jusqu'où.
+
+**Comportement** :
+- Masque les spots DX classiques pendant l'affichage (carte trop chargée sinon)
+- Trace une **enveloppe fermée** reliant **toutes** les stations qui te reçoivent, triées par azimut depuis le QTH — un vrai diagramme de réception continu, pas une étoile rayonnant depuis le centre
+- Ligne pleine (pas de tirets), vert foncé, bien visible
+- Marqueurs triangulaires colorés par SNR (vert ≥-5dB, jaune -15 à -5dB, rouge <-15dB), la station la plus lointaine mise en évidence (🎯)
+- Séparation stricte HF / VHF-UHF : un spot 6m ne s'affiche que sur la carte HF, un spot 2m/70cm uniquement sur la carte VHF/UHF (même découpage que `HF_BANDS`/`VHF_BANDS` côté backend) — nouveau champ `band` ajouté à la réponse `/api/my-signal` (via `find_band()`, déjà existant)
+- Checkbox **"tout le temps · stations qui me spotent"** — persistée en `localStorage`, restaure l'affichage automatiquement à chaque chargement de page
+- Rafraîchissement principal toutes les 3 minutes + vérification légère toutes les 15s qui compare une signature de l'ensemble des stations reçues (call + bande + horodatage) : tout changement (nouvelle station, changement de bande en cours d'opération) déclenche un recalcul immédiat sans attendre le cycle complet
+
+**Bugs corrigés en cours de route** :
+- Le rafraîchissement périodique des spots DX classiques (`updateMaps()`) réattachait inconditionnellement les marqueurs à la carte, annulant le masquage demandé — désormais conditionné à l'état du toggle
+- Référence à une variable supprimée lors du refactor HF/VHF (`mySignalOn`) provoquant une erreur JS silencieuse à chaque cycle de 90s — nettoyée
+- Chevauchement visuel du bouton avec le titre du panneau (`float:right` sur un header non-flex) — corrigé en flexbox `justify-content:space-between`
+
+#### 🎨 Ajustements visuels
+
+- Labels du panel MY SIGNAL agrandis (indicatif, mode/fréquence, distance, badge SNR)
+- Distance maximale reportée mise en évidence : taille ×1.35, orange, gras
+- Ligne verte de bordure sur les rapports avec SNR > 0dB, nettement renforcée (opacité, épaisseur de bordure)
+- Largeur des colonnes du layout classique/smart ajustée : colonne centrale (cartes) élargie de 1cm, colonnes latérales réduites de 0,5cm chacune — meilleure lisibilité des cartes et de leurs nouveaux diagrammes de réception
+
+---
 
 ### v11.0 — Moteur prédictif réellement mesuré (refonte complète) · Sécurité renforcée
 

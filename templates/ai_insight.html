@@ -254,6 +254,31 @@
 </div>
 
     <script>
+
+        /* ── SÉCURITÉ v11 — Jeton API automatique (voir index.html) ──── */
+        window._apiToken = null;
+        window._apiTokenPromise = fetch('/api/token')
+            .then(r => r.json())
+            .then(d => { window._apiToken = d.token || null; return window._apiToken; })
+            .catch(() => null);
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = async function(input, init) {
+                init = init || {};
+                const method = (init.method || 'GET').toUpperCase();
+                if (method === 'POST' || method === 'DELETE') {
+                    if (window._apiToken === null) { await window._apiTokenPromise; }
+                    if (window._apiToken) {
+                        init.headers = new Headers(init.headers || {});
+                        if (!init.headers.has('X-API-Token')) {
+                            init.headers.set('X-API-Token', window._apiToken);
+                        }
+                    }
+                }
+                return originalFetch.call(this, input, init);
+            };
+        })();
+
         // --- COULEURS SYNCHRONISÉES AVEC INDEX.HTML ---
         const BAND_COLORS = {
             '160m': '#4b0082', '80m': '#0000ff', '60m': '#00ced1', '40m': '#00ff00',

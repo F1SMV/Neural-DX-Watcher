@@ -1,4 +1,4 @@
-# 📡 Neural DX Watcher — v11.0
+# ⚡ Neural DX Watcher — v11.1
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -151,6 +151,43 @@ No cloud dependency.
 ---
 
 ## 🗂️ Version History
+
+### v11.1 — Security Level 2 · "WHO HEARS ME" Toggle on HF & VHF/UHF Maps
+
+#### 🔒 Security Level 2 — Local API Token
+
+- Hex token auto-generated on first startup, persisted to `data/api_token.txt` (`chmod 600`)
+- `@require_api_token` decorator on state-modifying routes: `/update_qra`, `/spot`, `/api/spot`, `/watchlist.json` (POST/DELETE only — `GET` stays open, read continuously by all 3 modes), `/api/briefing/refresh`, `/api/lotw/login`, `/api/lotw/logout`, `/api/satellites/config`, `/api/satellites/refresh_tle`, `/api/ntfy/test`
+- New `GET /api/token` route distributes the token to the frontend
+- **Global `fetch()` interceptor** on the frontend (`index.html`, `satellites.html`, `map.html`, `ai_insight.html`): every `POST`/`DELETE` request automatically receives the `X-API-Token` header, without patching hundreds of individual calls
+- Fixed bug: a function registered under two routes (`/spot` + `/api/spot`) with a duplicated `@require_api_token` caused a Flask `AssertionError` at startup — a single decorator placed right above `def` resolves the endpoint conflict
+
+#### 📶 "WHO HEARS ME" Toggle — Real Coverage Visualization on Maps
+
+New feature leveraging data already collected by MY SIGNAL: a **`📶 QUI M'ENTEND`** button on both maps (**DX MAP HF** and **DX MAP VHF/UHF**), visualizing at a glance who's actually receiving the signal, in which direction, and how far.
+
+**Behavior**:
+- Hides regular DX spots while active (map too crowded otherwise)
+- Draws a **closed envelope** connecting **all** stations receiving you, sorted by bearing from the QTH — a real continuous reception diagram, not a star radiating from the center
+- Solid line (no dashes), dark green, clearly visible
+- Triangular markers color-coded by SNR (green ≥-5dB, yellow -15 to -5dB, red <-15dB), farthest station highlighted (🎯)
+- Strict HF / VHF-UHF separation: a 6m spot only shows on the HF map, a 2m/70cm spot only on the VHF/UHF map (same split as `HF_BANDS`/`VHF_BANDS` on the backend) — new `band` field added to the `/api/my-signal` response (via the existing `find_band()`)
+- **"always · stations hearing me"** checkbox — persisted in `localStorage`, automatically restores the display on every page load
+- Main refresh every 3 minutes + lightweight check every 15s comparing a signature of the currently received station set (call + band + timestamp): any change (new station, band switch mid-operation) triggers an immediate recalculation without waiting for the full cycle
+
+**Bugs fixed along the way**:
+- The periodic regular-spot refresh (`updateMaps()`) unconditionally re-attached markers to the map, undoing the requested hide — now gated on toggle state
+- Reference to a variable removed during the HF/VHF refactor (`mySignalOn`) causing a silent JS error every 90s cycle — cleaned up
+- Visual overlap of the button with the panel title (`float:right` on a non-flex header) — fixed with flexbox `justify-content:space-between`
+
+#### 🎨 Visual Adjustments
+
+- Enlarged MY SIGNAL panel labels (callsign, mode/frequency, distance, SNR badge)
+- Max reported distance highlighted: 1.35× size, orange, bold
+- Green border highlight on reports with SNR > 0dB, significantly strengthened (opacity, border thickness)
+- Classic/smart layout column widths adjusted: center column (maps) widened by 1cm, side columns reduced by 0.5cm each — better readability for maps and their new reception diagrams
+
+---
 
 ### v11.0 — Genuinely Measured Predictive Engine (Complete Rewrite) · Hardened Security
 

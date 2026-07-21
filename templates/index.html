@@ -5,7 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>⚡ Neural DX Watcher v11.0</title>
+<title>⚡ Neural DX Watcher v11.1</title>
 
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -264,7 +264,7 @@
         }
         #main-container {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: calc(33.333% - 0.5cm) calc(33.333% + 1cm) calc(33.333% - 0.5cm);
             gap: 10px;
             padding: 10px;
             align-items: start;
@@ -3986,7 +3986,7 @@
         body.mode-cockpit .ck-fc.ck-wl    { color: #fbbf24 !important; }  /* watchlist = jaune */
         body.mode-cockpit .ck-fc.ck-new-dxcc { color: #f87171 !important; } /* new dxcc = rouge */
 
-        /* ── SPARKLINES DX FEED v11.0 ── */
+        /* ── SPARKLINES DX FEED v11.1 ── */
         .ck-sparkline {
             display: inline-block;
             vertical-align: middle;
@@ -4050,25 +4050,25 @@
         /* ── MY SIGNAL (PSK Reporter) ── */
         .ck-mysig-row {
             display: flex; align-items: center; gap: 8px;
-            padding: 5px 6px;
+            padding: 6px 7px;
             border-radius: 7px;
-            font-size: .78em;
+            font-size: .92em;
             font-family: 'Share Tech Mono', monospace;
         }
         .ck-mysig-row:hover { background: rgba(34,211,238,.05); }
-        .ck-mysig-call { flex: 0 0 auto; min-width: 62px; font-weight: 800; color: #eafdff; }
-        .ck-mysig-meta { flex: 1; color: #6f86a8; font-size: .88em; }
-        .ck-mysig-dist { flex: 0 0 auto; color: #a78bfa; font-size: .85em; font-weight: 700; }
+        .ck-mysig-call { flex: 0 0 auto; min-width: 68px; font-weight: 800; color: #eafdff; font-size: 1.05em; }
+        .ck-mysig-meta { flex: 1; color: #8aa0c0; font-size: 1em; }
+        .ck-mysig-dist { flex: 0 0 auto; color: #a78bfa; font-size: 1em; font-weight: 700; }
         .ck-mysig-snr {
             flex: 0 0 auto; font-weight: 700;
-            padding: 1px 7px; border-radius: 999px;
-            font-size: .82em;
+            padding: 2px 9px; border-radius: 999px;
+            font-size: .95em;
         }
         .ck-mysig-snr.good { background: rgba(34,197,94,.18); color: #86efac; }
         .ck-mysig-snr.fair { background: rgba(251,191,36,.18); color: #fcd34d; }
         .ck-mysig-snr.weak { background: rgba(248,113,113,.18); color: #fca5a5; }
 
-        /* ── WIDGET PRÉDICTIONS v11.0 ── */
+        /* ── WIDGET PRÉDICTIONS v11.1 ── */
         #ck-predictions-panel { min-height: 120px; }
         .pred-item {
             display: flex; align-items: center; gap: 8px;
@@ -4274,7 +4274,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V11.0</div>
+    <div id="title">📡 NEURAL DX WATCHER V11.1</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -4374,7 +4374,7 @@
       </div>
     </div>
 
-    <!-- Prédictions personnalisées v11.0 -->
+    <!-- Prédictions personnalisées v11.1 -->
     <div class="ck-panel" data-panel-id="ck-predictions" id="ck-predictions-panel">
       <div class="ck-title" style="justify-content:space-between;">
         <span>🔮 PRÉDICTIONS PERSONNALISÉES</span>
@@ -4909,11 +4909,41 @@
 
 <div class="column" id="col2">
 <div class="panel map-panel" data-panel-id="map-hf" id="map-hf-panel">
-<div class="panel-header"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> DX MAP HF ({{ hf_bands|length }} Bands)</div>
+<div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+  <span><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> DX MAP HF ({{ hf_bands|length }} Bands)</span>
+  <span style="display:flex;align-items:center;gap:6px;">
+    <label style="display:flex;align-items:center;gap:3px;font-size:.65em;color:#94a3b8;cursor:pointer;font-family:monospace;" title="Affiche en continu uniquement les stations qui ME spotent (masque les spots DX classiques)">
+      <input type="checkbox" id="mysig-permanent-toggle" onchange="toggleMySignalPermanent(this.checked, 'hf')" style="cursor:pointer;">
+      tout le temps · stations qui me spotent
+    </label>
+    <button id="mysig-map-toggle" onclick="toggleMySignalOnMap('hf')"
+      title="Afficher les stations qui m'entendent (PSK Reporter)"
+      style="padding:3px 11px;font-size:.92em;font-weight:700;cursor:pointer;border-radius:4px;
+             background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.5);
+             color:#fb923c;font-family:monospace;letter-spacing:.3px;white-space:nowrap;">
+      📶 QUI M'ENTEND
+    </button>
+  </span>
+</div>
 <div class="map-area" id="map-hf"></div>
 </div>
 <div class="panel map-panel" data-panel-id="map-vhf" id="map-vhf-panel">
-<div class="panel-header"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> DX MAP VHF/UHF ({{ vhf_bands|length }} Bands)</div>
+<div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+  <span><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> DX MAP VHF/UHF ({{ vhf_bands|length }} Bands)</span>
+  <span style="display:flex;align-items:center;gap:6px;">
+    <label style="display:flex;align-items:center;gap:3px;font-size:.65em;color:#94a3b8;cursor:pointer;font-family:monospace;" title="Affiche en continu uniquement les stations qui ME spotent en VHF/UHF (masque les spots DX classiques)">
+      <input type="checkbox" id="mysig-permanent-toggle-vhf" onchange="toggleMySignalPermanent(this.checked, 'vhf')" style="cursor:pointer;">
+      tout le temps · stations qui me spotent
+    </label>
+    <button id="mysig-map-toggle-vhf" onclick="toggleMySignalOnMap('vhf')"
+      title="Afficher les stations qui m'entendent en VHF/UHF (PSK Reporter)"
+      style="padding:3px 11px;font-size:.92em;font-weight:700;cursor:pointer;border-radius:4px;
+             background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.5);
+             color:#fb923c;font-family:monospace;letter-spacing:.3px;white-space:nowrap;">
+      📶 QUI M'ENTEND
+    </button>
+  </span>
+</div>
 <div class="map-area" id="map-vhf"></div>
 </div>
 </div>
@@ -5100,6 +5130,39 @@
 </div>
 
 <script>
+        /* ── SÉCURITÉ v11 — Jeton API automatique ────────────────────────
+           Plutôt que de patcher individuellement des centaines d'appels
+           fetch() dans ce fichier, on intercepte fetch() globalement :
+           toute requête POST/DELETE vers cette même origine reçoit
+           automatiquement l'en-tête X-API-Token. Les GET (lecture) ne
+           sont jamais concernés — aucun changement de comportement pour
+           l'affichage normal de l'application. */
+        window._apiToken = null;
+        window._apiTokenPromise = fetch('/api/token')
+            .then(r => r.json())
+            .then(d => { window._apiToken = d.token || null; return window._apiToken; })
+            .catch(() => null);
+
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = async function(input, init) {
+                init = init || {};
+                const method = (init.method || 'GET').toUpperCase();
+                if (method === 'POST' || method === 'DELETE') {
+                    if (window._apiToken === null) {
+                        await window._apiTokenPromise;
+                    }
+                    if (window._apiToken) {
+                        init.headers = new Headers(init.headers || {});
+                        if (!init.headers.has('X-API-Token')) {
+                            init.headers.set('X-API-Token', window._apiToken);
+                        }
+                    }
+                }
+                return originalFetch.call(this, input, init);
+            };
+        })();
+
         const MY_CALL = '{{ my_call }}';
         const SPD_THRESHOLD = {{ spd_threshold }};
         const DEFAULT_QRA = '{{ user_qra }}';
@@ -5620,8 +5683,15 @@
             if (!markersHF.getLayers().length) { mapHF.setView(userLatLng, 3); }
             if (!markersVHF.getLayers().length) { mapVHF.setView(userLatLng, 3); }
 
-            markersHF.addTo(mapHF);
-            markersVHF.addTo(mapVHF);
+            // Ne pas réafficher les spots DX classiques si le toggle MY SIGNAL
+            // est actif sur cette carte — sinon le refresh périodique des spots
+            // annule le masquage demandé par l'utilisateur.
+            if (!(typeof _mysig !== 'undefined' && _mysig.hf && _mysig.hf.on)) {
+                markersHF.addTo(mapHF);
+            }
+            if (!(typeof _mysig !== 'undefined' && _mysig.vhf && _mysig.vhf.on)) {
+                markersVHF.addTo(mapVHF);
+            }
             update6mPanel(spots);
         }
 
@@ -9118,7 +9188,9 @@ async function loadMySignal() {
     }
 
     const reports = d.reports || [];
-    const summaryTxt = reports.length ? `${reports.length} stations · max ${d.max_distance_km || 0} km` : '';
+    const summaryTxt = reports.length
+      ? `${reports.length} stations · max <span style="font-size:1.35em;font-weight:800;color:#fb923c;">${d.max_distance_km || 0} km</span>`
+      : '';
     const html = reports.length
       ? reports.map(e => {
           const snrCls = e.snr == null ? '' : (e.snr >= -5 ? 'good' : e.snr >= -15 ? 'fair' : 'weak');
@@ -9126,7 +9198,11 @@ async function loadMySignal() {
           const ageMin = Math.floor(e.age_s / 60);
           const ageLabel = ageMin < 1 ? '<1m' : ageMin + 'm';
           const dist = e.distance_km ? e.distance_km.toLocaleString() + ' km' : '—';
-          return `<div class="ck-mysig-row">
+          // Ligne entière en vert prononcé si le signal reporté dépasse 0dB (excellent report)
+          const strongRow = (e.snr != null && e.snr > 0)
+            ? ' style="background:rgba(34,197,94,.32);border-left:4px solid #22c55e;font-weight:700;"'
+            : '';
+          return `<div class="ck-mysig-row"${strongRow}>
             <span class="ck-mysig-call">${e.call}</span>
             <span class="ck-mysig-meta">${e.mode || ''} ${e.freq_mhz ? e.freq_mhz + ' MHz' : ''} · ${ageLabel}</span>
             <span class="ck-mysig-dist">${dist}</span>
@@ -9137,7 +9213,7 @@ async function loadMySignal() {
 
     targets.forEach(t => {
       t.body.innerHTML = html;
-      if (t.summary) t.summary.textContent = summaryTxt;
+      if (t.summary) t.summary.innerHTML = summaryTxt;
     });
   } catch (e) {
     targets.forEach(t => {
@@ -9148,7 +9224,249 @@ async function loadMySignal() {
 
 function _ckMySignalInit() {
   loadMySignal();
-  setInterval(loadMySignal, 90000);  // aligné sur le cache backend 90s
+  setInterval(() => {
+    loadMySignal();
+    // Rafraîchir aussi l'enveloppe carte si un toggle est actif (HF et/ou VHF)
+    if (_mysig.hf.on)  loadMySignalOnMap('hf');
+    if (_mysig.vhf.on) loadMySignalOnMap('vhf');
+  }, 90000);  // aligné sur le cache backend 90s
+}
+
+/* ── Toggle "QUI M'ENTEND" sur la carte HF ────────────────────────────────
+   Affiche à la demande les stations qui reçoivent MY_CALL. Pour éviter une
+   carte surchargée : les spots DX classiques sont masqués pendant l'affichage,
+   et au lieu de rayonner depuis le QTH, une ligne relie les stations les plus
+   lointaines ENTRE ELLES (triées par azimut) — un "front de propagation".
+   Rafraîchi toutes les 3 minutes. Un mode "tout le temps" (checkbox) garde
+   l'affichage actif en continu, persisté en localStorage.
+   Disponible sur LES DEUX cartes (HF et VHF/UHF), chacune avec son état
+   propre et son filtre de bandes — les spots qui t'entendent en 6m/HF vont
+   sur la carte HF, ceux en 4m/2m/70cm/23cm/QO-100 sur la carte VHF/UHF
+   (même split que HF_BANDS/VHF_BANDS côté backend). */
+const MYSIG_HF_BANDS  = ['160m','80m','60m','40m','30m','20m','17m','15m','12m','10m','6m'];
+const MYSIG_VHF_BANDS = ['4m','2m','70cm','23cm','13cm','QO-100'];
+const MYSIG_REFRESH_MS = 180000;  // 3 min
+
+// État indépendant par carte : { hf: {...}, vhf: {...} }
+const _mysig = {
+  hf:  { map: () => mapHF,  markers: () => markersHF, layer: null, on: false, timer: null,
+         permanent: localStorage.getItem('mysig_permanent_hf') === '1', bands: MYSIG_HF_BANDS,
+         btnId: 'mysig-map-toggle', cbId: 'mysig-permanent-toggle',
+         maxDistanceSeen: 0, fastCheckTimer: null, lastSignature: '' },
+  vhf: { map: () => mapVHF, markers: () => markersVHF, layer: null, on: false, timer: null,
+         permanent: localStorage.getItem('mysig_permanent_vhf') === '1', bands: MYSIG_VHF_BANDS,
+         btnId: 'mysig-map-toggle-vhf', cbId: 'mysig-permanent-toggle-vhf',
+         maxDistanceSeen: 0, fastCheckTimer: null, lastSignature: '' },
+};
+
+function toggleMySignalPermanent(checked, which) {
+  const s = _mysig[which || 'hf'];
+  s.permanent = checked;
+  localStorage.setItem('mysig_permanent_' + (which || 'hf'), checked ? '1' : '0');
+  if (checked && !s.on) toggleMySignalOnMap(which);
+}
+
+function toggleMySignalOnMap(which) {
+  which = which || 'hf';
+  const s = _mysig[which];
+  const map = s.map(), markers = s.markers();
+  s.on = !s.on;
+  const btn = document.getElementById(s.btnId);
+  if (s.on) {
+    if (btn) {
+      btn.style.background = 'rgba(167,139,250,.20)';
+      btn.style.borderColor = 'rgba(167,139,250,.6)';
+      btn.style.color = '#a78bfa';
+    }
+    if (map && markers) map.removeLayer(markers);
+    s.maxDistanceSeen = 0;
+    s.lastSignature = '';
+    loadMySignalOnMap(which);
+    clearInterval(s.timer);
+    s.timer = setInterval(() => loadMySignalOnMap(which), MYSIG_REFRESH_MS);
+    // Vérification légère plus fréquente (30s) — ne redessine PAS
+    // systématiquement, seulement si un nouveau record de distance apparaît
+    // (nouveau spot plus loin que tous les précédents). Évite d'attendre
+    // les 3 minutes complètes pour voir une ouverture record se dessiner.
+    clearInterval(s.fastCheckTimer);
+    s.fastCheckTimer = setInterval(() => _checkNewDistanceRecord(which), 15000);
+  } else {
+    if (btn) {
+      btn.style.background = 'rgba(251,146,60,.15)';
+      btn.style.borderColor = 'rgba(251,146,60,.5)';
+      btn.style.color = '#fb923c';
+    }
+    clearInterval(s.timer);
+    s.timer = null;
+    clearInterval(s.fastCheckTimer);
+    s.fastCheckTimer = null;
+    if (s.layer && map) map.removeLayer(s.layer);
+    s.layer = null;
+    if (map && markers) map.addLayer(markers);
+  }
+}
+
+// Restaurer l'état "tout le temps" au chargement de la page, pour chaque carte
+(function() {
+  ['hf', 'vhf'].forEach(which => {
+    const s = _mysig[which];
+    const checkPermanent = () => {
+      const cb = document.getElementById(s.cbId);
+      if (cb && s.permanent) {
+        cb.checked = true;
+        if (!s.on) toggleMySignalOnMap(which);
+      } else if (!cb) {
+        setTimeout(checkPermanent, 300);
+      }
+    };
+    setTimeout(checkPermanent, 500);
+  });
+})();
+
+// Interpolation grand-cercle (slerp sphérique) — Leaflet ne fournit pas
+// de géodésique nativement. Découpe la ligne si elle traverse
+// l'antiméridien (saut de longitude > 180°) pour un rendu propre.
+function _greatCirclePoints(lat1, lon1, lat2, lon2, segments) {
+  const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+  const phi1 = toRad(lat1), l1 = toRad(lon1), phi2 = toRad(lat2), l2 = toRad(lon2);
+  const d = 2 * Math.asin(Math.sqrt(
+    Math.sin((phi2 - phi1) / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin((l2 - l1) / 2) ** 2
+  ));
+  if (d === 0) return [[[lat1, lon1]]];
+  const pts = [];
+  for (let i = 0; i <= segments; i++) {
+    const f = i / segments;
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(phi1) * Math.cos(l1) + B * Math.cos(phi2) * Math.cos(l2);
+    const y = A * Math.cos(phi1) * Math.sin(l1) + B * Math.cos(phi2) * Math.sin(l2);
+    const z = A * Math.sin(phi1) + B * Math.sin(phi2);
+    const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
+    const lon = Math.atan2(y, x);
+    pts.push([toDeg(lat), toDeg(lon)]);
+  }
+  const segsOut = [];
+  let current = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (Math.abs(pts[i][1] - pts[i - 1][1]) > 180) {
+      segsOut.push(current);
+      current = [];
+    }
+    current.push(pts[i]);
+  }
+  segsOut.push(current);
+  return segsOut;
+}
+
+// Azimut depuis le QTH vers un point (0-360°, formule standard)
+function _bearingFromQTH(lat2, lon2) {
+  const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+  const phi1 = toRad(userLatLng[0]), phi2 = toRad(lat2);
+  const dLon = toRad(lon2 - userLatLng[1]);
+  const y = Math.sin(dLon) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLon);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+async function _checkNewDistanceRecord(which) {
+  const s = _mysig[which];
+  if (!s.on) return;
+  try {
+    const r = await fetch('/api/my-signal', { cache: 'no-store' });
+    const d = await r.json();
+    if (!d.ok) return;
+    const filtered = (d.reports || []).filter(
+      e => e.lat != null && e.lon != null && e.band && s.bands.includes(e.band)
+    );
+    const maxNow = Math.max(0, ...filtered.map(e => e.distance_km || 0));
+    // Signature de l'ensemble des stations actuellement reçues — détecte
+    // TOUT changement (nouveau call, disparition, changement de bande après
+    // un changement d'opération HF), pas seulement un nouveau record de
+    // distance. Recalcul immédiat dès qu'un changement est détecté, sans
+    // attendre le timer principal de 3 min.
+    const signature = filtered.map(e => e.call + ':' + e.band + ':' + e.ts).sort().join('|');
+    const changed = signature !== s.lastSignature;
+    s.lastSignature = signature;
+
+    if (maxNow > s.maxDistanceSeen || changed) {
+      loadMySignalOnMap(which);
+      clearInterval(s.timer);
+      s.timer = setInterval(() => loadMySignalOnMap(which), MYSIG_REFRESH_MS);
+    }
+  } catch (e) { /* silencieux */ }
+}
+
+async function loadMySignalOnMap(which) {
+  which = which || 'hf';
+  const s = _mysig[which];
+  const map = s.map();
+  if (!map) return;
+  try {
+    const r = await fetch('/api/my-signal', { cache: 'no-store' });
+    const d = await r.json();
+    if (!d.ok) return;
+
+    if (s.layer) map.removeLayer(s.layer);
+    s.layer = L.layerGroup();
+
+    // Filtrer sur les bandes de CETTE carte uniquement (HF vs VHF/UHF)
+    // — un spot 6m ne pollue pas la carte VHF, un spot 2m ne pollue pas la carte HF.
+    const withCoords = (d.reports || []).filter(
+      e => e.lat != null && e.lon != null && e.band && s.bands.includes(e.band)
+    );
+
+    // Mémoriser la distance max vue — sert à _checkNewDistanceRecord()
+    // pour déclencher un recalcul immédiat sur un nouveau record.
+    s.maxDistanceSeen = Math.max(0, ...withCoords.map(e => e.distance_km || 0));
+
+    // Enveloppe fermée : TOUS les points affichés sont reliés entre eux,
+    // triés par azimut depuis le QTH pour tracer un contour cohérent tout
+    // autour (pas une étoile depuis le centre), boucle refermée sur le
+    // premier point — visualise la vraie étendue de la propagation.
+    const byBearing = [...withCoords].sort(
+      (a, b) => _bearingFromQTH(a.lat, a.lon) - _bearingFromQTH(b.lat, b.lon)
+    );
+
+    for (let i = 0; i < byBearing.length; i++) {
+      const a = byBearing[i];
+      const b = byBearing[(i + 1) % byBearing.length];  // boucle : dernier → premier
+      if (byBearing.length < 2) break;
+      const segs = _greatCirclePoints(a.lat, a.lon, b.lat, b.lon, 24);
+      segs.forEach(seg => {
+        s.layer.addLayer(L.polyline(seg, {
+          color: '#0d7a3f', weight: 2.6, opacity: 0.88
+        }));
+      });
+    }
+
+    // Le point le plus lointain reste mis en évidence (marqueur plus gros + 🎯)
+    const farthestOne = withCoords.length
+      ? withCoords.reduce((a, b) => (b.distance_km || 0) > (a.distance_km || 0) ? b : a)
+      : null;
+
+    withCoords.forEach(e => {
+      const isFarthest = e === farthestOne;
+      const snrColor = e.snr == null ? '#a78bfa'
+        : (e.snr >= -5 ? '#22c55e' : e.snr >= -15 ? '#fbbf24' : '#f87171');
+      const size = isFarthest ? 14 : 9;
+
+      const icon = L.divIcon({
+        html: `<div style="width:0;height:0;border-left:${size/2}px solid transparent;
+                 border-right:${size/2}px solid transparent;border-bottom:${size}px solid ${snrColor};
+                 filter:drop-shadow(0 0 ${isFarthest ? 4 : 2}px ${snrColor});
+                 opacity:${isFarthest ? 1 : 0.75};"></div>`,
+        className: 'mysig-marker-icon', iconSize: [size, size], iconAnchor: [size/2, size]
+      });
+      const marker = L.marker([e.lat, e.lon], { icon }).bindPopup(
+        `<b>${e.call}</b>${isFarthest ? ' 🎯' : ''}<br>${e.band || ''} ${e.mode || ''} ${e.freq_mhz ? e.freq_mhz + ' MHz' : ''}<br>` +
+        `SNR: ${e.snr != null ? (e.snr >= 0 ? '+' : '') + e.snr + 'dB' : '—'}<br>` +
+        `Distance: ${e.distance_km ? e.distance_km.toLocaleString() + ' km' : '—'}`
+      );
+      s.layer.addLayer(marker);
+    });
+
+    s.layer.addTo(map);
+  } catch (e) { console.error('MY SIGNAL map error:', e); }
 }
 
 if (document.readyState === 'loading') {
@@ -9371,7 +9689,7 @@ fetch('/api/check_update')
     return Number.isFinite(n) ? n : fb;
   }
 
-  // ── v11.0 : cache de la réalité (spots 24h) ──
+  // ── v11.1 : cache de la réalité (spots 24h) ──
   window._voacapRealityCache = null;
   window._voacapRealityZone  = null;
   window._voacapView = localStorage.getItem('ck_voacap_view') || 'theory';
@@ -9667,7 +9985,7 @@ fetch('/api/check_update')
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEURAL DX WATCHER v11.0 — Client JS
+   NEURAL DX WATCHER v11.1 — Client JS
    · Sparklines DX Feed
    · Widget Prédictions personnalisées
    · Présence heartbeat → ntfy filtre

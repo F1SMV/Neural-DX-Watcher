@@ -86,7 +86,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '11.0'
+APP_VERSION = '11.1'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -399,6 +399,68 @@ logger.addHandler(console_handler)
 
 # --- FLASK APP INITIALIZATION ---
 app = Flask(__name__, template_folder="templates")
+
+# ── SÉCURITÉ v11 — Niveau 2 : jeton local sur les routes qui modifient un
+# état (spot, watchlist, LoTW, config satellites, ntfy...). Pas un système
+# d'auth complet — juste une protection basique puisque tout est ouvert
+# sur le LAN sans aucune vérification aujourd'hui.
+#
+# Le jeton est généré automatiquement au premier démarrage et persisté
+# dans data/api_token.txt (déjà gitignored via data/). Le frontend le lit
+# une fois au chargement de la page (route /api/token, elle-même ouverte
+# uniquement en local — voir garde ci-dessous) et l'envoie ensuite dans
+# l'en-tête X-API-Token à chaque requête mutative.
+import secrets as _secrets
+
+API_TOKEN_FILE = Path("data/api_token.txt")
+
+
+def _load_or_create_api_token() -> str:
+    API_TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if API_TOKEN_FILE.exists():
+        tok = API_TOKEN_FILE.read_text(encoding="utf-8").strip()
+        if tok:
+            return tok
+    tok = _secrets.token_hex(24)
+    API_TOKEN_FILE.write_text(tok, encoding="utf-8")
+    try:
+        os.chmod(API_TOKEN_FILE, 0o600)
+    except Exception:
+        pass
+    logger.info("Sécurité: nouveau jeton API généré (data/api_token.txt)")
+    return tok
+
+
+API_TOKEN = _load_or_create_api_token()
+
+
+def require_api_token(fn):
+    """
+    Décorateur : exige l'en-tête X-API-Token sur les routes qui modifient
+    un état. Le frontend servi par cette même app le connaît (voir
+    /api/token) — seul un tiers extérieur au LAN sans accès à la page
+    HTML ne pourra pas forger de requêtes.
+    """
+    from functools import wraps
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        provided = request.headers.get("X-API-Token", "")
+        if not _secrets.compare_digest(provided, API_TOKEN):
+            return jsonify({"ok": False, "error": "Jeton API manquant ou invalide"}), 401
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+@app.route("/api/token")
+def api_token():
+    """
+    Distribue le jeton au frontend. Ouvert sans jeton (poule/œuf), mais
+    n'a de valeur que pour quelqu'un déjà capable de charger la page HTML
+    de l'application — donc déjà sur le LAN autorisé.
+    """
+    return jsonify({"token": API_TOKEN})
 
 # --- PLAGES DE FREQUENCES CW ---
 CW_RANGES = [
@@ -1414,6 +1476,7 @@ def world_page():
     return render_template("world.html")
 
 @app.route('/update_qra', methods=['POST'])
+@require_api_token
 def update_qra():
     global user_qra, user_lat, user_lon
     new_qra = request.form.get('qra_locator', '').upper().strip()
@@ -1448,6 +1511,7 @@ def cluster_send_line(line: str) -> bool:
 
 @app.route('/spot', methods=['POST'])
 @app.route('/api/spot', methods=['POST'])
+@require_api_token
 def api_spot():
     """Spot a callsign to the DX cluster: expects JSON {freq, call, comment}."""
     data = request.get_json(silent=True) or {}
@@ -1725,6 +1789,11 @@ def _parse_end_date_from_title(title):
 def manage_watchlist():
     if request.method == 'GET':
         return jsonify(sorted(list(watchlist)))
+    # Jeton requis uniquement pour les méthodes mutatives — GET reste
+    # ouvert car lu en permanence par les 3 modes d'affichage.
+    provided = request.headers.get("X-API-Token", "")
+    if not _secrets.compare_digest(provided, API_TOKEN):
+        return jsonify({'ok': False, 'error': 'Jeton API manquant ou invalide'}), 401
     data = request.get_json(force=True, silent=True)
     if not data or 'call' not in data:
         return abort(400)
@@ -3666,6 +3735,7 @@ def briefing_debug():
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()})
 
 @app.route("/api/briefing/refresh", methods=["POST"])
+@require_api_token
 def briefing_force_refresh():
     """Force le rechargement du cache briefing."""
     with briefing_lock:
@@ -4072,6 +4142,7 @@ def _parse_adif_lotw(adif_text, all_confirmed=False):
     return qsos
 
 @app.route('/api/lotw/login', methods=['POST'])
+@require_api_token
 def lotw_login():
     """Connexion LoTW : importe TOUS les QSOs (confirmés ou non)."""
     data = request.get_json(force=True)
@@ -4232,6 +4303,7 @@ def lotw_diag():
     })
 
 @app.route('/api/lotw/logout', methods=['POST'])
+@require_api_token
 def lotw_logout():
     """Efface toutes les données LoTW de la mémoire."""
     with lotw_lock:
@@ -5057,6 +5129,7 @@ def api_satellites_list():
     return jsonify({'satellites': result})
 
 @app.route('/api/satellites/config', methods=['POST'])
+@require_api_token
 def api_satellites_config():
     """Met à jour la liste des satellites actifs."""
     data = request.get_json(force=True)
@@ -5080,6 +5153,7 @@ def api_satellites_config():
     return jsonify({'ok': True, 'saved': len([s for s in valid if s['active']])})
 
 @app.route('/api/satellites/refresh_tle', methods=['POST'])
+@require_api_token
 def api_tle_refresh():
     """Force le rechargement des TLE depuis CelesTrak."""
     global _tle_cache, _tle_cache_ts
@@ -5361,17 +5435,22 @@ def api_my_signal():
                     continue
 
                 dist_km = None
+                rx_lat_out, rx_lon_out = None, None
                 if rx_loc:
                     try:
                         rx_lat, rx_lon = _maidenhead_to_latlon(rx_loc)
                         dist_km = round(calculate_distance(user_lat, user_lon, rx_lat, rx_lon))
+                        rx_lat_out, rx_lon_out = round(rx_lat, 3), round(rx_lon, 3)
                     except Exception:
                         pass
 
                 entries.append({
                     'call':     rx_call,
                     'locator':  rx_loc,
+                    'lat':      rx_lat_out,
+                    'lon':      rx_lon_out,
                     'freq_mhz': round(freq_hz / 1e6, 4) if freq_hz else None,
+                    'band':     find_band(freq_hz / 1000) if freq_hz else None,
                     'mode':     mode,
                     'snr':      int(snr) if snr not in (None, '') else None,
                     'distance_km': dist_km,
@@ -5473,6 +5552,7 @@ def api_ntfy_status():
 
 
 @app.route("/api/ntfy/test", methods=["POST"])
+@require_api_token
 def api_ntfy_test():
     try:
         alerter._send(
