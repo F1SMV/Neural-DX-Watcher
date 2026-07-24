@@ -5,7 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>⚡ Neural DX Watcher v11.1</title>
+<title>⚡ Neural DX Watcher v11.2</title>
 
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -3986,7 +3986,7 @@
         body.mode-cockpit .ck-fc.ck-wl    { color: #fbbf24 !important; }  /* watchlist = jaune */
         body.mode-cockpit .ck-fc.ck-new-dxcc { color: #f87171 !important; } /* new dxcc = rouge */
 
-        /* ── SPARKLINES DX FEED v11.1 ── */
+        /* ── SPARKLINES DX FEED v11.2 ── */
         .ck-sparkline {
             display: inline-block;
             vertical-align: middle;
@@ -4068,7 +4068,7 @@
         .ck-mysig-snr.fair { background: rgba(251,191,36,.18); color: #fcd34d; }
         .ck-mysig-snr.weak { background: rgba(248,113,113,.18); color: #fca5a5; }
 
-        /* ── WIDGET PRÉDICTIONS v11.1 ── */
+        /* ── WIDGET PRÉDICTIONS v11.2 ── */
         #ck-predictions-panel { min-height: 120px; }
         .pred-item {
             display: flex; align-items: center; gap: 8px;
@@ -4104,6 +4104,7 @@
         }
         #ntfy-badge::before { content: "●"; font-size: .8em; }
 
+        @keyframes spin { to { transform: rotate(360deg); } }
         </style>
 </head>
 <body>
@@ -4274,7 +4275,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V11.1</div>
+    <div id="title">📡 NEURAL DX WATCHER V11.2</div>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -4374,7 +4375,7 @@
       </div>
     </div>
 
-    <!-- Prédictions personnalisées v11.1 -->
+    <!-- Prédictions personnalisées v11.2 -->
     <div class="ck-panel" data-panel-id="ck-predictions" id="ck-predictions-panel">
       <div class="ck-title" style="justify-content:space-between;">
         <span>🔮 PRÉDICTIONS PERSONNALISÉES</span>
@@ -7439,7 +7440,10 @@
                 tbody.innerHTML = '';
 
                 if (spots.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">No ${type.toUpperCase()} spots received.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;padding:16px;color:#556;">
+                        <span class="spinner" style="display:inline-block;width:11px;height:11px;border:2px solid #333;border-top-color:#00f3ff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px;"></span>
+                        Connexion au cluster DX en cours — les spots ${type.toUpperCase()} apparaîtront dès réception (flux temps réel, pas d'historique).
+                    </td></tr>`;
                 } else {
                     // Filtrer par type
                     spots = spots.filter(spot => spot.type.toLowerCase() === type);
@@ -9187,9 +9191,11 @@ async function loadMySignal() {
       return;
     }
 
-    const reports = d.reports || [];
+    // Fraîcheur : un rapport de plus de 5 min ne représente plus la
+    // propagation actuelle — retiré du panel (même seuil que la carte).
+    const reports = (d.reports || []).filter(e => e.age_s == null || e.age_s <= MYSIG_MAX_AGE_S);
     const summaryTxt = reports.length
-      ? `${reports.length} stations · max <span style="font-size:1.35em;font-weight:800;color:#fb923c;">${d.max_distance_km || 0} km</span>`
+      ? `${reports.length} stations · max <span style="font-size:1.35em;font-weight:800;color:#fb923c;">${Math.max(0, ...reports.map(e => e.distance_km || 0))} km</span>`
       : '';
     const html = reports.length
       ? reports.map(e => {
@@ -9246,6 +9252,11 @@ function _ckMySignalInit() {
 const MYSIG_HF_BANDS  = ['160m','80m','60m','40m','30m','20m','17m','15m','12m','10m','6m'];
 const MYSIG_VHF_BANDS = ['4m','2m','70cm','23cm','13cm','QO-100'];
 const MYSIG_REFRESH_MS = 180000;  // 3 min
+// Un rapport de réception plus vieux que ce seuil ne représente plus la
+// propagation ACTUELLE — il est exclu de l'enveloppe, qui disparaît
+// entièrement si plus aucun rapport n'est assez frais (ex: 10 min sans
+// transmettre → l'enveloppe doit s'effacer, pas rester figée indéfiniment).
+const MYSIG_MAX_AGE_S = 300;  // 5 min
 
 // État indépendant par carte : { hf: {...}, vhf: {...} }
 const _mysig = {
@@ -9377,6 +9388,7 @@ async function _checkNewDistanceRecord(which) {
     if (!d.ok) return;
     const filtered = (d.reports || []).filter(
       e => e.lat != null && e.lon != null && e.band && s.bands.includes(e.band)
+           && (e.age_s == null || e.age_s <= MYSIG_MAX_AGE_S)
     );
     const maxNow = Math.max(0, ...filtered.map(e => e.distance_km || 0));
     // Signature de l'ensemble des stations actuellement reçues — détecte
@@ -9411,8 +9423,11 @@ async function loadMySignalOnMap(which) {
 
     // Filtrer sur les bandes de CETTE carte uniquement (HF vs VHF/UHF)
     // — un spot 6m ne pollue pas la carte VHF, un spot 2m ne pollue pas la carte HF.
+    // Filtrer aussi par fraîcheur : un rapport > 15 min ne représente plus
+    // la propagation actuelle, il disparaît de l'enveloppe.
     const withCoords = (d.reports || []).filter(
       e => e.lat != null && e.lon != null && e.band && s.bands.includes(e.band)
+           && (e.age_s == null || e.age_s <= MYSIG_MAX_AGE_S)
     );
 
     // Mémoriser la distance max vue — sert à _checkNewDistanceRecord()
@@ -9434,7 +9449,7 @@ async function loadMySignalOnMap(which) {
       const segs = _greatCirclePoints(a.lat, a.lon, b.lat, b.lon, 24);
       segs.forEach(seg => {
         s.layer.addLayer(L.polyline(seg, {
-          color: '#0d7a3f', weight: 2.6, opacity: 0.88
+          color: '#ff2222', weight: 2.6, opacity: 0.88
         }));
       });
     }
@@ -9689,7 +9704,7 @@ fetch('/api/check_update')
     return Number.isFinite(n) ? n : fb;
   }
 
-  // ── v11.1 : cache de la réalité (spots 24h) ──
+  // ── v11.2 : cache de la réalité (spots 24h) ──
   window._voacapRealityCache = null;
   window._voacapRealityZone  = null;
   window._voacapView = localStorage.getItem('ck_voacap_view') || 'theory';
@@ -9985,7 +10000,7 @@ fetch('/api/check_update')
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEURAL DX WATCHER v11.1 — Client JS
+   NEURAL DX WATCHER v11.2 — Client JS
    · Sparklines DX Feed
    · Widget Prédictions personnalisées
    · Présence heartbeat → ntfy filtre

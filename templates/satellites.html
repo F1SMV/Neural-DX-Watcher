@@ -95,6 +95,7 @@
         .progress-fill{height:100%;border-radius:3px;transition:width .5s;}
 
         @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes sat-hourglass-spin{0%{transform:rotate(0deg)}50%{transform:rotate(180deg)}100%{transform:rotate(360deg)}}
         .spinner{display:inline-block;width:11px;height:11px;border:2px solid #333;
             border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;
             vertical-align:middle;margin-right:4px;}
@@ -151,7 +152,15 @@
             </div>
             <!-- Boutons sélection satellite -->
             <div id="sat-selector" style="display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border-bottom:1px solid #111;background:rgba(0,0,0,0.3);"></div>
-            <div id="sat-map"></div>
+            <div style="position:relative;">
+              <div id="sat-map"></div>
+              <div id="sat-map-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;
+                   align-items:center;justify-content:center;background:rgba(5,10,18,.92);z-index:500;
+                   font-family:'Share Tech Mono',monospace;color:#8aa6c8;text-align:center;gap:10px;">
+                <span style="font-size:2.2em;animation:sat-hourglass-spin 1.4s linear infinite;">⏳</span>
+                <span style="font-size:.85em;">Calcul des positions satellites…<br><span style="font-size:.82em;color:#556;">Premier appel : jusqu'à 45s (chargement TLE + sgp4)</span></span>
+              </div>
+            </div>
         </div>
 
         <!-- TABLEAU -->
@@ -519,6 +528,10 @@ async function loadPositions() {
         renderPassesSatSelector();
         updateMap();
 
+        // Retirer l'overlay de chargement une fois les premières positions reçues
+        const loadingOverlay = document.getElementById('sat-map-loading');
+        if (loadingOverlay) loadingOverlay.remove();
+
         const ts = new Date(d.ts*1000).toLocaleTimeString('fr-FR');
         document.getElementById('meta-ts').textContent = `🕐 ${ts}`;
         document.getElementById('map-ts').textContent  = ts;
@@ -529,7 +542,13 @@ async function loadPositions() {
         // → quand l'utilisateur clique, _freqCache[norad] est déjà rempli = affichage immédiat
         _preloadAllFrequencies(positions.filter(p=>!p.error).map(p=>p.norad));
 
-    } catch(e) { console.error(e); }
+    } catch(e) {
+        console.error(e);
+        const loadingOverlay = document.getElementById('sat-map-loading');
+        if (loadingOverlay) {
+            loadingOverlay.innerHTML = '<span style="font-size:1.8em;">⚠</span><span style="font-size:.85em;color:#f87171;">Erreur de chargement — nouvelle tentative en cours…</span>';
+        }
+    }
 }
 
 // Précharge silencieuse des fréquences — requêtes parallèles, sans bloquer l'UI

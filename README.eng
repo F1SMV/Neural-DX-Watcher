@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v11.1
+# ⚡ Neural DX Watcher — v11.2
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -151,6 +151,37 @@ No cloud dependency.
 ---
 
 ## 🗂️ Version History
+
+### v11.2 — Critical Fixes: META ANALYSIS, AI Insight, Satellites
+
+#### 🐛 500 Error on META ANALYSIS — Missing Analyzer Script
+
+The `tools/` directory and `tools/log_meta_analyzer.py` script simply didn't exist on the server — the `POST /api/meta/run` route was failing systematically. Complete rewrite of the missing script:
+
+- Parses `SPOT: CALL (band, mode) -> SPD: X pts (Dist: Ykm)` lines from the application log
+- Deduplicates by callsign (keeps best SPD score), sorts top spots
+- Generates `data/meta/summary.json` in the exact format expected by the AI Insight page
+- Designed to never crash: missing or empty log → valid empty summary, never an error
+
+Additionally, the backend now returns the **actual error detail** (script `stderr`) instead of a bare opaque return code — future errors will be immediately diagnosable instead of requiring blind investigation.
+
+#### 🔧 AI Insight Page — Native `confirm()`/`alert()` Finally Replaced
+
+The `analysis.html` → `ai_insight.html` rename (v10.2) had carried over a version predating the dialog fixes made along the way — native browser popups (`confirm()`, `alert()`) were still present in production. Fixed: inline HTML dialog for run confirmation, detailed error message (including backend `stderr`) displayed directly on the page.
+
+#### ⏳ Satellites Page — Loading Indicator
+
+The first position computation call (TLE + sgp4) can take up to 45 seconds after a server restart. Added an explicit loading indicator (animated hourglass + message) on the map, automatically removed once positions arrive.
+
+#### 📡 Index Page — Clarified Wait Message
+
+The spot table showed a generic empty message without explaining that the DX Cluster feed is **real-time** (no backlog on connection) — a new spot must literally happen somewhere after your connection to appear. Message replaced with a clear explanation of this normal behavior.
+
+#### 🎨 "WHO HEARS ME" Toggle — Color Adjusted
+
+The reception envelope line changes from dark green to **red**, significantly more visible against the Esri satellite map background.
+
+---
 
 ### v11.1 — Security Level 2 · "WHO HEARS ME" Toggle on HF & VHF/UHF Maps
 

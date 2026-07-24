@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v11.1
+# ⚡ Neural DX Watcher — v11.2
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -151,6 +151,37 @@ Aucune dépendance cloud.
 ---
 
 ## 🗂️ Historique des versions
+
+### v11.2 — Corrections critiques : META ANALYSE, AI Insight, Satellites
+
+#### 🐛 Erreur 500 sur META ANALYSE — script analyseur manquant
+
+Le dossier `tools/` et le script `tools/log_meta_analyzer.py` n'existaient pas sur le serveur — la route `POST /api/meta/run` échouait systématiquement. Écriture complète du script manquant :
+
+- Parse les lignes `SPOT: CALL (band, mode) -> SPD: X pts (Dist: Ykm)` du log applicatif
+- Déduplique par indicatif (garde le meilleur score SPD), trie les top spots
+- Génère `data/meta/summary.json` au format exact attendu par la page AI Insight
+- Conçu pour ne jamais planter : log absent ou vide → résumé valide vide, jamais d'erreur
+
+En complément, le backend renvoie désormais le **détail réel de l'erreur** (`stderr` du script) au lieu d'un simple code retour opaque — les erreurs futures seront immédiatement diagnostiquables au lieu de nécessiter une investigation à l'aveugle.
+
+#### 🔧 Page AI Insight — `confirm()`/`alert()` natifs enfin remplacés
+
+Le renommage `analysis.html` → `ai_insight.html` (v10.2) avait repris une version antérieure aux corrections de dialogue faites en cours de route — les popups navigateur natifs (`confirm()`, `alert()`) étaient toujours présents en production. Corrigé : dialog HTML inline pour la confirmation de relance, message d'erreur détaillé (incluant le `stderr` du backend) affiché directement dans la page.
+
+#### ⏳ Page Satellites — indicateur de chargement
+
+Le premier appel de calcul de position (TLE + sgp4) peut prendre jusqu'à 45 secondes après un démarrage serveur. Ajout d'un indicateur de chargement explicite (sablier animé + message) sur la carte, retiré automatiquement dès que les positions arrivent.
+
+#### 📡 Page Index — message d'attente clarifié
+
+Le tableau de spots affichait un message vide générique sans expliquer que le flux DX Cluster est **temps réel** (pas d'historique à la connexion) — un nouveau spot doit littéralement se produire quelque part après ta connexion pour apparaître. Message remplacé par une explication claire de ce comportement normal.
+
+#### 🎨 Toggle "QUI M'ENTEND" — couleur ajustée
+
+La ligne d'enveloppe de réception passe de vert foncé à **rouge**, nettement plus visible sur le fond satellite Esri des cartes.
+
+---
 
 ### v11.1 — Sécurité niveau 2 · Toggle "QUI M'ENTEND" sur les cartes HF & VHF/UHF
 

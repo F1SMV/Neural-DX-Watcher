@@ -86,7 +86,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '11.1'
+APP_VERSION = '11.2'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -1737,13 +1737,27 @@ def run_meta():
         log_path = request.args.get("log", str(LOG_PATH_DEFAULT))
         cmd = ["python3", str(ANALYZER), "--log", log_path, "--outdir", str(META_DIR)]
 
-        subprocess.run(cmd, timeout=120, check=True)
+        # Vérification préalable : le script analyzer existe-t-il vraiment ?
+        # Sans ce contrôle, une absence de fichier produit un CalledProcessError
+        # opaque (juste un code retour, aucun message exploitable).
+        if not ANALYZER.exists():
+            return jsonify({
+                "status": "error",
+                "msg": f"Script d'analyse introuvable : {ANALYZER} — vérifiez qu'il est bien déployé sur le serveur."
+            }), 500
+
+        result = subprocess.run(cmd, timeout=120, capture_output=True, text=True)
+        if result.returncode != 0:
+            return jsonify({
+                "status": "failed",
+                "code": result.returncode,
+                "stderr": (result.stderr or "")[-2000:],
+                "stdout": (result.stdout or "")[-500:],
+            }), 500
 
         return jsonify({"status": "ok"})
     except subprocess.TimeoutExpired:
         return jsonify({"status": "timeout"}), 504
-    except subprocess.CalledProcessError as e:
-        return jsonify({"status": "failed", "code": e.returncode}), 500
     except Exception as e:
         return jsonify({"status": "error", "msg": str(e)}), 500
 @app.route('/wanted.json')

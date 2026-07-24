@@ -137,6 +137,17 @@
 </style>
 </head>
 <body>
+
+<!-- Dialog confirmation META analyse (remplace confirm() natif) -->
+<div id="meta-confirm-dialog" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);align-items:center;justify-content:center;">
+    <div style="background:#0e0e0e;border:1px solid var(--accent, #00f3ff);border-radius:12px;padding:24px 28px;max-width:340px;text-align:center;">
+        <p style="color:#a0a0a0;margin:0 0 16px;font-size:.9em;"><b>Relancer la méta-analyse ?</b><br><small style="color:#666">Disponible 1x par jour</small></p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button class="btn" id="meta-confirm-yes" style="border-color:#22c55e;color:#22c55e;">✓ Confirmer</button>
+            <button class="btn" id="meta-confirm-no">✕ Annuler</button>
+        </div>
+    </div>
+</div>
 <header>
     <div>
         <h1>Neural AI Analysis Center</h1>
@@ -230,7 +241,7 @@
                 <span>📊 META ANALYSE / META ANALYSIS</span>
                 <span style="display:flex; gap:8px; align-items:center;">
                     <span class="status-badge" id="metaFreshBadge" title="Fraîcheur / Freshness">—</span>
-                    <button class="btn" id="metaRunBtn" style="padding:4px 8px;" onclick="runMetaOncePerDay()" title="Relancer (1 fois / jour) / Run (once per day)">↻ RUN</button>
+                    <button class="btn" id="metaRunBtn" style="padding:4px 8px;" onclick="showMetaConfirm()" title="Relancer la méta-analyse (1x/jour)">↻ RUN</button>
                 </span>
             </div>
             <div class="explanation">
@@ -567,18 +578,47 @@ function fillList(id, items, tag) {
             }
         }
 
+        function showMetaConfirm() {
+            const d = document.getElementById('meta-confirm-dialog');
+            if (d) d.style.display = 'flex';
+        }
+        function hideMetaConfirm() {
+            const d = document.getElementById('meta-confirm-dialog');
+            if (d) d.style.display = 'none';
+        }
+        function showMetaError(msg) {
+            let errEl = document.getElementById('meta-error-msg');
+            if (!errEl) {
+                errEl = document.createElement('div');
+                errEl.id = 'meta-error-msg';
+                errEl.style.cssText = 'margin-top:8px;padding:8px 12px;background:rgba(255,0,60,.10);border-left:3px solid #ff003c;color:#ff6b8a;font-size:.78em;border-radius:4px;white-space:pre-wrap;font-family:monospace;max-height:200px;overflow-y:auto;';
+                document.getElementById('metaRunBtn')?.closest('div')?.appendChild(errEl);
+            }
+            errEl.textContent = '⚠ ' + msg;
+            errEl.style.display = 'block';
+            setTimeout(() => { if (errEl) errEl.style.display = 'none'; }, 15000);
+        }
+
         async function runMetaOncePerDay(){
             _metaSetRunButtonState();
             const btn = document.getElementById("metaRunBtn");
             if(btn && btn.disabled) return;
 
-            if(!confirm("Relancer la méta-analyse maintenant ? / Run meta analysis now?")) return;
+            // confirm() natif remplacé par dialog inline (voir showMetaConfirm)
 
             try{
                 if(btn){ btn.disabled = true; btn.textContent = "↻ ..."; }
                 const r = await fetch("/api/meta/run", { method:"POST" });
                 if(!r.ok){
-                    alert("META run failed (HTTP " + r.status + ").");
+                    let detail = '';
+                    try {
+                        const j = await r.json();
+                        detail = j.stderr || j.msg || (j.code != null ? `code ${j.code}` : '');
+                    } catch(_) {}
+                    const msg = r.status === 500
+                        ? `Erreur ${r.status}${detail ? ' — ' + detail : ' — méta-analyse déjà en cours ou limitée à 1x/jour, laissez votre machine travailler.'}`
+                        : `Erreur ${r.status}${detail ? ' — ' + detail : ''}`;
+                    showMetaError(msg);
                     if(btn){ btn.disabled = false; btn.textContent = "↻ RUN"; }
                     return;
                 }
@@ -586,7 +626,7 @@ function fillList(id, items, tag) {
                 setTimeout(loadMeta, 1800);
             }catch(e){
                 console.error("META run error:", e);
-                alert("META error: " + e);
+                showMetaError('Erreur réseau — vérifiez que le serveur est actif : ' + e);
                 if(btn){ btn.disabled = false; btn.textContent = "↻ RUN"; }
                 return;
             }
@@ -642,7 +682,7 @@ function fillList(id, items, tag) {
             }
         }
 
-document.addEventListener('DOMContentLoaded', () => {
+function _metaDialogInit() {
             initTheme();
             initSortable();
             initDXBriefingUI();
@@ -652,7 +692,17 @@ document.addEventListener('DOMContentLoaded', () => {
             setInterval(updateMetaCountdown, 1000);
             setInterval(_metaSetRunButtonState, 60000);
             setInterval(() => loadDXBriefing(false), 600000);
-        });
+            document.getElementById('meta-confirm-yes')?.addEventListener('click', () => {
+                hideMetaConfirm();
+                runMetaOncePerDay();
+            });
+            document.getElementById('meta-confirm-no')?.addEventListener('click', hideMetaConfirm);
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', _metaDialogInit);
+        } else {
+            _metaDialogInit();
+        }
     </script>
 </body>
 </html>
