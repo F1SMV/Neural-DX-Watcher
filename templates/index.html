@@ -5,7 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>⚡ Neural DX Watcher v11.2</title>
+<title>⚡ Neural DX Watcher v11.3</title>
 
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -3986,7 +3986,7 @@
         body.mode-cockpit .ck-fc.ck-wl    { color: #fbbf24 !important; }  /* watchlist = jaune */
         body.mode-cockpit .ck-fc.ck-new-dxcc { color: #f87171 !important; } /* new dxcc = rouge */
 
-        /* ── SPARKLINES DX FEED v11.2 ── */
+        /* ── SPARKLINES DX FEED v11.3 ── */
         .ck-sparkline {
             display: inline-block;
             vertical-align: middle;
@@ -4068,7 +4068,7 @@
         .ck-mysig-snr.fair { background: rgba(251,191,36,.18); color: #fcd34d; }
         .ck-mysig-snr.weak { background: rgba(248,113,113,.18); color: #fca5a5; }
 
-        /* ── WIDGET PRÉDICTIONS v11.2 ── */
+        /* ── WIDGET PRÉDICTIONS v11.3 ── */
         #ck-predictions-panel { min-height: 120px; }
         .pred-item {
             display: flex; align-items: center; gap: 8px;
@@ -4108,6 +4108,21 @@
         </style>
 </head>
 <body>
+
+<!-- Panneau Setup ⚙ — masquer/afficher les pavés, persisté côté serveur -->
+<div id="setup-panel-overlay" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.75);align-items:center;justify-content:center;">
+  <div style="background:#0a0e18;border:1px solid rgba(0,243,255,.4);border-radius:12px;
+              padding:20px 24px;max-width:480px;width:92%;max-height:82vh;display:flex;flex-direction:column;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h3 style="margin:0;color:#00f3ff;font-family:'Orbitron',sans-serif;font-size:1.05em;">⚙ SETUP — Pavés affichés</h3>
+      <button onclick="closeSetupPanel()" style="background:none;border:none;color:#888;font-size:1.4em;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <p style="color:#667;font-size:.75em;margin:2px 0 12px;">Décochez un pavé pour le masquer sur tous vos appareils. Un pavé masqué arrête aussi ses rafraîchissements automatiques (économie réseau/CPU).</p>
+    <div id="setup-panel-list" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:2px;">
+      <div style="text-align:center;color:#556;padding:20px;">Chargement…</div>
+    </div>
+  </div>
+</div>
 
 <!-- BANDEAU DE MISE À JOUR -->
 <div id="update-banner" style="display:none; position:fixed; top:0; left:0; width:100%; background:#ff9800; color:#fff; text-align:center; padding:10px; z-index:9999; font-weight:bold;">
@@ -4275,7 +4290,12 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V11.2</div>
+    <div id="title">📡 NEURAL DX WATCHER V11.3</div>
+    <button id="setup-gear-btn" onclick="openSetupPanel()" title="Setup — masquer/afficher les pavés"
+      style="background:rgba(0,243,255,.08);border:1px solid rgba(0,243,255,.3);color:#00f3ff;
+             border-radius:6px;padding:4px 9px;font-size:1.1em;cursor:pointer;line-height:1;">
+      ⚙
+    </button>
     <div id="indicators" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
       <div class="indicator-item">QRA: <span id="qra-display">{{ user_qra }}</span></div>
       <div class="indicator-item">UTC: <span id="utc-time"></span></div>
@@ -4375,7 +4395,7 @@
       </div>
     </div>
 
-    <!-- Prédictions personnalisées v11.2 -->
+    <!-- Prédictions personnalisées v11.3 -->
     <div class="ck-panel" data-panel-id="ck-predictions" id="ck-predictions-panel">
       <div class="ck-title" style="justify-content:space-between;">
         <span>🔮 PRÉDICTIONS PERSONNALISÉES</span>
@@ -4668,12 +4688,13 @@
 
     <!-- MY SIGNAL — self-monitoring PSK Reporter. "Qui m'entend, où, avec
          quel SNR" sans ouvrir un site tiers. Source : retrieve.pskreporter.info,
-         cache backend 90s (politique d'usage PSK Reporter). -->
+         cache backend 5 min (politique d'usage officielle PSK Reporter). -->
     <div class="ck-panel" data-panel-id="ck-my-signal">
       <div class="ck-title" style="justify-content:space-between;">
         <span>📶 MY SIGNAL <small style="opacity:.6;font-weight:400;">· PSK Reporter</small></span>
         <span id="ck-mysig-summary" style="font-size:.62em;color:#6f86a8;font-weight:400;font-family:monospace;"></span>
       </div>
+      <div id="ck-mysig-freshness" style="font-size:.6em;color:#3a4a60;font-family:monospace;padding:0 2px 2px;"></div>
       <div id="ck-mysig-body">
         <div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Chargement…</div>
       </div>
@@ -4924,6 +4945,7 @@
              color:#fb923c;font-family:monospace;letter-spacing:.3px;white-space:nowrap;">
       📶 QUI M'ENTEND
     </button>
+    <span id="mysig-freshness-hf" style="font-size:.62em;color:#3a4a60;font-family:monospace;white-space:nowrap;"></span>
   </span>
 </div>
 <div class="map-area" id="map-hf"></div>
@@ -4943,6 +4965,7 @@
              color:#fb923c;font-family:monospace;letter-spacing:.3px;white-space:nowrap;">
       📶 QUI M'ENTEND
     </button>
+    <span id="mysig-freshness-vhf" style="font-size:.62em;color:#3a4a60;font-family:monospace;white-space:nowrap;"></span>
   </span>
 </div>
 <div class="map-area" id="map-vhf"></div>
@@ -4958,6 +4981,7 @@
     <span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 📶 MY SIGNAL · PSK Reporter
     <span id="cs-mysig-summary" style="float:right;font-size:0.75em;color:#6f86a8;font-weight:400;font-family:monospace;"></span>
   </div>
+  <div id="cs-mysig-freshness" style="font-size:.68em;color:#3a4a60;font-family:monospace;padding:2px 8px;"></div>
   <div id="cs-mysig-body" style="padding:4px 0;">
     <div style="padding:14px;text-align:center;color:#3a4a60;font-size:.82em;">Chargement…</div>
   </div>
@@ -5163,6 +5187,106 @@
                 return originalFetch.call(this, input, init);
             };
         })();
+
+        /* ── Panneau Setup ⚙ — masquer/afficher les pavés ──────────────────
+           Config persistée côté serveur (data/ui_config.json), partagée
+           entre tous les appareils qui accèdent à l'app (pas localStorage,
+           qui serait par-navigateur uniquement). */
+        const SETUP_PANEL_LABELS = {
+            'wanted':               'DX Wanted (Top 10)',
+            'watchlist':            'Watchlist',
+            'wl-tracking':          'Watchlist · Tracking',
+            'my-signal':            'MY SIGNAL (PSK Reporter)',
+            'surge':                'Surge Alerts',
+            'lotw':                 'LoTW — Logbook of the World',
+            'qth':                  'QTH / Setup initial',
+            'solar':                'Solar & Geomagnetic Data',
+            'voacap':               'Propagation HF · VOACAP',
+            'map-hf':               'DX Map HF',
+            'map-vhf':              'DX Map VHF/UHF',
+            'spots-hf':             'DX Spots HF',
+            'spots-vhf':            'DX Spots VHF/UHF',
+            'spots-6m':             'DX Spots 6m',
+            'spotter':              'Spot manuel',
+            'smart-spots':          'Smart Spots (mode SMART)',
+            'bandmap':              'Bandmap Waterfall',
+            'chart-history':        'Graphique historique',
+            'chart-live-hf':        'Graphique live HF',
+            'chart-live-vhf':       'Graphique live VHF',
+            'ck-stats':             '[Cockpit] Synthèse 6m/24h',
+            'ck-activity-scale':    "[Cockpit] Échelle d'activité",
+            'ck-solar':             '[Cockpit] Solar & Geomagnetic',
+            'ck-voacap':            '[Cockpit] Propagation VHF · VOACAP',
+            'ck-magic-band':        '[Cockpit] Magic Band 6m',
+            'ck-heatmap':           '[Cockpit] Heatmap 6m',
+            'ck-band-conditions':   '[Cockpit] Conditions bandes',
+            'ck-dx-feed':           '[Cockpit] DX Feed',
+            'ck-top-spots':         '[Cockpit] Top Spots',
+            'ck-predictions':       '[Cockpit] Prédictions personnalisées',
+            'ck-manual-spot':       '[Cockpit] Spot manuel',
+            'ck-wl-tracking':       '[Cockpit] Watchlist · Tracking',
+            'ck-my-signal':         '[Cockpit] MY SIGNAL (PSK Reporter)',
+        };
+
+        let _uiConfig = {};  // {panel_id: false} pour les pavés masqués — absent = visible
+
+        async function fetchUiConfig() {
+            try {
+                const r = await fetch('/api/ui-config', { cache: 'no-store' });
+                _uiConfig = await r.json();
+            } catch (e) { _uiConfig = {}; }
+            applyUiConfig();
+        }
+
+        function isPanelHidden(panelId) {
+            return _uiConfig[panelId] === false;
+        }
+
+        function applyUiConfig() {
+            document.querySelectorAll('[data-panel-id]').forEach(el => {
+                const id = el.getAttribute('data-panel-id');
+                el.style.display = isPanelHidden(id) ? 'none' : '';
+            });
+        }
+
+        async function setPanelVisible(panelId, visible) {
+            if (visible) delete _uiConfig[panelId]; else _uiConfig[panelId] = false;
+            applyUiConfig();
+            try {
+                await fetch('/api/ui-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ panel_id: panelId, visible })
+                });
+            } catch (e) { /* silencieux — l'affichage local reste correct */ }
+        }
+
+        function renderSetupList() {
+            const list = document.getElementById('setup-panel-list');
+            if (!list) return;
+            const ids = Object.keys(SETUP_PANEL_LABELS).sort((a, b) =>
+                SETUP_PANEL_LABELS[a].replace('[Cockpit] ', '').localeCompare(SETUP_PANEL_LABELS[b].replace('[Cockpit] ', ''))
+            );
+            list.innerHTML = ids.map(id => {
+                const checked = !isPanelHidden(id) ? 'checked' : '';
+                return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:.85em;color:#ccc;font-family:monospace;" onmouseover="this.style.background='rgba(0,243,255,.05)'" onmouseout="this.style.background=''">
+                    <input type="checkbox" ${checked} onchange="setPanelVisible('${id}', this.checked)" style="cursor:pointer;">
+                    ${SETUP_PANEL_LABELS[id]}
+                </label>`;
+            }).join('');
+        }
+
+        function openSetupPanel() {
+            const overlay = document.getElementById('setup-panel-overlay');
+            if (overlay) { overlay.style.display = 'flex'; renderSetupList(); }
+        }
+        function closeSetupPanel() {
+            const overlay = document.getElementById('setup-panel-overlay');
+            if (overlay) overlay.style.display = 'none';
+        }
+
+        // Appliquer la config dès que possible (avant même le rendu complet des panels)
+        fetchUiConfig();
 
         const MY_CALL = '{{ my_call }}';
         const SPD_THRESHOLD = {{ spd_threshold }};
@@ -5388,26 +5512,17 @@
                 const r = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 const data = await r.json();
-                let raw = data.stale || data.calls || data.items || [];
-                if (!Array.isArray(raw)) raw = Object.values(raw);
 
-                const now = Date.now();
-                const items = raw.map(x => {
-                    if (typeof x === 'string') return { call: x.toUpperCase(), days: null, raw: x };
-                    const call = String(x.call || x.callsign || x.dx_call || '').toUpperCase();
-                    const last = x.last_seen_utc || x.last_seen || x.utc || x.time || null;
-                    const ts = last ? Date.parse(last) : NaN;
-                    const ageDays = Number.isFinite(ts) ? Math.floor((now - ts) / 86400000) : (Number(x.days_inactive || x.age_days || x.days) || null);
-                    return { call, days: ageDays, raw: x };
-                }).filter(x => x.call);
-
-                // Si l'API renvoie les âges, on refiltre côté navigateur pour garantir que les boutons 7/14/30/60 changent vraiment la liste.
-                const filtered = items.some(x => x.days !== null)
-                    ? items.filter(x => x.days === null || x.days >= days)
-                    : items;
-
-                filtered.sort((a,b) => (b.days ?? -1) - (a.days ?? -1) || a.call.localeCompare(b.call));
-                purgeStaleList = filtered.map(x => x.call);
+                // Le backend a déjà tout fait : filtrage selon `days` (avec la
+                // vraie logique end_date/grâce/jamais-spotté) et tri (expéditions
+                // terminées -> inactifs -> jamais vus). On affiche tel quel —
+                // ne PAS re-filtrer/re-trier ici : l'ancien code recalculait un
+                // "nombre de jours" approximatif depuis last_seen_utc, absent
+                // pour les expéditions terminées ou les calls jamais spotté,
+                // et laissait alors passer ces entrées quel que soit le bouton
+                // 7j/14j/30j/60j cliqué, en plus d'ignorer le tri du backend.
+                const items = Array.isArray(data.stale) ? data.stale : [];
+                purgeStaleList = items.map(x => String(x.call || '').toUpperCase()).filter(Boolean);
 
                 if (!purgeStaleList.length) {
                     list.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-style:italic;">Aucun call inactif depuis ' + days + ' jours 🎉</div>';
@@ -5415,12 +5530,18 @@
                     return;
                 }
 
-                list.innerHTML = filtered.map(item =>
-                    '<label class="purge-item">' +
-                    '<input type="checkbox" class="purge-cb" value="' + item.call + '" checked>' +
-                    '<span>' + item.call + (item.days !== null ? ' <small style="opacity:.55;">' + item.days + 'j</small>' : '') + '</span>' +
-                    '</label>'
-                ).join('');
+                list.innerHTML = items.map(item => {
+                    const call = String(item.call || '').toUpperCase();
+                    // Ne précocher que ce que le backend juge sûr (ex: expédition
+                    // terminée depuis longtemps) — pas les cas en période de
+                    // grâce ou "jamais spotté", qui restent une décision manuelle.
+                    const checked = item.pre_checked ? ' checked' : '';
+                    const reason = item.reason ? ' <small style="opacity:.55;">' + item.reason + '</small>' : '';
+                    return '<label class="purge-item">' +
+                        '<input type="checkbox" class="purge-cb" value="' + call + '"' + checked + '>' +
+                        '<span>' + call + reason + '</span>' +
+                        '</label>';
+                }).join('');
 
                 list.onchange = updatePurgeStatus;
                 updatePurgeStatus();
@@ -5657,10 +5778,21 @@
         }
 
         function updateMaps(spots) {
+            // Respecte le filtre bande actif sur chaque panel de spots (HF / VHF-UHF) :
+            // la carte n'affiche que la bande sélectionnée, pas toutes les bandes,
+            // car l'espace carte est trop restreint pour tout superposer lisiblement.
+            const hfBandFilterEl = document.getElementById('hf-band-filter');
+            const vhfBandFilterEl = document.getElementById('vhf-band-filter');
+            const hfBandFilter = hfBandFilterEl ? hfBandFilterEl.value : 'All';
+            const vhfBandFilter = vhfBandFilterEl ? vhfBandFilterEl.value : 'All';
+
             markersHF.clearLayers();
             markersVHF.clearLayers();
             spots.forEach(spot => {
                 if (spot.lat && spot.lon && !isNaN(spot.lat) && !isNaN(spot.lon)) {
+                    if (spot.type === 'HF' && hfBandFilter !== 'All' && spot.band !== hfBandFilter) return;
+                    if (spot.type === 'VHF' && vhfBandFilter !== 'All' && spot.band !== vhfBandFilter) return;
+
                     const markerIcon = L.divIcon({
                         className: 'dx-marker-point',
                         html: `<div style="width: 10px; height: 10px; background-color: ${spot.color}; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 5px ${spot.color};"></div>`,
@@ -7761,11 +7893,17 @@
             const hfBandSelect = document.getElementById('hf-band-filter');
             const vhfBandSelect = document.getElementById('vhf-band-filter');
 
-            hfBandSelect.addEventListener('change', () => updateSpots('hf'));
+            hfBandSelect.addEventListener('change', () => {
+                updateSpots('hf');
+                if (lastAllSpots && lastAllSpots.length) updateMaps(lastAllSpots);
+            });
             document.getElementById('hf-mode-filter').addEventListener('change', () => updateSpots('hf'));
             document.getElementById('hf-freq-sort').addEventListener('change', () => updateSpots('hf'));
 
-            vhfBandSelect.addEventListener('change', () => updateSpots('vhf'));
+            vhfBandSelect.addEventListener('change', () => {
+                updateSpots('vhf');
+                if (lastAllSpots && lastAllSpots.length) updateMaps(lastAllSpots);
+            });
             document.getElementById('vhf-mode-filter').addEventListener('change', () => updateSpots('vhf'));
             document.getElementById('vhf-freq-sort').addEventListener('change', () => updateSpots('vhf'));
 
@@ -8593,6 +8731,7 @@
 
         // Refresh ages every 15s, redraw waterfall
         setInterval(() => {
+            if (isPanelHidden('bandmap')) return;  // pavé masqué — pas de recalcul inutile
             const now = Date.now();
             bandmapSpots = bandmapSpots.filter(s => (now - s.time_ms) < BANDMAP_TTL_MS);
             bandmapDrawWaterfall();
@@ -8872,6 +9011,7 @@
         }
 
         async function loadVoacap(zone) {
+            if (isPanelHidden('voacap')) return;  // pavé masqué — pas de calcul inutile
             voacapCurrentZone = zone;
             localStorage.setItem('voacap_zone', zone);
 
@@ -9043,6 +9183,7 @@
 })();
 
 async function loadWatchlistTracking(){
+  if (isPanelHidden('wl-tracking')) return;  // pavé masqué — pas de fetch inutile
   const body = document.getElementById('wl-track-body');
   const status = document.getElementById('wl-track-status');
   const filter = document.getElementById('wl-track-filter').value.trim();
@@ -9116,6 +9257,7 @@ setInterval(loadWatchlistTracking, 30000);
    backend /api/watchlist/tracking.json retourne déjà tout sans filtre
    quand q est vide, donc zéro changement backend nécessaire. */
 async function loadCockpitWlTracking() {
+  if (isPanelHidden('ck-wl-tracking')) return;  // pavé masqué — pas de fetch inutile
   const body = document.getElementById('ck-wl-track-body');
   const countEl = document.getElementById('ck-wl-track-count');
   const purgeSel = document.getElementById('ck-wl-track-purge');
@@ -9182,6 +9324,7 @@ async function loadMySignal() {
     const r = await fetch('/api/my-signal', { cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
+    _mysigUpdateFreshnessUI(d);
 
     if (!d.ok) {
       targets.forEach(t => {
@@ -9231,11 +9374,19 @@ async function loadMySignal() {
 function _ckMySignalInit() {
   loadMySignal();
   setInterval(() => {
+    // Ne rien faire si les DEUX copies du panel (classic/smart ET cockpit)
+    // sont masquées — sinon on continue puisqu'une seule fonction alimente
+    // les deux panels simultanément en un seul fetch.
+    if (isPanelHidden('my-signal') && isPanelHidden('ck-my-signal')) return;
     loadMySignal();
     // Rafraîchir aussi l'enveloppe carte si un toggle est actif (HF et/ou VHF)
     if (_mysig.hf.on)  loadMySignalOnMap('hf');
     if (_mysig.vhf.on) loadMySignalOnMap('vhf');
-  }, 90000);  // aligné sur le cache backend 90s
+  }, 20000);  // 20s : interroge notre propre cache backend (pas PSK Reporter
+              // directement), donc aucun impact sur leur politique de 5 min —
+              // ça permet juste de détecter plus vite quand le backend vient
+              // de rafraîchir ses données et d'afficher le compte à rebours
+              // de fraîcheur de façon fluide plutôt que par paliers de 90s.
 }
 
 /* ── Toggle "QUI M'ENTEND" sur la carte HF ────────────────────────────────
@@ -9252,6 +9403,31 @@ function _ckMySignalInit() {
 const MYSIG_HF_BANDS  = ['160m','80m','60m','40m','30m','20m','17m','15m','12m','10m','6m'];
 const MYSIG_VHF_BANDS = ['4m','2m','70cm','23cm','13cm','QO-100'];
 const MYSIG_REFRESH_MS = 180000;  // 3 min
+
+// Affiche depuis quand les données PSK Reporter datent, et dans combien de
+// temps une interrogation neuve sera possible. Le backend n'interroge PSK
+// Reporter qu'au maximum une fois par cache_ttl (5 min, imposé par la
+// politique d'usage officielle de PSK Reporter) — sans ce repère, un délai
+// de quelques minutes avant l'arrivée de nouveaux spots ressemble à un bug
+// ("figé") alors que c'est le fonctionnement normal.
+function _mysigFreshnessText(d) {
+  if (!d || d.fetched_at == null) return '';
+  const ageS = Math.max(0, Math.round(Date.now() / 1000 - d.fetched_at));
+  const ttl = d.cache_ttl || 300;
+  const remain = Math.max(0, ttl - ageS);
+  const ageLabel = ageS < 60 ? ageS + 's' : Math.floor(ageS / 60) + 'm' + (ageS % 60) + 's';
+  return remain > 0
+    ? `MàJ PSK il y a ${ageLabel} · prochaine possible dans ${remain}s`
+    : `MàJ PSK il y a ${ageLabel} · prochaine interrogation en cours`;
+}
+
+function _mysigUpdateFreshnessUI(d) {
+  const txt = _mysigFreshnessText(d);
+  ['cs-mysig-freshness', 'ck-mysig-freshness', 'mysig-freshness-hf', 'mysig-freshness-vhf'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = txt;
+  });
+}
 // Un rapport de réception plus vieux que ce seuil ne représente plus la
 // propagation ACTUELLE — il est exclu de l'enveloppe, qui disparaît
 // entièrement si plus aucun rapport n'est assez frais (ex: 10 min sans
@@ -9337,6 +9513,14 @@ function toggleMySignalOnMap(which) {
 // Interpolation grand-cercle (slerp sphérique) — Leaflet ne fournit pas
 // de géodésique nativement. Découpe la ligne si elle traverse
 // l'antiméridien (saut de longitude > 180°) pour un rendu propre.
+// Au-delà de cette latitude, les arcs de grand cercle sont coupés plutôt que
+// tracés : en projection Mercator, les grands cercles passant près du pôle
+// bombent fortement et se recoupent visuellement de façon trompeuse (effet
+// "toile emmêlée" au-dessus du Groenland/Arctique), même quand le tri par
+// azimut est mathématiquement correct. Les stations concernées restent
+// affichées (marqueur), seul le tracé de liaison est coupé.
+const MYSIG_ENVELOPE_MAX_LAT = 70;
+
 function _greatCirclePoints(lat1, lon1, lat2, lon2, segments) {
   const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
   const phi1 = toRad(lat1), l1 = toRad(lon1), phi2 = toRad(lat2), l2 = toRad(lon2);
@@ -9356,16 +9540,26 @@ function _greatCirclePoints(lat1, lon1, lat2, lon2, segments) {
     const lon = Math.atan2(y, x);
     pts.push([toDeg(lat), toDeg(lon)]);
   }
+  // Découpe en sous-segments : à chaque saut d'antiméridien (comme avant)
+  // ET dès qu'un point dépasse MYSIG_ENVELOPE_MAX_LAT (nord ou sud) — ce
+  // point est simplement omis, ce qui coupe l'arc au lieu de le tracer
+  // à travers la zone polaire.
   const segsOut = [];
-  let current = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    if (Math.abs(pts[i][1] - pts[i - 1][1]) > 180) {
-      segsOut.push(current);
+  let current = [];
+  for (let i = 0; i < pts.length; i++) {
+    const [lat, lon] = pts[i];
+    if (Math.abs(lat) > MYSIG_ENVELOPE_MAX_LAT) {
+      if (current.length > 1) segsOut.push(current);
+      current = [];
+      continue;
+    }
+    if (current.length && Math.abs(lon - current[current.length - 1][1]) > 180) {
+      if (current.length > 1) segsOut.push(current);
       current = [];
     }
-    current.push(pts[i]);
+    current.push([lat, lon]);
   }
-  segsOut.push(current);
+  if (current.length > 1) segsOut.push(current);
   return segsOut;
 }
 
@@ -9416,6 +9610,7 @@ async function loadMySignalOnMap(which) {
   try {
     const r = await fetch('/api/my-signal', { cache: 'no-store' });
     const d = await r.json();
+    _mysigUpdateFreshnessUI(d);
     if (!d.ok) return;
 
     if (s.layer) map.removeLayer(s.layer);
@@ -9704,7 +9899,7 @@ fetch('/api/check_update')
     return Number.isFinite(n) ? n : fb;
   }
 
-  // ── v11.2 : cache de la réalité (spots 24h) ──
+  // ── v11.3 : cache de la réalité (spots 24h) ──
   window._voacapRealityCache = null;
   window._voacapRealityZone  = null;
   window._voacapView = localStorage.getItem('ck_voacap_view') || 'theory';
@@ -10000,7 +10195,7 @@ fetch('/api/check_update')
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEURAL DX WATCHER v11.2 — Client JS
+   NEURAL DX WATCHER v11.3 — Client JS
    · Sparklines DX Feed
    · Widget Prédictions personnalisées
    · Présence heartbeat → ntfy filtre
@@ -10091,6 +10286,7 @@ fetch('/api/check_update')
 
   /* ── Widget Prédictions ─────────────────────────────────────────────── */
   async function loadPredictions() {
+    if (isPanelHidden('ck-predictions')) return;  // pavé masqué — pas de calcul inutile
     try {
       const r = await fetch('/api/predictions');
       if (!r.ok) return;

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPg==">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛰️ DX Briefing v10.5</title>
+    <title>🛰️ DX Briefing v11.3</title>
     <link rel="stylesheet" href="/static/base.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -246,7 +247,7 @@
         <a class="btn" href="/map">🗺 Map</a>
         <a class="btn" href="/world">🌍 World</a>
         <a class="btn" href="/satellites">🛰️ Satellites</a>
-        <a class="btn" href="/analysis.html">📊 Analyse</a>
+        <a class="btn" href="/ai-insight">🧠 AI Insight</a>
         <button class="btn" onclick="toggleTheme()">🔆</button>
     </div>
 </div>
@@ -258,6 +259,30 @@
 </div>
 
 <script>
+        /* ── SÉCURITÉ v11 — Jeton API automatique (voir index.html) ──── */
+        window._apiToken = null;
+        window._apiTokenPromise = fetch('/api/token')
+            .then(r => r.json())
+            .then(d => { window._apiToken = d.token || null; return window._apiToken; })
+            .catch(() => null);
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = async function(input, init) {
+                init = init || {};
+                const method = (init.method || 'GET').toUpperCase();
+                if (method === 'POST' || method === 'DELETE') {
+                    if (window._apiToken === null) { await window._apiTokenPromise; }
+                    if (window._apiToken) {
+                        init.headers = new Headers(init.headers || {});
+                        if (!init.headers.has('X-API-Token')) {
+                            init.headers.set('X-API-Token', window._apiToken);
+                        }
+                    }
+                }
+                return originalFetch.call(this, input, init);
+            };
+        })();
+
 const metaEl   = document.getElementById('meta');
 const gridEl   = document.getElementById('sources-grid');
 const dxCb     = document.getElementById('dx-mode-checkbox');

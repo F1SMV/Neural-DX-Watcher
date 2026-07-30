@@ -86,7 +86,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '11.2'
+APP_VERSION = '11.3'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -462,6 +462,56 @@ def api_token():
     """
     return jsonify({"token": API_TOKEN})
 
+
+# ── v11.3 — Panneau Setup ⚙ : configuration des pavés visibles/masqués ──────
+# Persistée côté serveur (partagée entre tous les appareils qui accèdent à
+# l'app), pas en localStorage (qui serait par-navigateur uniquement).
+UI_CONFIG_FILE = Path("data/ui_config.json")
+
+
+def _load_ui_config() -> dict:
+    if UI_CONFIG_FILE.exists():
+        try:
+            return json.loads(UI_CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+@app.route("/api/ui-config")
+def api_ui_config_get():
+    """Retourne la config actuelle : {panel_id: false} pour les pavés masqués uniquement."""
+    return jsonify(_load_ui_config())
+
+
+@app.route("/api/ui-config", methods=["POST"])
+@require_api_token
+def api_ui_config_set():
+    """
+    Met à jour la config. Corps attendu : {"panel_id": "ck-voacap", "visible": false}
+    Un pavé absent du fichier = visible par défaut (pas besoin de tout lister).
+    """
+    data = request.get_json(silent=True) or {}
+    panel_id = (data.get("panel_id") or "").strip()
+    visible = data.get("visible", True)
+    if not panel_id:
+        return jsonify({"ok": False, "error": "panel_id requis"}), 400
+
+    cfg = _load_ui_config()
+    if visible:
+        cfg.pop(panel_id, None)  # visible = valeur par défaut, pas la peine de stocker
+    else:
+        cfg[panel_id] = False
+
+    try:
+        UI_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        UI_CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({"ok": True, "config": cfg})
+
+
 # --- PLAGES DE FREQUENCES CW ---
 CW_RANGES = [
     ('160m', 1.810, 1.838), ('80m', 3.500, 3.560), ('40m', 7.000, 7.035),
@@ -473,7 +523,7 @@ CW_RANGES = [
 FT8_VHF_FREQ_RANGE_KHZ = (144171, 144177)
 
 # --- FRÉQUENCES PSK31 (en kHz) ---
-PSK31_HF_FREQ_RANGE_KHZ = (14.069, 14.071)
+PSK31_HF_FREQ_RANGE_KHZ = (14070, 14071)
 
 
 # --- SSL BYPASS ---
@@ -827,6 +877,10 @@ def get_band_and_mode_smart(freq_float, comment):
     ]
     is_ft8_hf = any(abs(freq_khz - f) <= 1.0 for f in FT8_HF_FREQS_KHZ)
 
+    # PSK31 20m (14.070 MHz — juste au-dessus du segment CW)
+    psk31_min, psk31_max = PSK31_HF_FREQ_RANGE_KHZ
+    is_psk31 = (band == "20m" and psk31_min <= freq_khz <= psk31_max)
+
     # PRIORITE
     if is_ft2_hf:
         mode = "FT2"
@@ -834,6 +888,8 @@ def get_band_and_mode_smart(freq_float, comment):
         mode = "FT4"
     elif is_ft8_vhf or is_ft8_6m or is_ft8_hf:
         mode = "FT8"
+    elif is_psk31:
+        mode = "PSK31"
 
     # CW
     if mode == "SSB":
@@ -859,6 +915,8 @@ def get_band_and_mode_smart(freq_float, comment):
         mode = "FM"
     elif "RTTY" in comment:
         mode = "RTTY"
+    elif "PSK31" in comment or "PSK-31" in comment:
+        mode = "PSK31"
     elif "SSTV" in comment or abs(freq_khz - 14230) <= 2:
         mode = "SSTV"
 
@@ -5396,7 +5454,30 @@ def api_reality_check(zone):
 # ═══════════════════════════════════════════════════════════════════════════
 
 _my_signal_cache = {'ts': 0, 'data': None}
-_MY_SIGNAL_CACHE_TTL = 90  # secondes — respecte la politique PSK Reporter
+_MY_SIGNAL_CACHE_TTL = 300  # secondes — 5 min = limite officielle PSK Reporter
+# (pskreporter.info/pskdev.html : "retrieve reception data no more often than
+# once every five minutes" — l'ancienne valeur de 90s l'enfreignait de 3.3x,
+# ce qui pouvait déclencher un throttling silencieux côté PSK Reporter après
+# un certain temps de fonctionnement continu : plus aucune donnée neuve ne
+# remonte, sans erreur visible ("PSK reporter semble ne rien recevoir").
+
+
+def _my_signal_refresh_ages(result, now):
+    """Recalcule age_s pour chaque report à partir de son 'ts' absolu.
+
+    Sans ça, age_s reste figé à la valeur calculée lors du fetch PSK Reporter
+    d'origine — si un fetch live échoue ensuite (PSK Reporter indisponible,
+    timeout), le fallback sert ces données en cache indéfiniment avec un
+    age_s qui ne grandit jamais. Le filtre de fraîcheur 5 min côté frontend
+    ne se déclenche alors jamais, et l'ancienne enveloppe reste affichée
+    pour toujours au lieu de disparaître ("carte figée").
+    """
+    if not result or not result.get('reports'):
+        return result
+    for e in result['reports']:
+        if e.get('ts'):
+            e['age_s'] = max(0, int(now - e['ts']))
+    return result
 
 
 @app.route('/api/my-signal')
@@ -5407,7 +5488,7 @@ def api_my_signal():
     """
     now = time.time()
     if _my_signal_cache['data'] is not None and (now - _my_signal_cache['ts']) < _MY_SIGNAL_CACHE_TTL:
-        return jsonify(_my_signal_cache['data'])
+        return jsonify(_my_signal_refresh_ages(_my_signal_cache['data'], now))
 
     try:
         import urllib.request, urllib.parse, re as _re
@@ -5489,6 +5570,8 @@ def api_my_signal():
             'reports': entries,
             'source': 'pskreporter',
             'ts': now,
+            'fetched_at': now,               # dernière interrogation réelle de PSK Reporter
+            'cache_ttl': _MY_SIGNAL_CACHE_TTL,  # prochaine interrogation possible dans (cache_ttl - âge)
         }
         _my_signal_cache['data'] = result
         _my_signal_cache['ts'] = now
@@ -5498,8 +5581,8 @@ def api_my_signal():
         logger.debug(f"api_my_signal: {e}")
         # Fallback : cache expiré si dispo, sinon vide
         if _my_signal_cache['data'] is not None:
-            return jsonify(_my_signal_cache['data'])
-        return jsonify({'ok': False, 'call': MY_CALL, 'reports': [], 'error': str(e)})
+            return jsonify(_my_signal_refresh_ages(_my_signal_cache['data'], now))
+        return jsonify({'ok': False, 'call': MY_CALL, 'reports': [], 'error': str(e), 'cache_ttl': _MY_SIGNAL_CACHE_TTL})
 
 
 # Log statut sgp4
