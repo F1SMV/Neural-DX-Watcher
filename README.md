@@ -171,7 +171,7 @@ sudo mkdir -p /etc/nginx/ssl
 sudo htpasswd -c /etc/nginx/.htpasswd f1smv   # mot de passe
 ```
 
-Créer `/etc/nginx/sites-available/neuraldx` avec la configuration reverse proxy sur le port **8443** (n'interfère pas avec ton NAS sur 443).
+Créer `/etc/nginx/sites-available/neuraldx` avec la configuration reverse proxy sur le port **8443**.
 
 ### 5. Routeur
 Forward du port externe **8443** vers `192.168.1.81:8443` (TCP).
