@@ -1,9 +1,21 @@
-# ⚡ Neural DX Watcher — v11.3
+# ⚡ Neural DX Watcher — v11.4
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
 Application web locale de surveillance DX et d'analyse radio destinée aux radioamateurs exigeants.  
 Conçue pour **observer**, **comprendre** et **prendre du recul** — pas pour faire du bruit visuel.
+
+---
+
+## ⚙️ Configuration initiale — Définis ton indicatif
+
+Avant de lancer l'application, édite `webapp.py` et modifie cette ligne (ligne ~89) :
+
+```python
+MY_CALL = "F1SMV"  # ← Remplace par TON indicatif
+```
+
+Puis relance Flask pour que les changements prennent effet.
 
 ---
 
@@ -171,7 +183,7 @@ sudo mkdir -p /etc/nginx/ssl
 sudo htpasswd -c /etc/nginx/.htpasswd f1smv   # mot de passe
 ```
 
-Créer `/etc/nginx/sites-available/neuraldx` avec la configuration reverse proxy sur le port **8443**.
+Créer `/etc/nginx/sites-available/neuraldx` avec la configuration reverse proxy sur le port **8443** (n'interfère pas avec ton NAS sur 443).
 
 ### 5. Routeur
 Forward du port externe **8443** vers `192.168.1.81:8443` (TCP).
@@ -194,6 +206,13 @@ Aucune dépendance cloud.
 ---
 
 ## 🗂️ Historique des versions
+
+### v11.4 — Opportunités DXCC · Polling automatique
+
+- Ajout polling automatique toutes les 30 min pour le pavé "Opportunités DXCC" (quand LoTW actif + panel visible)
+- Auparavant figé sans action utilisateur ; détecte maintenant les nouvelles expéditions automatiquement
+
+---
 
 ### v11.3 — Infrastructure HTTPS · K-index fixé · Filtrage cartes · Fraîcheur PSK Reporter
 
@@ -268,7 +287,10 @@ Le premier appel de calcul de position (TLE + sgp4) peut prendre jusqu'à 45 sec
 
 ### v11.0 — Refonte predictor.py, dxcc_resolver.py, durcissement sécurité
 
-### v10.5 → v10.0 — [voir plus bas]
+### v10.5 → v10.0 — Versions antérieures
+
+Les versions antérieures à v10.0 ne figurent pas ici pour éviter de surcharger la documentation.  
+Consulter l'historique complet sur GitHub : 👉 https://github.com/F1SMV/Neural-DX-Watcher/commits/main
 
 ---
 

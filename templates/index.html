@@ -8999,6 +8999,16 @@
             }
         }
 
+        // ===== AUTO-REFRESH LOTW OPPORTUNITIES (every 30 min) =====
+        // LoTW expeditions change gradually; 30-min refresh is a good balance between
+        // reactivity to new opportunities and respecting backend load.
+        // Runs only if lotwActive=true AND panel not hidden (respects panel visibility).
+        setInterval(() => {
+            if (lotwActive && !isPanelHidden('lotw-opps')) {
+                loadLotwOpportunities();
+            }
+        }, 1800000);  // 30 minutes = 1800000 ms
+
         // ===== VOACAP PROPAGATION PANEL =====
         let voacapCurrentZone = localStorage.getItem('voacap_zone') || 'EU';
 

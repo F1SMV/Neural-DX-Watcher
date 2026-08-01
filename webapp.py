@@ -86,7 +86,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '11.3'
+APP_VERSION = '11.4'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -210,39 +210,79 @@ BRIEFING_DEFAULT_SOURCES = [
 # --- SOLAR (XML) FETCHER ---
 
 def fetch_noaa_kp_latest(timeout=10):
-    """Fetch latest NOAA planetary Kp index (table JSON). Returns dict or None."""
+    """Fetch latest NOAA planetary Kp index (table JSON). Returns dict or None.
+    
+    Formats supportés :
+    - Tableau d'objets (format actuel NOAA) : [{"time_tag":"...","Kp":3.67,...}, ...]
+    - Tableau de tableaux (format legacy) : [["time_tag","Kp",...], ["2026-...",3.67,...], ...]
+    """
     try:
         req = urllib.request.Request(NOAA_KP_URL, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             data = json.loads(r.read().decode('utf-8', errors='ignore'))
 
-        # Expected format: [ ["time_tag","Kp","a_running","station_count"], ["2026-...","3.67","22","8"], ... ]
-        if not isinstance(data, list) or len(data) < 2 or not isinstance(data[0], list):
+        if not isinstance(data, list) or len(data) < 1:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Kp NOAA format unexpected: not a list or empty")
             return None
 
-        header = data[0]
-        def _h(name, default=None):
-            return header.index(name) if name in header else default
+        # Format 1 : tableau d'objets (format actuel NOAA depuis 2020+)
+        if isinstance(data[0], dict):
+            row = data[-1]  # dernière ligne
+            time_tag = str(row.get("time_tag", "")).replace(".000", "")
+            kp = row.get("Kp")
+            a_running = row.get("a_running")
+            station_count = row.get("station_count")
+            
+            if kp is None:
+                return None
+            
+            try:
+                kp = float(kp)
+                a_running = int(a_running) if a_running else None
+                station_count = int(station_count) if station_count else None
+            except (ValueError, TypeError):
+                return None
+            
+            return {
+                "kp": kp,
+                "kp_time_utc": time_tag,
+                "kp_a_running": a_running,
+                "kp_station_count": station_count,
+            }
+        
+        # Format 2 : tableau de tableaux (format legacy)
+        elif isinstance(data[0], list) and len(data) >= 2:
+            header = data[0]
+            def _h(name, default=None):
+                return header.index(name) if name in header else default
 
-        i_time = _h("time_tag", 0)
-        i_kp = _h("Kp", 1)
-        i_a = _h("a_running", None)
-        i_sc = _h("station_count", None)
+            i_time = _h("time_tag", 0)
+            i_kp = _h("Kp", 1)
+            i_a = _h("a_running", None)
+            i_sc = _h("station_count", None)
 
-        row = data[-1]
-        time_tag = str(row[i_time]).replace(".000", "")
-        kp = float(str(row[i_kp]).replace(",", "."))
-        a_running = int(row[i_a]) if i_a is not None and str(row[i_a]).strip() else None
-        station_count = int(row[i_sc]) if i_sc is not None and str(row[i_sc]).strip() else None
+            row = data[-1]
+            time_tag = str(row[i_time]).replace(".000", "")
+            kp = float(str(row[i_kp]).replace(",", "."))
+            a_running = int(row[i_a]) if i_a is not None and str(row[i_a]).strip() else None
+            station_count = int(row[i_sc]) if i_sc is not None and str(row[i_sc]).strip() else None
 
-        return {
-            "kp": kp,
-            "kp_time_utc": time_tag,
-            "kp_a_running": a_running,
-            "kp_station_count": station_count,
-        }
+            return {
+                "kp": kp,
+                "kp_time_utc": time_tag,
+                "kp_a_running": a_running,
+                "kp_station_count": station_count,
+            }
+        
+        else:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Kp NOAA format not recognized (not dict or list): {type(data[0])}")
+            return None
+            
     except Exception as e:
-        logging.getLogger(__name__).warning(f"Kp NOAA fetch failed: {e}")
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Kp NOAA fetch failed ({NOAA_KP_URL}): {type(e).__name__}: {e}")
         return None
 
 def fetch_solar_from_wwv_txt():
@@ -283,7 +323,23 @@ def fetch_solar_from_wwv_txt():
         kp_station_count = kp_info.get("kp_station_count") if kp_info else None
 
         # Backward-compat: keep 'k' field but prefer planetary Kp when available
-        k_display = f"{kp_val:.2f}" if isinstance(kp_val, (int, float)) else k_idx
+        # Si Kp NOAA a échoué mais A-index est disponible, on approx Kp depuis A
+        # (A ≈ 3 × Kp en moyenne pour conversion rapide)
+        if isinstance(kp_val, (int, float)):
+            k_display = f"{kp_val:.2f}"
+        elif k_idx != "N/A":
+            k_display = k_idx
+        else:
+            # Fallback : calcul approx Kp depuis A-index si dispon
+            try:
+                a_num = int(a_idx) if isinstance(a_idx, (int, str)) and str(a_idx).isdigit() else None
+                if a_num is not None:
+                    approx_kp = a_num / 3.0  # A ≈ 3 × Kp
+                    k_display = f"{approx_kp:.1f}" if a_num > 0 else "0"
+                else:
+                    k_display = "N/A"
+            except (ValueError, TypeError):
+                k_display = "N/A"
 
         with solar_lock:
             solar_cache = {
@@ -309,7 +365,8 @@ def fetch_solar_from_wwv_txt():
                 '</solar>'
             )
 
-        logger.info(f"SOLAR updated: SFI={sfi} A={a_idx} K={k_display} (Kp={kp_val})")
+        status_msg = f"SFI={sfi} A={a_idx} K={k_display}" + (f" (Kp={kp_val})" if kp_val is not None else " (Kp fetch failed, falling back)")
+        logger.info(f"SOLAR updated: {status_msg}")
 
     except Exception as e:
         logger.error(f"SolarWorker: impossible de récupérer/produire solar.xml: {e}")

@@ -1,9 +1,21 @@
-# ⚡ Neural DX Watcher — v11.3
+# ⚡ Neural DX Watcher — v11.4
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
 A local web application for DX monitoring and radio analysis, designed for the demanding amateur radio operator.  
 Built to **observe**, **understand** and **step back** — not to generate visual noise.
+
+---
+
+## ⚙️ Initial Setup — Set Your Callsign
+
+Before launching the application, edit `webapp.py` and modify this line (around line ~89):
+
+```python
+MY_CALL = "F1SMV"  # ← Replace with YOUR callsign
+```
+
+Then restart Flask for changes to take effect.
 
 ---
 
@@ -171,7 +183,7 @@ sudo mkdir -p /etc/nginx/ssl
 sudo htpasswd -c /etc/nginx/.htpasswd f1smv   # personal password
 ```
 
-Create `/etc/nginx/sites-available/neuraldx` with reverse proxy configuration on port **8443**.
+Create `/etc/nginx/sites-available/neuraldx` with reverse proxy configuration on port **8443** (no conflict with your NAS on 443).
 
 ### 5. Router
 Forward external port **8443** to `192.168.1.81:8443` (TCP).
@@ -194,6 +206,13 @@ No cloud dependency.
 ---
 
 ## 🗂️ Version History
+
+### v11.4 — DXCC Opportunities · Automatic Polling
+
+- Added automatic polling every 30 minutes for the "DXCC Opportunities" panel (when LoTW active + panel visible)
+- Previously frozen without user action; now detects new expeditions automatically
+
+---
 
 ### v11.3 — HTTPS Infrastructure · K-index Fixed · Map Filtering · PSK Freshness
 
@@ -268,7 +287,10 @@ The first position computation call (TLE + sgp4) can take up to 45 seconds after
 
 ### v11.0 — Predictor.py Refactor, dxcc_resolver.py, Security Hardening
 
-### v10.5 → v10.0 — [see below]
+### v10.5 → v10.0 — Previous Versions
+
+Earlier versions are not documented here to avoid cluttering the documentation.  
+See the full commit history on GitHub: 👉 https://github.com/F1SMV/Neural-DX-Watcher/commits/main
 
 ---
 
