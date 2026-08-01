@@ -520,7 +520,7 @@ def api_token():
     return jsonify({"token": API_TOKEN})
 
 
-# ── v11.3 — Panneau Setup ⚙ : configuration des pavés visibles/masqués ──────
+# ── v11.4 — Panneau Setup ⚙ : configuration des pavés visibles/masqués ──────
 # Persistée côté serveur (partagée entre tous les appareils qui accèdent à
 # l'app), pas en localStorage (qui serait par-navigateur uniquement).
 UI_CONFIG_FILE = Path("data/ui_config.json")
