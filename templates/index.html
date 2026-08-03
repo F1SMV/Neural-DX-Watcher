@@ -5,7 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <link rel="stylesheet" href="/static/base.css">
-<title>⚡ Neural DX Watcher v11.4</title>
+<title>⚡ Neural DX Watcher v11.5</title>
 
 <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -3986,7 +3986,7 @@
         body.mode-cockpit .ck-fc.ck-wl    { color: #fbbf24 !important; }  /* watchlist = jaune */
         body.mode-cockpit .ck-fc.ck-new-dxcc { color: #f87171 !important; } /* new dxcc = rouge */
 
-        /* ── SPARKLINES DX FEED v11.4 ── */
+        /* ── SPARKLINES DX FEED v11.5 ── */
         .ck-sparkline {
             display: inline-block;
             vertical-align: middle;
@@ -4068,7 +4068,7 @@
         .ck-mysig-snr.fair { background: rgba(251,191,36,.18); color: #fcd34d; }
         .ck-mysig-snr.weak { background: rgba(248,113,113,.18); color: #fca5a5; }
 
-        /* ── WIDGET PRÉDICTIONS v11.4 ── */
+        /* ── WIDGET PRÉDICTIONS v11.5 ── */
         #ck-predictions-panel { min-height: 120px; }
         .pred-item {
             display: flex; align-items: center; gap: 8px;
@@ -4290,7 +4290,7 @@
 <div id="header">
   <!-- Ligne 1 : titre + indicateurs -->
   <div id="header-row1">
-    <div id="title">📡 NEURAL DX WATCHER V11.4</div>
+    <div id="title">📡 NEURAL DX WATCHER V11.5</div>
     <button id="setup-gear-btn" onclick="openSetupPanel()" title="Setup — masquer/afficher les pavés"
       style="background:rgba(0,243,255,.08);border:1px solid rgba(0,243,255,.3);color:#00f3ff;
              border-radius:6px;padding:4px 9px;font-size:1.1em;cursor:pointer;line-height:1;">
@@ -4395,7 +4395,7 @@
       </div>
     </div>
 
-    <!-- Prédictions personnalisées v11.4 -->
+    <!-- Prédictions personnalisées v11.5 -->
     <div class="ck-panel" data-panel-id="ck-predictions" id="ck-predictions-panel">
       <div class="ck-title" style="justify-content:space-between;">
         <span>🔮 PRÉDICTIONS PERSONNALISÉES</span>
@@ -5136,10 +5136,12 @@
 </div>
 
 <div class="panel" data-panel-id="chart-history" id="chart-history-panel">
-<div class="panel-header"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> HISTORIQUE 30MIN (12H)</div>
+<div class="panel-header"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> HISTORIQUE — 5 DERNIÈRES HEURES</div>
 <div class="chart-container">
 <canvas id="historyChart"></canvas>
 </div>
+<!-- Calls marquants par tranche horaire -->
+<div id="history-highlights" style="margin-top: 14px;"></div>
 </div>
 
 <div class="panel" data-panel-id="chart-live-hf" id="chart-live-hf-panel">
@@ -5934,6 +5936,64 @@
             historyChart.update();
         }
 
+        // ===== CALLS MARQUANTS — 5 dernières heures =====
+        async function loadHistoryHighlights() {
+            const container = document.getElementById('history-highlights');
+            if (!container) return;
+            const BAND_COLORS_JS = JSON.parse('{{ band_colors | tojson }}');
+            try {
+                const resp = await fetch('/history_highlights.json');
+                const data = await resp.json();
+                const hours = data.hours || [];
+                const spdThreshold = data.spd_threshold || 70;
+
+                container.innerHTML = hours.map(h => {
+                    const isEmpty = h.total_spots === 0;
+                    const bandColor = BAND_COLORS_JS[h.dominant_band] || '#888';
+
+                    // En-tête de tranche horaire
+                    const header = `
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                            <span style="font-family:monospace;font-weight:bold;font-size:0.85em;color:var(--accent);min-width:36px;">${h.hour_label}</span>
+                            ${isEmpty ? '' : `<span style="font-size:0.7em;padding:1px 7px;border-radius:10px;background:${bandColor}22;color:${bandColor};border:1px solid ${bandColor}55;">${h.dominant_band || '—'}</span>`}
+                            <span style="font-size:0.72em;color:#888;">${h.total_spots} spot${h.total_spots > 1 ? 's' : ''}</span>
+                        </div>`;
+
+                    if (isEmpty) {
+                        return `<div style="margin-bottom:12px;opacity:0.4;">
+                            ${header}
+                            <div style="font-size:0.72em;color:#666;padding-left:44px;font-style:italic;">Aucune activité</div>
+                        </div>`;
+                    }
+
+                    // Chips des calls marquants (triés par SPD)
+                    const chips = h.top_calls.map(c => {
+                        const isRare = c.score >= spdThreshold;
+                        const dist = c.dist_km ? `${Math.round(c.dist_km)}km` : '';
+                        const cColor = BAND_COLORS_JS[c.band] || '#999';
+                        return `
+                            <div style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;margin:2px;
+                                        border-radius:5px;font-size:0.74em;
+                                        background:${isRare ? 'rgba(255,180,0,0.12)' : 'rgba(120,120,120,0.08)'};
+                                        border:1px solid ${isRare ? 'rgba(255,180,0,0.5)' : 'rgba(120,120,120,0.25)'};">
+                                <span style="font-family:monospace;font-weight:bold;color:${isRare ? '#ffb400' : 'var(--text-main)'};">${c.call}</span>
+                                <span style="color:${cColor};font-size:0.9em;">${c.band || ''}</span>
+                                ${c.mode ? `<span style="color:#888;font-size:0.85em;">${c.mode}</span>` : ''}
+                                ${dist ? `<span style="color:#666;font-size:0.82em;">${dist}</span>` : ''}
+                                <span style="color:${isRare ? '#ffb400' : '#666'};font-size:0.8em;font-weight:bold;">${c.score}</span>
+                            </div>`;
+                    }).join('');
+
+                    return `<div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(120,120,120,0.15);">
+                        ${header}
+                        <div style="padding-left:44px;">${chips}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = `<div style="font-size:0.8em;color:#888;font-style:italic;">Historique indisponible</div>`;
+            }
+        }
+
         function updateLiveBandsChart(chart, chartData) {
             chart.data.labels = chartData.labels;
             chart.data.datasets = [{
@@ -6082,6 +6142,7 @@
                 const historyResponse = await fetch('/history.json');
                 const historyData = await historyResponse.json();
                 updateHistoryChart(historyData);
+                loadHistoryHighlights();  // Calls marquants 5h
             } catch (e) { console.error("Failed to fetch history data:", e); }
 
             try {
@@ -9909,7 +9970,7 @@ fetch('/api/check_update')
     return Number.isFinite(n) ? n : fb;
   }
 
-  // ── v11.4 : cache de la réalité (spots 24h) ──
+  // ── v11.5 : cache de la réalité (spots 24h) ──
   window._voacapRealityCache = null;
   window._voacapRealityZone  = null;
   window._voacapView = localStorage.getItem('ck_voacap_view') || 'theory';
@@ -10205,7 +10266,7 @@ fetch('/api/check_update')
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   NEURAL DX WATCHER v11.4 — Client JS
+   NEURAL DX WATCHER v11.5 — Client JS
    · Sparklines DX Feed
    · Widget Prédictions personnalisées
    · Présence heartbeat → ntfy filtre

@@ -86,7 +86,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '11.4'
+APP_VERSION = '11.5'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -111,6 +111,40 @@ RARE_PREFIXES = [
 
 TOP_RANKING_LIMIT = 10
 DEFAULT_QRA = "JN23"
+
+# --- CONFIGURATION UTILISATEUR (persistent en data/config.json) ---
+CONFIG_FILE = Path("data/config.json")
+
+def load_user_config():
+    """Charge MY_CALL et user_qra depuis data/config.json (ou defaults si absent)."""
+    global MY_CALL, user_qra
+    try:
+        if CONFIG_FILE.exists():
+            data = json.loads(CONFIG_FILE.read_text(encoding='utf-8'))
+            MY_CALL = data.get('my_call', MY_CALL).upper().strip()
+            user_qra = data.get('user_qra', DEFAULT_QRA).upper().strip()
+            logger.info(f"Config chargée : MY_CALL={MY_CALL}, user_qra={user_qra}")
+        else:
+            logger.info(f"Config.json absent, utilisation defaults : MY_CALL={MY_CALL}, user_qra={DEFAULT_QRA}")
+            save_user_config()  # Crée le fichier avec les defaults
+    except Exception as e:
+        logger.warning(f"Erreur lors du chargement config.json : {e}, utilisation defaults")
+
+def save_user_config():
+    """Sauvegarde MY_CALL et user_qra dans data/config.json."""
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            'my_call': MY_CALL,
+            'user_qra': user_qra,
+            'timestamp_utc': datetime.utcnow().isoformat()
+        }
+        CONFIG_FILE.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        logger.info(f"Config sauvegardée : MY_CALL={MY_CALL}, user_qra={user_qra}")
+    except Exception as e:
+        logger.warning(f"Erreur lors de la sauvegarde config.json : {e}")
+
+# --- FIN CONFIGURATION UTILISATEUR ---
 
 # --- THEMES/COULEURS RESTAURÉES ---
 TEXT_MAIN = "#a0a0a0" # Gris clair
@@ -520,7 +554,7 @@ def api_token():
     return jsonify({"token": API_TOKEN})
 
 
-# ── v11.4 — Panneau Setup ⚙ : configuration des pavés visibles/masqués ──────
+# ── v11.3 — Panneau Setup ⚙ : configuration des pavés visibles/masqués ──────
 # Persistée côté serveur (partagée entre tous les appareils qui accèdent à
 # l'app), pas en localStorage (qui serait par-navigateur uniquement).
 UI_CONFIG_FILE = Path("data/ui_config.json")
@@ -1486,6 +1520,9 @@ def telnet_worker():
                                     "de": None,
                                     "band": spot_obj.get("band"),
                                     "mode": spot_obj.get("mode"),
+                                    "score": spd_score,
+                                    "dxcc": info.get('c'),
+                                    "dist_km": dist_km,
                                     # freq_khz best-effort (float) si possible
                                     "freq_khz": (float(str(spot_obj.get("freq")).replace(",", ".")) if spot_obj.get("freq") is not None else None),
                                 })
@@ -1603,10 +1640,25 @@ def update_qra():
         user_qra = new_qra
         user_lat = new_lat
         user_lon = new_lon
+        save_user_config()  # Persister le changement dans data/config.json
         logger.info(f"QTH mis à jour: {user_qra}")
     else:
         logger.warning(f"Tentative de mise à jour QTH invalide: {new_qra}")
     return redirect(url_for('index'))
+
+
+@app.route('/api/update_mycall', methods=['POST'])
+@require_api_token
+def api_update_mycall():
+    """Changer MY_CALL et le persister dans data/config.json."""
+    global MY_CALL
+    new_call = request.json.get('my_call', '').upper().strip()
+    if not new_call or len(new_call) < 3 or len(new_call) > 10:
+        return jsonify({'ok': False, 'error': 'Invalid callsign (3-10 chars)'}), 400
+    MY_CALL = new_call
+    save_user_config()
+    logger.info(f"MY_CALL changé : {MY_CALL}")
+    return jsonify({'ok': True, 'my_call': MY_CALL})
 
 
 def cluster_send_line(line: str) -> bool:
@@ -3908,31 +3960,50 @@ def api_briefing():
 
 @app.route('/history.json')
 def get_history():
+    """Retourne l'historique 30min/12h avec détails : bande dominante par slot."""
     now_utc = time.gmtime(time.time())
     current_hour = now_utc.tm_hour
     current_minute = now_utc.tm_min
     current_slot = ((current_hour * 2) + (current_minute // 30)) % HISTORY_SLOTS
 
-    # Génère les labels pour les 12 dernières heures (24 slots de 30 min)
+    # Labels des 24 slots (H-00:00 = plus récent)
     labels = []
+    slot_details = []  # [{band: "20m", count: 45}, ...]
     for i in range(HISTORY_SLOTS):
         slot = (current_slot - i + HISTORY_SLOTS) % HISTORY_SLOTS
         hours_ago = (HISTORY_SLOTS - 1 - i) * HISTORY_PERIOD_MINUTES // 60
         minutes_ago = (HISTORY_SLOTS - 1 - i) * HISTORY_PERIOD_MINUTES % 60
-        target_hour = (current_hour - hours_ago) % 24
-        target_minute = (current_minute - minutes_ago) % 60
         labels.append(f"H-{hours_ago:02d}:{minutes_ago:02d}")
+        
+        # Trouver la bande dominante pour ce slot
+        with history_lock:
+            band_counts = {}
+            for band in HISTORY_BANDS:
+                band_counts[band] = history_30min.get(band, [0]*HISTORY_SLOTS)[slot] or 0
+            
+            dominant_band = max(band_counts, key=band_counts.get) if band_counts else "?"
+            dominant_count = band_counts.get(dominant_band, 0)
+        
+        slot_details.append({
+            "band": dominant_band,
+            "count": dominant_count
+        })
 
     with history_lock:
         data = {band: list(hist) for band, hist in history_30min.items()}
 
-    # Rotate data to show most recent first (H-00:30, H-01:00, etc.)
+    # Rotate data to show most recent first
     current_data = {}
     for band in HISTORY_BANDS:
         rotated = data[band][current_slot:] + data[band][:current_slot]
         current_data[band] = rotated
 
-    return jsonify({"labels": labels, "data": current_data})
+    return jsonify({
+        "labels": labels,
+        "data": current_data,
+        "slot_details": slot_details,
+        "ts": time.time()
+    })
 
 @app.route('/live_bands.json')
 def get_live_bands_data():
@@ -5511,7 +5582,7 @@ def api_reality_check(zone):
 # ═══════════════════════════════════════════════════════════════════════════
 
 _my_signal_cache = {'ts': 0, 'data': None}
-_MY_SIGNAL_CACHE_TTL = 300  # secondes — 5 min = limite officielle PSK Reporter
+_MY_SIGNAL_CACHE_TTL = 90  # secondes — compromis réactivité vs rate limit PSK Reporter
 # (pskreporter.info/pskdev.html : "retrieve reception data no more often than
 # once every five minutes" — l'ancienne valeur de 90s l'enfreignait de 3.3x,
 # ce qui pouvait déclencher un throttling silencieux côté PSK Reporter après
@@ -5720,6 +5791,75 @@ def api_ntfy_test():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/history_highlights.json")
+def history_highlights():
+    """Retourne les calls les plus marquants (SPD élevé) des 5 dernières heures,
+    groupés par tranche horaire d'1h. Pour chaque tranche : top calls par score SPD."""
+    HOURS = 5
+    now = time.time()
+    cutoff = now - HOURS * 3600
+
+    # Grouper par tranche horaire (H-0 = heure en cours, H-1 = il y a 1h, etc.)
+    slots = {i: [] for i in range(HOURS)}  # {0: [spots], 1: [spots], ...}
+
+    with spot_history_lock:
+        for entry in spot_history:
+            ts = entry.get("ts", 0)
+            if ts < cutoff:
+                continue
+            age_h = int((now - ts) // 3600)
+            if age_h >= HOURS:
+                continue
+            slots[age_h].append(entry)
+
+    # Pour chaque tranche, extraire les calls marquants
+    result = []
+    for hour_offset in range(HOURS):
+        entries = slots[hour_offset]
+        if not entries:
+            result.append({
+                "hour_label": f"H-{hour_offset}",
+                "total_spots": 0,
+                "top_calls": [],
+                "dominant_band": None
+            })
+            continue
+
+        # Dédupliquer par call en gardant le meilleur score
+        best_by_call = {}
+        for e in entries:
+            call = e.get("dx")
+            if not call:
+                continue
+            score = e.get("score") or 0
+            if call not in best_by_call or score > best_by_call[call].get("score", 0):
+                best_by_call[call] = {
+                    "call": call,
+                    "score": score,
+                    "band": e.get("band"),
+                    "mode": e.get("mode"),
+                    "dxcc": e.get("dxcc"),
+                    "dist_km": e.get("dist_km"),
+                    "ts": e.get("ts")
+                }
+
+        # Trier par score SPD décroissant, prendre le top 5
+        top_calls = sorted(best_by_call.values(), key=lambda x: x["score"], reverse=True)[:5]
+
+        # Bande dominante
+        band_counts = Counter(e.get("band") for e in entries if e.get("band"))
+        dominant_band = band_counts.most_common(1)[0][0] if band_counts else None
+
+        result.append({
+            "hour_label": f"H-{hour_offset}",
+            "total_spots": len(entries),
+            "top_calls": top_calls,
+            "dominant_band": dominant_band
+        })
+
+    return jsonify({"hours": result, "spd_threshold": SPD_THRESHOLD, "ts": now})
+
+
 @app.route("/api/spot_history")
 def api_spot_history():
     """Historique compact pour les sparklines DX Feed."""
@@ -5743,6 +5883,7 @@ def api_spot_history():
 if __name__ == "__main__":
     load_cty_dat()
     load_watchlist()
+    load_user_config()  # Charger MY_CALL et user_qra depuis config.json
 
     logger.info(f"\n--- {APP_VERSION} ---")
     load_lotw_cache()

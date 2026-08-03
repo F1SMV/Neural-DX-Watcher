@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v11.4
+# ⚡ Neural DX Watcher — v11.5
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -9,13 +9,31 @@ Conçue pour **observer**, **comprendre** et **prendre du recul** — pas pour f
 
 ## ⚙️ Configuration initiale — Définis ton indicatif
 
-Avant de lancer l'application, édite `webapp.py` et modifie cette ligne (ligne ~89) :
+Avant de lancer l'application, tu peux **soit** :
+
+### Option 1 : Éditer webapp.py (une seule fois)
+
+Édite `webapp.py` et modifie cette ligne (ligne ~89) :
 
 ```python
 MY_CALL = "F1SMV"  # ← Remplace par TON indicatif
 ```
 
-Puis relance Flask pour que les changements prennent effet.
+Puis relance Flask. La configuration est maintenant **sauvegardée en local** dans `data/config.json` — elle persiste à chaque redémarrage et mise à jour.
+
+### Option 2 : Éditer data/config.json directement
+
+Une fois lancée, l'app crée automatiquement `data/config.json`. Tu peux l'éditer directement :
+
+```json
+{
+  "my_call": "F1SMV",
+  "user_qra": "JN23",
+  "timestamp_utc": "2026-01-01T00:00:00"
+}
+```
+
+Sauvegarde et relance Flask.
 
 ---
 
@@ -206,6 +224,14 @@ Aucune dépendance cloud.
 ---
 
 ## 🗂️ Historique des versions
+
+### v11.5 — Configuration persistante · MY_CALL & QRA en data/config.json
+
+- **Persistance config** : MY_CALL et user_qra sont maintenant sauvegardés dans `data/config.json` (persistent entre redémarrages)
+- Plus besoin de ressaisir le call ou le locator à chaque redéploiement ou restart Flask
+- Fichier auto-créé au premier lancement avec les defaults
+- Deux façons de configurer : éditer `webapp.py` OU `data/config.json` directement
+- Nouvelle route API `/api/update_mycall` pour changer le call via API (futur : intégrer dans l'interface)
 
 ### v11.4 — Opportunités DXCC · Polling automatique
 

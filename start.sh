@@ -6,7 +6,7 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${YELLOW}[INIT] Démarrage de Neural Dx Watcher v11.4 crée par F1SMV...${NC}"
+echo -e "${YELLOW}[INIT] Démarrage de Neural Dx Watcher v11.5 crée par F1SMV...${NC}"
 sleep 10
 
 # 1. Nettoyage des ports — arrêt propre (SIGTERM) avant kill -9 en dernier

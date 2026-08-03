@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v11.4
+# ⚡ Neural DX Watcher — v11.5
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -9,13 +9,31 @@ Built to **observe**, **understand** and **step back** — not to generate visua
 
 ## ⚙️ Initial Setup — Set Your Callsign
 
-Before launching the application, edit `webapp.py` and modify this line (around line ~89):
+Before launching the application, you can **either**:
+
+### Option 1: Edit webapp.py (one time only)
+
+Edit `webapp.py` and modify this line (around line ~89):
 
 ```python
 MY_CALL = "F1SMV"  # ← Replace with YOUR callsign
 ```
 
-Then restart Flask for changes to take effect.
+Then restart Flask. Your configuration is now **saved locally** in `data/config.json` — it persists across restarts and updates.
+
+### Option 2: Edit data/config.json directly
+
+Once launched, the app automatically creates `data/config.json`. You can edit it directly:
+
+```json
+{
+  "my_call": "F1SMV",
+  "user_qra": "JN23",
+  "timestamp_utc": "2026-01-01T00:00:00"
+}
+```
+
+Save and restart Flask.
 
 ---
 
@@ -77,6 +95,8 @@ Philosophy:
 - Receiver callsign, mode, frequency, distance, report age, color-coded SNR
 - **Data freshness display**: "PSK update Xs ago · next possible in Ys" *(v11.3)*
 - Integrated in **all 3 modes** (CLASSIC, SMART, COCKPIT)
+
+**⏱️ Délai temps réel :** Après un QSO, ton call apparaît typiquement en **2-3 minutes** (limité par l'agrégation PSK Reporter elle-même, pas par Neural DX Watcher). Le backend interroge PSK Reporter toutes les 90 secondes.
 
 👉 **Instant antenna testing, verification before calling into a pileup.**
 
@@ -206,6 +226,14 @@ No cloud dependency.
 ---
 
 ## 🗂️ Version History
+
+### v11.5 — Persistent Configuration · MY_CALL & QRA in data/config.json
+
+- **Config persistence** : MY_CALL and user_qra are now saved to `data/config.json` (persists across restarts)
+- No need to re-enter your callsign or locator on every restart or redeploy
+- File auto-created on first launch with defaults
+- Two configuration methods: edit `webapp.py` OR edit `data/config.json` directly
+- New API route `/api/update_mycall` for changing callsign via API (future: integrate in UI)
 
 ### v11.4 — DXCC Opportunities · Automatic Polling
 
