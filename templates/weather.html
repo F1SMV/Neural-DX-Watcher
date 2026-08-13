@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="stylesheet" href="/static/base.css">
+<title>⚡ Neural DX Watcher v{{ version }} — Météo Radio</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<style>
+    :root {
+        /* Instrument Panel — ambre phosphore (signal/vie) + teal (info/calme), sur graphite, pas noir pur */
+        --bg-color: #14171d;
+        --bg-color-2: #0e1116;
+        --panel-bg: #1b1f27;
+        --bezel-hi: rgba(255,255,255,0.06);
+        --text-main: #dbe1ea;
+        --text-dim: #8a92a3;
+        --text-soft: #9aa2b3;
+        --amber: #ffb200;
+        --amber-rgb: 255,178,0;
+        --teal: #45d6c4;
+        --teal-rgb: 69,214,196;
+        --accent: var(--teal);
+        --accent-rgb: var(--teal-rgb);
+        --alert: #ff5f5a;
+        --warn: #ffb200;
+        --ok: #3ddc84;
+        --cold: #5ec8e6;
+        --font-display: 'Space Grotesk', sans-serif;
+        --font-mono: 'IBM Plex Mono', monospace;
+    }
+    body[data-theme='dark']   { --bg-color:#1b1b1b; --bg-color-2:#141414; --panel-bg:#232323; --text-main:#e7e7e7; --text-dim:#9a9a9a; --text-soft:#aaa; --teal:#5ee6a0; --teal-rgb:94,230,160; --accent:var(--teal); --accent-rgb:var(--teal-rgb); }
+    body[data-theme='matrix'] { --bg-color:#050805; --bg-color-2:#020402; --panel-bg:#0c150c; --text-main:#8fffb0; --text-dim:#4fbf6e; --text-soft:#6fd98c; --amber:#c9ff5e; --amber-rgb:201,255,94; --teal:#39e07a; --teal-rgb:57,224,122; --accent:var(--teal); --accent-rgb:var(--teal-rgb); }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-mono); }
+    body {
+        background-color: var(--bg-color);
+        background-image:
+            radial-gradient(ellipse at 15% -10%, rgba(var(--amber-rgb), 0.05) 0%, transparent 45%),
+            radial-gradient(ellipse at 85% 105%, rgba(var(--teal-rgb), 0.05) 0%, transparent 45%),
+            repeating-linear-gradient(135deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+        color: var(--text-main);
+        min-height: 100vh;
+        transition: background-color .3s, color .3s;
+        font-size: 16px;
+    }
+    a { color: inherit; }
+
+    /* ═══ HEADER / STATUS BAR ═══ */
+    #topbar {
+        background: linear-gradient(180deg, var(--panel-bg) 0%, var(--bg-color-2) 100%);
+        border-bottom: 2px solid rgba(var(--amber-rgb),0.35);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        padding: 10px 18px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+    #brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+    #brand .logo { font-size: 1.4em; filter: grayscale(0.3); }
+    #brand .name { font-family: var(--font-display); font-weight: 900; font-size: 1.05em; color: var(--accent); text-shadow: 0 0 10px rgba(var(--accent-rgb),0.5); letter-spacing: 1px; }
+    #brand .name .ver { color: var(--text-soft); font-weight: 400; font-size: 0.85em; margin-left: 4px; }
+    #brand .subtitle { font-size: 0.85em; color: var(--text-soft); letter-spacing: 2px; text-transform: uppercase; }
+
+    .status-chip { text-align: center; padding: 2px 10px; border-right: 1px solid rgba(255,255,255,0.07); }
+    .status-chip:last-of-type { border-right: none; }
+    .status-chip .chip-label { font-size: 0.85em; color: var(--text-soft); letter-spacing: 1px; text-transform: uppercase; }
+    .status-chip .chip-value { font-size: 1.05em; font-weight: bold; color: var(--text-main); }
+    .status-chip .chip-value.accent { color: var(--amber); }
+
+    #clock-block { text-align: right; font-size: 0.85em; padding-left: 10px; border-left: 1px solid rgba(255,255,255,0.07); }
+    #clock-block .clock-time { font-family: var(--font-display); font-size: 1.15em; color: var(--accent); }
+    #clock-block .clock-date { color: var(--text-soft); font-size: 0.85em; }
+    #clock-block .clock-qth { color: var(--text-soft); font-size: 0.85em; margin-top: 2px; }
+
+    #theme-toggle-btn {
+        font-size: 1.05em; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 18px; padding: 4px 11px; cursor: pointer; color: var(--text-main); transition: border-color .2s;
+    }
+    #theme-toggle-btn:hover { border-color: var(--accent); }
+
+    #nav-links { display: flex; gap: 4px; flex-wrap: wrap; }
+    #nav-links a {
+        text-decoration: none; font-size: 0.85em; padding: 5px 9px; border-radius: 4px;
+        background: rgba(var(--accent-rgb),0.06); border: 1px solid rgba(var(--accent-rgb),0.15); white-space: nowrap;
+    }
+    #nav-links a:hover { color: var(--accent); border-color: var(--accent); }
+    #nav-links a.active { color: var(--accent); border-color: var(--accent); background: rgba(var(--accent-rgb),0.12); }
+
+    /* ═══ LAYOUT ═══ */
+    #dashboard { padding: 14px; max-width: 1500px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    .row { display: grid; gap: 14px; }
+    .row-main { grid-template-columns: 280px 1fr 300px; }
+    .row-bottom { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 1100px) {
+        .row-main { grid-template-columns: 1fr; }
+        .row-bottom { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+        position: relative;
+        background: linear-gradient(160deg, var(--panel-bg) 0%, var(--bg-color-2) 100%);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-top: 1px solid var(--bezel-hi);
+        border-radius: 5px;
+        padding: 16px 16px 14px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.45), inset 0 1px 0 var(--bezel-hi);
+    }
+    .panel::before, .panel::after {
+        content: ''; position: absolute; top: 7px; width: 4px; height: 4px; border-radius: 50%;
+        background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.35), rgba(0,0,0,0.4));
+        box-shadow: inset 0 0 1px rgba(0,0,0,0.6);
+    }
+    .panel::before { left: 8px; }
+    .panel::after { right: 8px; }
+    .panel-header {
+        font-family: var(--font-display); font-weight: 700; font-size: 0.82em; color: var(--text-main);
+        margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);
+        letter-spacing: 1.5px; text-transform: uppercase;
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-header .ph-left { display: flex; align-items: center; }
+    .dd-handle { font-size: 1.4em; cursor: grab; margin-right: 6px; color: var(--text-dim); opacity: 0.6; }
+    .dd-handle:hover { opacity: 1; color: var(--amber); }
+    .sortable-ghost { opacity: 0.3; }
+    .panel-subtitle { font-size: 0.85em; color: var(--text-dim); line-height: 1.5; margin: 4px 2px 12px; font-style: italic; }
+    .loading, .empty-state { color: var(--text-soft); font-size: 0.85em; font-style: italic; padding: 8px 2px; }
+
+    /* ═══ SYNTHÈSE GLOBALE (jauge ring) ═══ */
+    /* ═══ Cadran S-mètre analogique — élément signature ═══ */
+    #meter-wrap { display: flex; flex-direction: column; align-items: center; margin: 4px 0 10px; }
+    #meter-face { position: relative; width: 168px; height: 96px; }
+    #meter-face svg { overflow: visible; }
+    .meter-tick { stroke: var(--text-dim); stroke-width: 1.5; }
+    .meter-tick-label { fill: var(--text-dim); font-family: var(--font-mono); font-size: 8px; text-anchor: middle; }
+    .meter-needle { stroke: var(--amber); stroke-width: 2.5; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(var(--amber-rgb),0.7)); transition: transform 0.7s cubic-bezier(.34,1.4,.5,1); transform-origin: 84px 88px; }
+    .meter-pivot { fill: var(--text-main); stroke: var(--bg-color-2); stroke-width: 1.5; }
+    #meter-readout { font-family: var(--font-display); font-weight: 700; font-size: 1.7em; color: var(--text-main); margin-top: 2px; }
+    #meter-readout .unit { font-size: 0.5em; color: var(--text-dim); font-weight: 500; margin-left: 2px; }
+    .synth-bullets { font-size: 0.85em; width: 100%; margin-top: 6px; }
+    .synth-bullet { display: flex; justify-content: space-between; padding: 3px 0; }
+    .synth-bullet .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+    #synthesis-situation { font-size: 0.85em; line-height: 1.55; color: var(--text-soft); border-top: 1px solid rgba(255,255,255,0.07); padding-top: 10px; margin-top: 6px; }
+
+    /* ═══ ALERTES ═══ */
+    .alert-item { display: flex; gap: 8px; padding: 8px 4px; border-left: 3px solid; margin-bottom: 6px; border-radius: 0 4px 4px 0; background: rgba(255,255,255,0.02); }
+    .alert-item.storm { border-color: var(--alert); }
+    .alert-item.opening { border-color: var(--ok); }
+    .alert-item.ducting { border-color: var(--cold); }
+    .alert-item.pressure { border-color: var(--warn); }
+    .alert-icon { font-size: 1.2em; }
+    .alert-title { font-weight: bold; font-size: 0.85em; }
+    .alert-detail { font-size: 0.85em; color: var(--text-soft); margin-top: 1px; }
+
+    /* ═══ CARTE FOUDRE ═══ */
+    #lightning-map-wrap { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid rgba(var(--accent-rgb),0.15); box-shadow: inset 0 0 40px rgba(var(--accent-rgb),0.05); }
+    #lightning-map { height: 280px; background: #050810; }
+    #map-scanline { position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(var(--accent-rgb),0.6), transparent); animation: scan 5s linear infinite; pointer-events: none; z-index: 500; }
+    @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+    #lightning-summary-row { display: flex; gap: 8px; margin: 10px 0 8px; font-size: 0.85em; }
+    .lightning-stat { flex: 1; text-align: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(120,120,120,0.12); border-radius: 6px; padding: 6px 4px; }
+    .lightning-stat-value { font-size: 1.25em; font-weight: bold; color: var(--warn); }
+    .lightning-stat-label { font-size: 0.85em; color: var(--text-soft); }
+    @keyframes strikePulse { 0% { transform: scale(0.6); opacity: 1; } 70% { transform: scale(2.2); opacity: 0; } 100% { transform: scale(2.2); opacity: 0; } }
+    .strike-marker-fresh { width: 12px; height: 12px; border-radius: 50%; background: #ff3b30; box-shadow: 0 0 8px 2px rgba(255,59,48,0.8); }
+    .strike-marker-fresh::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #ff3b30; animation: strikePulse 1.6s ease-out infinite; }
+    .strike-marker-old { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,149,0,0.55); }
+    .strike-marker-ancient { width: 6px; height: 6px; border-radius: 50%; background: rgba(120,120,120,0.4); }
+    .qth-marker { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 10px 3px rgba(var(--accent-rgb),0.6); }
+
+    /* ═══ QRN / corrélation ═══ */
+    .correlation-band-badge { display: inline-block; font-family: var(--font-display); font-weight: 700; font-size: 0.85em; color: var(--amber); background: rgba(var(--amber-rgb),0.1); border: 1px solid rgba(var(--amber-rgb),0.4); border-radius: 4px; padding: 3px 9px; margin-top: 2px; letter-spacing: 1px; }
+    #gauge-row { display: flex; gap: 4px; margin: 10px 2px 4px; }
+    .gauge-segment { flex: 1; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; letter-spacing: 0.5px; opacity: 0.25; transition: opacity .3s, transform .3s; color: #fff; }
+    .gauge-segment.active { opacity: 1; transform: scaleY(1.15); box-shadow: 0 0 14px currentColor; }
+    .gauge-calm { background: #22c55e; } .gauge-elevated { background: #f59e0b; } .gauge-disturbed { background: #f97316; } .gauge-stormy { background: #ef4444; }
+    #gauge-caption { text-align: center; font-size: 0.85em; color: var(--text-soft); margin: 6px 0 10px; font-weight: bold; }
+    .detail-row { display: flex; gap: 8px; align-items: flex-start; padding: 8px 4px; border-top: 1px solid rgba(120,120,120,0.1); font-size: 0.9em; line-height: 1.5; }
+    .detail-row-icon { font-size: 1.1em; flex-shrink: 0; }
+    .detail-row.correlation-en { color: var(--text-soft); font-style: italic; }
+    .detail-row-label { display: block; font-size: 0.85em; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; font-weight: bold; }
+
+    /* ═══ Conditions HF/VHF ═══ */
+    .cond-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+    .cond-tab { flex: 1; text-align: center; padding: 6px; border-radius: 6px; font-size: 0.85em; font-weight: bold; cursor: pointer; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+    .cond-tab.active { background: rgba(var(--accent-rgb),0.15); border-color: var(--accent); color: var(--accent); }
+    .cond-row { display: flex; justify-content: space-between; padding: 7px 2px; border-bottom: 1px solid rgba(120,120,120,0.08); font-size: 0.85em; }
+    .cond-row .cond-label { color: var(--text-soft); }
+    .cond-row .cond-value { font-weight: bold; }
+    .cond-value.risk-eleve { color: var(--alert); }
+    .cond-value.risk-modere { color: var(--warn); }
+    .cond-value.risk-faible { color: var(--ok); }
+    .cond-hero { display: flex; align-items: center; gap: 12px; padding: 6px 4px 14px; }
+    .cond-hero-icon { font-size: 2.2em; }
+    .cond-hero-temp { font-family: var(--font-display); font-size: 2em; font-weight: 700; }
+    .cond-hero-label { font-size: 0.85em; color: var(--text-soft); }
+    .metric-alert { color: var(--alert) !important; } .metric-warn { color: var(--warn) !important; } .metric-ok { color: var(--ok) !important; } .metric-cold { color: var(--cold) !important; }
+
+    /* ═══ Activité par bande ═══ */
+    .band-table-title { font-size: 0.85em; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 6px; }
+    .band-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.85em; }
+    .band-row .band-name { width: 44px; color: var(--text-soft); }
+    .band-row .band-bar-track { flex: 1; height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px; overflow: hidden; }
+    .band-row .band-bar-fill { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), rgba(var(--accent-rgb),0.4)); transition: width 0.4s ease; }
+    .band-row .band-count { width: 46px; text-align: right; color: var(--text-main); font-weight: bold; }
+    .band-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+
+    /* ═══ VOACAP rapide ═══ */
+    #voacap-zone-select { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.15); color: var(--text-main); border-radius: 4px; padding: 3px 8px; font-size: 0.85em; font-family: 'Share Tech Mono', monospace; }
+    .voacap-metric-row { display: flex; justify-content: space-between; padding: 6px 2px; font-size: 0.88em; border-bottom: 1px solid rgba(120,120,120,0.08); }
+    .voacap-metric-row .v-label { color: var(--text-soft); }
+    .voacap-metric-row .v-value { font-weight: bold; color: var(--accent); }
+    #voacap-best-band { margin-top: 10px; text-align: center; padding: 10px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.3); border-radius: 6px; }
+    #voacap-best-band .vb-label { font-size: 0.85em; color: var(--text-soft); text-transform: uppercase; }
+    #voacap-best-band .vb-band { font-family: var(--font-display); font-size: 1.3em; color: var(--ok); font-weight: bold; }
+    /* ═══ MOBILE : lisibilité renforcée ═══ */
+    @media (max-width: 700px) {
+        body { font-size: 16px; }
+        #dashboard { padding: 10px; gap: 12px; }
+        .panel { padding: 14px 12px; }
+        .panel-header { font-size: 0.92em; }
+        .panel-subtitle { font-size: 0.85em; line-height: 1.6; }
+        .detail-row { font-size: 1em; line-height: 1.65; }
+        .detail-row-label { font-size: 0.88em; }
+        #gauge-caption { font-size: 0.95em; }
+        .cond-row { font-size: 0.95em; padding: 9px 2px; }
+        .voacap-metric-row { font-size: 1em; padding: 8px 2px; }
+        .band-row { font-size: 0.95em; padding: 7px 0; gap: 10px; }
+        .band-row .band-name { width: 52px; font-weight: bold; }
+        .band-row .band-count { width: 40px; font-size: 1.05em; }
+        .band-row .band-bar-track { height: 14px; }
+        .lightning-stat-value { font-size: 1.4em; }
+        .lightning-stat-label { font-size: 0.75em; }
+        .status-chip .chip-value { font-size: 1.15em; }
+        .status-chip .chip-label { font-size: 0.68em; }
+        #topbar { padding: 10px 12px; gap: 12px; }
+        #nav-links a { font-size: 0.85em; padding: 6px 10px; }
+        .alert-title { font-size: 0.95em; }
+        .alert-detail { font-size: 0.85em; }
+        .cond-tab { padding: 10px; font-size: 0.85em; }
+        #voacap-zone-select { font-size: 0.9em; padding: 6px 10px; }
+        .correlation-band-badge { font-size: 0.9em; }
+    }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+    <div id="brand">
+        <span class="logo">⛈️</span>
+        <div>
+            <div class="name">NEURAL DX WATCHER <span class="ver">v{{ version }}</span></div>
+            <div class="subtitle">Météo Radio · HF/VHF Propagation Intelligence</div>
+        </div>
+    </div>
+
+    <div class="status-chip"><div class="chip-label">SFI</div><div class="chip-value accent" id="hdr-sfi">—</div></div>
+    <div class="status-chip"><div class="chip-label">K-index</div><div class="chip-value" id="hdr-k">—</div></div>
+    <div class="status-chip"><div class="chip-label">A-index</div><div class="chip-value" id="hdr-a">—</div></div>
+
+    <div id="clock-block">
+        <div class="clock-time" id="hdr-clock">--:--:--</div>
+        <div class="clock-qth">{{ my_call }} · QTH</div>
+    </div>
+
+    <button id="theme-toggle-btn" onclick="toggleTheme()" title="Changer de thème">🔆</button>
+
+    <div id="nav-links">
+        <a href="/">🏠 ACCUEIL</a>
+        <a href="/ai-insight">📊 AI INSIGHT</a>
+        <a href="/briefing">📰 BRIEFING</a>
+        <a href="/map">🗺 MAP</a>
+        <a href="/world">🌍 WORLD</a>
+        <a href="/satellites">🛰️ SATELLITES</a>
+        <a href="/weather" class="active">⛈️ MÉTÉO</a>
+    </div>
+</div>
+
+<div id="dashboard">
+
+    <!-- ROW 1 : Synthèse | Carte foudre | Conditions HF/VHF -->
+    <div class="row row-main" id="row-main">
+
+        <div class="panel" id="panel-synthesis">
+            <div class="panel-header"><span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 📊 SYNTHÈSE GLOBALE</span></div>
+            <div id="synthesis-content"><div class="loading">Chargement…</div></div>
+            <div class="panel-header" style="margin-top:16px;">🔔 ALERTES</div>
+            <div id="alerts-content"><div class="loading">Chargement…</div></div>
+        </div>
+
+        <div class="panel" id="panel-lightning">
+            <div class="panel-header">
+                <span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> ⚡ ACTIVITÉ ÉLECTRIQUE</span>
+                <span style="font-size:0.85em;color:var(--text-soft);font-weight:normal;">Réseau Blitzortung</span>
+            </div>
+            <div id="lightning-map-wrap">
+                <div id="lightning-map"></div>
+                <div id="map-scanline"></div>
+            </div>
+            <div id="lightning-summary-row"></div>
+            <div id="lightning-list"></div>
+        </div>
+
+        <div class="panel" id="panel-conditions">
+            <div class="panel-header"><span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 🌡 CONDITIONS ACTUELLES</span></div>
+            <div class="cond-tabs">
+                <div class="cond-tab active" id="tab-hf" onclick="switchCondTab('hf')">HF</div>
+                <div class="cond-tab" id="tab-vhf" onclick="switchCondTab('vhf')">VHF / UHF</div>
+            </div>
+            <div id="cond-hf-content"><div class="loading">Chargement…</div></div>
+            <div id="cond-vhf-content" style="display:none;"><div class="loading">Chargement…</div></div>
+        </div>
+    </div>
+
+    <!-- ROW 2 : Corrélation bruit/QRN (pleine largeur) -->
+    <div class="panel" id="panel-correlation">
+        <div class="panel-header"><span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 🧠 BRUIT / QRN — CE QUE ÇA VEUT DIRE POUR TOI</span></div>
+        <div class="panel-subtitle">
+            <strong>QRN</strong> = bruit atmosphérique/électrique (code Q radioamateur). Ce pavé croise l'activité radio ambiante (WSPR près de chez toi, ou ton SNR FT8/FT4 si WSJT-X tourne) avec les impacts de foudre récents.<br>
+            <span style="opacity:0.7;"><strong>QRN</strong> = atmospheric/electrical noise (ham radio Q-code). Compares ambient radio activity with recent lightning strikes.</span>
+        </div>
+        <div id="correlation-band" class="correlation-band-badge"></div>
+        <div id="gauge-row">
+            <div class="gauge-segment gauge-calm" data-level="calm">CALME</div>
+            <div class="gauge-segment gauge-elevated" data-level="elevated">ÉLEVÉ</div>
+            <div class="gauge-segment gauge-disturbed" data-level="disturbed">PERTURBÉ</div>
+            <div class="gauge-segment gauge-stormy" data-level="stormy">ORAGEUX</div>
+        </div>
+        <div id="gauge-caption">Analyse en cours…</div>
+        <div class="detail-row" id="correlation-fr">
+            <span class="detail-row-icon">📡</span>
+            <div style="flex:1;">
+                <span class="detail-row-label">Activité radio HF (WSPR / SNR)</span>
+                <div id="activity-fr-text" class="loading">Analyse en cours…</div>
+                <span class="detail-row-label" style="margin-top:8px;">VHF / 6m (WSPR)</span>
+                <div id="vhf-fr-text" class="loading">Analyse en cours…</div>
+                <span class="detail-row-label" style="margin-top:8px;">QRN (foudre)</span>
+                <div id="lightning-fr-text" class="loading">Analyse en cours…</div>
+            </div>
+        </div>
+        <div class="detail-row correlation-en" id="correlation-en">
+            <span class="detail-row-icon">🇬🇧</span>
+            <div style="flex:1;">
+                <span class="detail-row-label">HF radio activity (WSPR / SNR)</span>
+                <div id="activity-en-text" class="loading">Analyzing…</div>
+                <span class="detail-row-label" style="margin-top:8px;">VHF / 6m (WSPR)</span>
+                <div id="vhf-en-text" class="loading">Analyzing…</div>
+                <span class="detail-row-label" style="margin-top:8px;">QRN (lightning)</span>
+                <div id="lightning-en-text" class="loading">Analyzing…</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROW 3 : VOACAP rapide | Activité par bande -->
+    <div class="row row-bottom" id="row-bottom">
+
+        <div class="panel" id="panel-voacap">
+            <div class="panel-header">
+                <span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 📶 VOACAP RAPIDE</span>
+                <select id="voacap-zone-select" onchange="loadVoacap()">
+                    <option value="EU">Europe</option>
+                    <option value="NA">Amérique du Nord</option>
+                    <option value="SA">Amérique du Sud</option>
+                    <option value="AS">Asie</option>
+                    <option value="OC">Océanie</option>
+                    <option value="AF">Afrique</option>
+                </select>
+            </div>
+            <div id="voacap-content"><div class="loading">Chargement…</div></div>
+        </div>
+
+        <div class="panel" id="panel-band-activity">
+            <div class="panel-header"><span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 📶 ACTIVITÉ PAR BANDE (24H)</span></div>
+            <div class="band-cols">
+                <div>
+                    <div class="band-table-title">HF</div>
+                    <div id="band-activity-hf"><div class="loading">Chargement…</div></div>
+                </div>
+                <div>
+                    <div class="band-table-title">VHF / UHF</div>
+                    <div id="band-activity-vhf"><div class="loading">Chargement…</div></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+const QTH_LAT = {{ qth_lat }};
+const QTH_LON = {{ qth_lon }};
+const LIGHTNING_RADIUS_KM = {{ lightning_radius_km }};
+
+const WEATHER_ICONS = { 0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌦️",61:"🌧️",63:"🌧️",65:"🌧️",71:"🌨️",73:"🌨️",75:"🌨️",80:"🌦️",81:"🌧️",82:"⛈️",95:"⛈️",96:"⛈️",99:"⛈️" };
+const WEATHER_LABELS = { 0:"Ciel dégagé",1:"Peu nuageux",2:"Partiellement nuageux",3:"Couvert",45:"Brouillard",48:"Brouillard givrant",51:"Bruine légère",53:"Bruine",55:"Bruine forte",61:"Pluie légère",63:"Pluie",65:"Pluie forte",71:"Neige légère",73:"Neige",75:"Neige forte",80:"Averses",81:"Averses fortes",82:"Averses violentes",95:"Orage",96:"Orage grêle",99:"Orage violent" };
+
+function fmtAge(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}min`;
+    return `${Math.floor(seconds / 3600)}h${Math.floor((seconds % 3600) / 60)}`;
+}
+
+// ── Horloge + en-tête solaire ──
+function tickClock() {
+    const now = new Date();
+    document.getElementById('hdr-clock').textContent = now.toISOString().substring(11, 19) + ' UTC';
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+async function loadHeaderSolar() {
+    try {
+        const resp = await fetch('/solar.json');
+        const data = await resp.json();
+        document.getElementById('hdr-sfi').textContent = data.sfi ?? '—';
+        document.getElementById('hdr-k').textContent = data.k ?? '—';
+        document.getElementById('hdr-a').textContent = data.a ?? '—';
+    } catch (e) { /* silencieux, non-critique */ }
+}
+
+// ── Synthèse globale ──
+function ringColor(pct) {
+    if (pct == null) return 'var(--text-dim)';
+    if (pct >= 75) return 'var(--ok)';
+    if (pct >= 50) return 'var(--warn)';
+    return 'var(--alert)';
+}
+async function loadSynthesis() {
+    const container = document.getElementById('synthesis-content');
+    try {
+        const resp = await fetch('/api/weather/synthesis.json');
+        const data = await resp.json();
+        const pct = data.global_pct;
+        const needleAngle = pct != null ? (pct / 100) * 180 - 90 : -90;
+
+        container.innerHTML = `
+            <div id="meter-wrap">
+                <div id="meter-face">
+                    <svg width="168" height="96" viewBox="0 0 168 96">
+                        <path d="M 14 88 A 70 70 0 0 1 84 18" fill="none" stroke="var(--alert)" stroke-width="6" opacity="0.55"/>
+                        <path d="M 84 18 A 70 70 0 0 1 133.5 38.5" fill="none" stroke="var(--warn)" stroke-width="6" opacity="0.55"/>
+                        <path d="M 133.5 38.5 A 70 70 0 0 1 154 88" fill="none" stroke="var(--ok)" stroke-width="6" opacity="0.55"/>
+                        <line class="meter-tick" x1="14" y1="88" x2="6" y2="88"/>
+                        <line class="meter-tick" x1="84" y1="18" x2="84" y2="10"/>
+                        <line class="meter-tick" x1="154" y1="88" x2="162" y2="88"/>
+                        <text class="meter-tick-label" x="14" y="94">0</text>
+                        <text class="meter-tick-label" x="84" y="8">50</text>
+                        <text class="meter-tick-label" x="154" y="94">100</text>
+                        <line class="meter-needle" x1="84" y1="88" x2="84" y2="28" style="transform:rotate(${needleAngle}deg);"/>
+                        <circle class="meter-pivot" cx="84" cy="88" r="5"/>
+                    </svg>
+                </div>
+                <div id="meter-readout">${pct != null ? pct : '—'}<span class="unit">%</span></div>
+                <div class="synth-bullets">
+                    <div class="synth-bullet"><span><span class="dot" style="background:${ringColor(data.hf_pct)}"></span>HF</span><span>${data.hf_pct != null ? data.hf_pct + '%' : '—'}</span></div>
+                    <div class="synth-bullet"><span><span class="dot" style="background:${ringColor(data.vhf_pct)}"></span>VHF</span><span>${data.vhf_pct != null ? data.vhf_pct + '%' : '—'}</span></div>
+                </div>
+            </div>
+            <div id="synthesis-situation">${data.hf_level_label_fr ? `QRN : <strong>${data.hf_level_label_fr}</strong>` : ''} — indice heuristique, pas une mesure calibrée.</div>
+        `;
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state">Synthèse indisponible</div>`;
+    }
+}
+
+// ── Alertes ──
+async function loadAlerts() {
+    const container = document.getElementById('alerts-content');
+    try {
+        const resp = await fetch('/api/weather/alerts.json');
+        const data = await resp.json();
+        if (!data.alerts || data.alerts.length === 0) {
+            container.innerHTML = `<div class="empty-state">Aucune alerte — conditions normales</div>`;
+            return;
+        }
+        container.innerHTML = data.alerts.map(a => `
+            <div class="alert-item ${a.type}">
+                <span class="alert-icon">${a.icon}</span>
+                <div><div class="alert-title">${a.title}</div><div class="alert-detail">${a.detail}</div></div>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state">Alertes indisponibles</div>`;
+    }
+}
+
+// ── Conditions HF/VHF ──
+function switchCondTab(which) {
+    document.getElementById('tab-hf').classList.toggle('active', which === 'hf');
+    document.getElementById('tab-vhf').classList.toggle('active', which === 'vhf');
+    document.getElementById('cond-hf-content').style.display = which === 'hf' ? 'block' : 'none';
+    document.getElementById('cond-vhf-content').style.display = which === 'vhf' ? 'block' : 'none';
+}
+function tempClass(t) { if (t == null) return ''; if (t >= 30) return 'metric-alert'; if (t >= 25) return 'metric-warn'; if (t < 0) return 'metric-cold'; return ''; }
+function pressureClass(p) { if (p == null) return ''; if (p < 1000) return 'metric-alert'; if (p < 1008) return 'metric-warn'; if (p > 1020) return 'metric-ok'; return ''; }
+function riskClass(r) { return { 'élevé': 'risk-eleve', 'modéré': 'risk-modere', 'faible': 'risk-faible' }[r] || ''; }
+
+async function loadConditions() {
+    const hfEl = document.getElementById('cond-hf-content');
+    const vhfEl = document.getElementById('cond-vhf-content');
+    try {
+        const [localResp, wsprResp] = await Promise.all([
+            fetch('/api/weather/local.json'),
+            fetch('/api/weather/wspr.json').catch(() => null),
+        ]);
+        const data = await localResp.json();
+        const wsprData = wsprResp && wsprResp.ok ? await wsprResp.json() : null;
+        const confirm2m = wsprData ? wsprData.confirmation_2m : null;
+
+        if (!data.ok) { hfEl.innerHTML = vhfEl.innerHTML = `<div class="empty-state">Indisponible</div>`; return; }
+
+        const icon = WEATHER_ICONS[data.weather_code] ?? "🌡️";
+        const label = WEATHER_LABELS[data.weather_code] ?? "—";
+
+        hfEl.innerHTML = `
+            <div class="cond-hero">
+                <div class="cond-hero-icon">${icon}</div>
+                <div><div class="cond-hero-temp ${tempClass(data.temp_c)}">${data.temp_c != null ? Math.round(data.temp_c) + '°C' : '—'}</div>
+                <div class="cond-hero-label">${label}</div></div>
+            </div>
+            <div class="cond-row"><span class="cond-label">🔽 Pression</span><span class="cond-value ${pressureClass(data.pressure_hpa)}">${data.pressure_hpa != null ? Math.round(data.pressure_hpa) + ' hPa' : '—'}</span></div>
+            <div class="cond-row"><span class="cond-label">💧 Humidité</span><span class="cond-value">${data.humidity_pct != null ? data.humidity_pct + '%' : '—'}</span></div>
+            <div class="cond-row"><span class="cond-label">🌬 Vent surface</span><span class="cond-value">${data.wind_kmh != null ? Math.round(data.wind_kmh) + ' km/h ' + (data.wind_dir_compass||'') : '—'}</span></div>
+            <div class="cond-row"><span class="cond-label">🌧 Précipitations</span><span class="cond-value">${data.precipitation_mm != null ? data.precipitation_mm + ' mm' : '0 mm'}</span></div>
+        `;
+
+        let confirmRow;
+        if (confirm2m && confirm2m.beacon_available) {
+            confirmRow = `<span class="cond-value metric-ok">✅ ${confirm2m.spot_count} spot${confirm2m.spot_count > 1 ? 's' : ''} (SNR ${confirm2m.avg_snr}dB)</span>`;
+        } else {
+            confirmRow = `<span class="cond-value" style="color:var(--text-soft);font-style:italic;">Aucune balise 2m disponible</span>`;
+        }
+
+        vhfEl.innerHTML = `
+            <div class="cond-row"><span class="cond-label">🌫️ Ducting tropo</span><span class="cond-value ${riskClass(data.ducting_risk)}">${data.ducting_risk ? data.ducting_risk.toUpperCase() : '—'}</span></div>
+            <div class="cond-row"><span class="cond-label">📊 Indice tropo</span><span class="cond-value">${data.tropo_index != null ? data.tropo_index + ' / 10' : '—'}</span></div>
+            <div class="cond-row"><span class="cond-label">🌬 Vent 300hPa</span><span class="cond-value">${data.wind_300hpa_kmh != null ? Math.round(data.wind_300hpa_kmh) + ' km/h ' + (data.wind_300hpa_compass||'') : '—'}</span></div>
+            <div class="cond-row"><span class="cond-label">⚡ CAPE</span><span class="cond-value">${data.cape != null ? Math.round(data.cape) + ' J/kg' : '—'}</span></div>
+            <div class="cond-row"><span class="cond-label">📻 Confirmation 2m (300km)</span>${confirmRow}</div>
+            <div class="panel-subtitle" style="margin-top:10px;">
+                Indice tropo : heuristique simplifiée (inversion surface/850hPa + humidité + CAPE) — indicatif, pas un modèle physique complet.<br>
+                Confirmation 2m : un spot WSPR en 2m à courte distance est un signe assez fiable de vrai ducting (contrairement au 6m, souvent lié au Sporadic-E longue distance). Nécessite qu'un opérateur balise activement à proximité — son absence ne signifie pas absence d'ouverture.
+            </div>
+        `;
+    } catch (e) {
+        hfEl.innerHTML = vhfEl.innerHTML = `<div class="empty-state">Indisponible</div>`;
+    }
+}
+
+// ── Carte foudre ──
+let lightningMap = null, lightningLayerGroup = null;
+function initLightningMap() {
+    lightningMap = L.map('lightning-map', { zoomControl: false, attributionControl: false }).setView([QTH_LAT, QTH_LON], 6);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 10 }).addTo(lightningMap);
+    L.circle([QTH_LAT, QTH_LON], { radius: LIGHTNING_RADIUS_KM * 1000, color: '#ff9500', weight: 1, fillColor: '#ff9500', fillOpacity: 0.04, dashArray: '4,6' }).addTo(lightningMap);
+    L.marker([QTH_LAT, QTH_LON], { icon: L.divIcon({ className: '', html: '<div class="qth-marker"></div>', iconSize: [14, 14] }) }).addTo(lightningMap);
+    lightningLayerGroup = L.layerGroup().addTo(lightningMap);
+}
+async function loadLightning() {
+    const summaryRow = document.getElementById('lightning-summary-row');
+    const listEl = document.getElementById('lightning-list');
+    try {
+        const resp = await fetch('/api/weather/lightning.json');
+        const data = await resp.json();
+        lightningLayerGroup.clearLayers();
+        if (!data.ok || data.count_1h === 0) {
+            summaryRow.innerHTML = `<div class="lightning-stat"><div class="lightning-stat-value">0</div><div class="lightning-stat-label">impact (1h)</div></div>`;
+            listEl.innerHTML = `<div class="empty-state">Aucune activité électrique détectée (rayon ${data.radius_km || 300}km)</div>`;
+            return;
+        }
+        const closest = [...data.strikes].sort((a, b) => a.dist_km - b.dist_km)[0];
+        summaryRow.innerHTML = `
+            <div class="lightning-stat"><div class="lightning-stat-value">${data.count_1h}</div><div class="lightning-stat-label">impacts (1h)</div></div>
+            <div class="lightning-stat"><div class="lightning-stat-value">${closest.dist_km}km</div><div class="lightning-stat-label">plus proche (${closest.bearing_compass})</div></div>
+        `;
+        data.strikes.forEach(s => {
+            let cls = 'strike-marker-ancient';
+            if (s.age_s < 300) cls = 'strike-marker-fresh'; else if (s.age_s < 1800) cls = 'strike-marker-old';
+            const icon = L.divIcon({ className: '', html: `<div style="position:relative;"><div class="${cls}"></div></div>`, iconSize: [12, 12] });
+            L.marker([s.lat, s.lon], { icon }).bindPopup(`⚡ ${s.dist_km}km ${s.bearing_compass} · il y a ${fmtAge(s.age_s)}`).addTo(lightningLayerGroup);
+        });
+        listEl.innerHTML = `<div style="max-height:90px;overflow-y:auto;margin-top:6px;">` + data.strikes.slice(0, 6).map(s => `
+            <div style="display:flex;justify-content:space-between;padding:3px 2px;font-size:0.85em;border-bottom:1px solid rgba(120,120,120,0.08);">
+                <span>📍 ${s.dist_km}km ${s.bearing_compass}</span><span style="color:var(--text-soft);">il y a ${fmtAge(s.age_s)}</span>
+            </div>`).join('') + `</div>`;
+    } catch (e) {
+        summaryRow.innerHTML = ''; listEl.innerHTML = `<div class="empty-state">Foudre indisponible</div>`;
+    }
+}
+
+// ── Corrélation QRN ──
+async function loadCorrelation() {
+    const bandEl = document.getElementById('correlation-band');
+    const captionEl = document.getElementById('gauge-caption');
+    const activityFrEl = document.getElementById('activity-fr-text');
+    const vhfFrEl = document.getElementById('vhf-fr-text');
+    const lightningFrEl = document.getElementById('lightning-fr-text');
+    const activityEnEl = document.getElementById('activity-en-text');
+    const vhfEnEl = document.getElementById('vhf-en-text');
+    const lightningEnEl = document.getElementById('lightning-en-text');
+    try {
+        const resp = await fetch('/api/weather/correlation.json');
+        const data = await resp.json();
+        const sourceLabel = { wspr: "📶 WSPR", wsjtx: "🖥️ WSJT-X (repli)", none: "—" }[data.source] || "—";
+        bandEl.innerHTML = data.reference_band ? `${sourceLabel} · Bande HF réf. : <strong>${data.reference_band}</strong>` : `📡 Aucune source disponible`;
+        document.querySelectorAll('.gauge-segment').forEach(seg => seg.classList.toggle('active', seg.dataset.level === data.level));
+        const captionMap = {
+            calm: "🟢 QRN faible — conditions calmes",
+            elevated: "🟡 QRN en légère hausse — surveille les bandes basses en QRP",
+            disturbed: "🟠 QRN notable — dégradation probable HF basse / FT8 faible signal",
+            stormy: "🔴 QRN fort — bruit marqué probable sur 80/40m",
+        };
+        captionEl.textContent = captionMap[data.level] || '';
+        activityFrEl.innerHTML = data.activity_fr || `<span class="empty-state">Indisponible</span>`;
+        vhfFrEl.innerHTML = data.vhf_fr || `<span class="empty-state">Indisponible</span>`;
+        lightningFrEl.innerHTML = data.lightning_fr || `<span class="empty-state">Indisponible</span>`;
+        activityEnEl.innerHTML = data.activity_en || `<span class="empty-state">Unavailable</span>`;
+        vhfEnEl.innerHTML = data.vhf_en || `<span class="empty-state">Unavailable</span>`;
+        lightningEnEl.innerHTML = data.lightning_en || `<span class="empty-state">Unavailable</span>`;
+    } catch (e) {
+        bandEl.innerHTML = ''; captionEl.textContent = '';
+        [activityFrEl, vhfFrEl, lightningFrEl, activityEnEl, vhfEnEl, lightningEnEl].forEach(el => el.innerHTML = `<span class="empty-state">Indisponible</span>`);
+    }
+}
+
+// ── VOACAP rapide ──
+async function loadVoacap() {
+    const container = document.getElementById('voacap-content');
+    const zone = document.getElementById('voacap-zone-select').value;
+    try {
+        const resp = await fetch(`/api/voacap?zone=${zone}`);
+        const data = await resp.json();
+        const utcHour = new Date().getUTCHours();
+        let bestBand = null, bestRel = -1;
+        const relByBand = {};
+        for (const band of data.bands) {
+            const rel = data.grid[band][utcHour];
+            relByBand[band] = rel;
+            if (rel > bestRel) { bestRel = rel; bestBand = band; }
+        }
+
+        const barsHtml = data.bands.map(band => {
+            const rel = relByBand[band];
+            const color = BAND_COLORS_JS[band] || 'var(--accent)';
+            return `
+            <div class="band-row">
+                <span class="band-name" style="color:${color};">${band}</span>
+                <span class="band-bar-track"><span class="band-bar-fill" style="width:${rel}%;background:${color};"></span></span>
+                <span class="band-count" style="color:${color};">${rel}%</span>
+            </div>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="voacap-metric-row"><span class="v-label">Zone</span><span class="v-value">${data.zone_name} (${data.dist_km} km)</span></div>
+            <div class="voacap-metric-row"><span class="v-label">MUF actuelle</span><span class="v-value">${data.muf} MHz</span></div>
+            <div class="voacap-metric-row"><span class="v-label">LUF actuelle</span><span class="v-value">${data.luf} MHz</span></div>
+            <div class="voacap-metric-row"><span class="v-label">SFI utilisé</span><span class="v-value">${data.sfi}</span></div>
+            <div id="voacap-best-band">
+                <div class="vb-label">Meilleure bande maintenant</div>
+                <div class="vb-band">${bestBand} (${bestRel}%)</div>
+            </div>
+            <div class="band-table-title" style="margin-top:14px;">Fiabilité par bande — ce trajet uniquement</div>
+            <div style="margin-top:4px;">${barsHtml}</div>
+            <div class="panel-subtitle" style="margin-top:10px;">
+                ⚠️ Cette prédiction ne concerne QUE le trajet vers <strong>${data.zone_name}</strong> (${data.dist_km} km) à l'heure actuelle. Elle peut légitimement différer du pavé "Activité par bande" ci-contre, qui lui reflète les spots <em>réels</em> reçus toutes distances et directions confondues — les deux mesurent des choses différentes, ce n'est pas une incohérence.
+            </div>
+        `;
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state">VOACAP indisponible</div>`;
+    }
+}
+
+// ── Activité par bande ──
+const BAND_COLORS_JS = JSON.parse('{{ band_colors | tojson }}');
+
+function renderBandRows(bands, containerId) {
+    const el = document.getElementById(containerId);
+    if (!bands || bands.length === 0) { el.innerHTML = `<div class="empty-state">Aucun spot sur 24h</div>`; return; }
+    const max = Math.max(...bands.map(b => b.count));
+    el.innerHTML = bands.map(b => {
+        const color = BAND_COLORS_JS[b.band] || 'var(--accent)';
+        return `
+        <div class="band-row">
+            <span class="band-name" style="color:${color};">${b.band}</span>
+            <span class="band-bar-track"><span class="band-bar-fill" style="width:${max > 0 ? (b.count / max * 100) : 0}%;background:${color};"></span></span>
+            <span class="band-count" style="color:${color};">${b.count}</span>
+        </div>`;
+    }).join('');
+}
+async function loadBandActivity() {
+    try {
+        const resp = await fetch('/api/weather/band_activity.json');
+        const data = await resp.json();
+        renderBandRows(data.hf, 'band-activity-hf');
+        renderBandRows(data.vhf, 'band-activity-vhf');
+    } catch (e) {
+        document.getElementById('band-activity-hf').innerHTML = document.getElementById('band-activity-vhf').innerHTML = `<div class="empty-state">Indisponible</div>`;
+    }
+}
+
+// ── Drag & Drop des pavés (SortableJS, persistance localStorage) ──
+function initPanelSorting() {
+    if (typeof Sortable === 'undefined') return;
+    [
+        { el: document.getElementById('row-main'), key: 'weather_order_main' },
+        { el: document.getElementById('row-bottom'), key: 'weather_order_bottom' },
+    ].forEach(({ el, key }) => {
+        if (!el) return;
+
+        // Restaurer l'ordre sauvegardé avant d'activer le tri
+        const savedOrder = JSON.parse(localStorage.getItem(key) || 'null');
+        if (savedOrder) {
+            savedOrder.forEach(id => {
+                const node = document.getElementById(id);
+                if (node) el.appendChild(node);
+            });
+        }
+
+        Sortable.create(el, {
+            handle: '.dd-handle',
+            animation: 150,
+            onEnd: () => {
+                const order = Array.from(el.children).map(c => c.id);
+                localStorage.setItem(key, JSON.stringify(order));
+            }
+        });
+    });
+}
+
+// ── Thème (softtech / dark / matrix) — identique à satellites.html ──
+function toggleTheme() {
+    const t = ['softtech', 'dark', 'matrix'];
+    const c = document.body.getAttribute('data-theme') || 'softtech';
+    const n = t[(t.indexOf(c) + 1) % t.length];
+    document.body.setAttribute('data-theme', n);
+    localStorage.setItem('theme', n);
+}
+document.body.setAttribute('data-theme', localStorage.getItem('theme') || 'softtech');
+
+// ── Init ──
+initLightningMap();
+initPanelSorting();
+loadHeaderSolar();
+loadSynthesis();
+loadAlerts();
+loadConditions();
+loadLightning();
+loadCorrelation();
+loadVoacap();
+loadBandActivity();
+
+setInterval(loadHeaderSolar, 300000);
+setInterval(loadSynthesis, 60000);
+setInterval(loadAlerts, 60000);
+setInterval(loadConditions, 1800000);
+setInterval(loadLightning, 60000);
+setInterval(loadCorrelation, 60000);
+setInterval(loadBandActivity, 300000);
+</script>
+
+</body>
+</html>

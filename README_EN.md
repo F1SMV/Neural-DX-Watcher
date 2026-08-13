@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v11.5
+# ⚡ Neural DX Watcher — v12.0
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -226,6 +226,37 @@ No cloud dependency.
 ---
 
 ## 🗂️ Version History
+
+### v12.0 — Major overhaul: enriched history, Weather module, persistent config
+
+- **HISTORY panel redesigned**: switched from "30min/12h" to **"last 5 hours"**, now showing **standout calls by SPD score** (top 5 per hour slot, sorted by rarity), larger characters and orange theme for better readability
+- **Persistent configuration**: MY_CALL and user_qra saved to `data/config.json`, automatically restored on every restart — no more re-entering
+- **DXCC Opportunities**: automatic polling every 30 min (LoTW active + panel visible)
+- **Browser tab title fix**: the page `<title>` was hardcoded to "v11.3" for several versions, never following `APP_VERSION` — fixed to display the current version dynamically
+
+#### 🌦️ New: Weather Module (Phase 1)
+
+New **⛈️ WEATHER** tab — first phase of the module described in
+`ARCHITECTURE_METEO.md`. Goal: answer "do weather conditions explain
+what I'm observing on the bands?"
+
+- **Local conditions** (Open-Meteo, free, no API key): temperature, pressure, humidity, wind, precipitation — QTH position reused automatically, zero extra setup
+- **Electrical activity** (community Blitzortung MQTT bridge): lightning strikes within a 300 km radius, distance and direction (bearing + compass point), 1h history
+- **Bilingual FR/EN noise/weather correlation**: factual and explanatory summary of ambient radio activity, crossed with recent electrical activity — **always shows the source and reference band** used (a 12dB SNR doesn't mean the same thing on 40m as on 10m) — phrased as observations, never as unproven causal claims
+  - **Priority source: WSPR spots** received by stations near the QTH (via [wspr.live](https://wspr.live), free, no API key) — works **24/7**, no dependency on WSJT-X being open
+  - **Automatic fallback: WSJT-X SNR** (new `snr_buffer`, fed by *all* received FT8/FT4 decodes, not just the ones shown in the DX Feed) if no WSPR beacons are received in the area
+- New API routes: `/api/weather/local.json`, `/api/weather/lightning.json`, `/api/weather/wspr.json`, `/api/weather/correlation.json`
+- New page: `/weather`
+
+**⚠️ New Python dependency**: `paho-mqtt` (for the lightning feed)
+```bash
+pip install paho-mqtt --break-system-packages
+```
+Without this dependency the app still starts normally — the lightning module disables itself cleanly (warning logged) without affecting the rest of the app.
+
+**⚠️ Lightning feed reliability**: the community Blitzortung bridge has no official service guarantee. If no strikes appear despite a visible storm elsewhere, see the troubleshooting notes in the `lightning_worker()` comments (webapp.py).
+
+Phase 2 (rain radar on map) and Phase 3 (AI synthesis, long-term history) not included — see `ARCHITECTURE_METEO.md`.
 
 ### v11.5 — Persistent Configuration · MY_CALL & QRA in data/config.json
 

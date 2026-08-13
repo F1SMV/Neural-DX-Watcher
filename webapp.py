@@ -15,6 +15,7 @@ import os
 import sqlite3
 import urllib.request
 import urllib.parse
+import urllib.error
 import feedparser
 import ssl
 import math
@@ -86,7 +87,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '11.5'
+APP_VERSION = '12.0'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -212,7 +213,7 @@ BRIEFING_SOURCES_FILE = Path("data/briefing_sources.json")
 BRIEFING_CACHE_TTL = 60 * 60 * 12
 BRIEFING_FEED_TIMEOUT = 15
 BRIEFING_ITEM_LIMIT = 8
-BRIEFING_USER_AGENT = "Spot-Watcher-DX/8.1 (+https://github.com/)"
+BRIEFING_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 QO100_NEWS_URL = "https://qo100dx.club/news"
 QO100_HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -415,6 +416,821 @@ def solar_worker():
 
 def geo_distance_km(a, b):
     return calculate_distance(a["lat"], a["lon"], b["lat"], b["lon"])
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# MODULE MÉTÉO — Phase 1 : conditions locales + foudre + corrélation
+# Architecture : cf. ARCHITECTURE_METEO.md
+# ══════════════════════════════════════════════════════════════════════════
+
+def calculate_bearing(lat1, lon1, lat2, lon2):
+    """Cap (0-360°, 0=Nord) du point 2 vu depuis le point 1."""
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dlon = math.radians(lon2 - lon1)
+    x = math.sin(dlon) * math.cos(phi2)
+    y = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(dlon)
+    brng = math.degrees(math.atan2(x, y))
+    return (brng + 360) % 360
+
+def bearing_to_compass(deg):
+    """Convertit un cap en points cardinaux (N, NE, E, SE, S, SW, W, NW)."""
+    if deg is None:
+        return "?"
+    dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+    idx = int((deg + 22.5) // 45) % 8
+    return dirs[idx]
+
+# ── Conditions locales (Open-Meteo) ──────────────────────────────────────
+weather_cache = {"data": None, "ts": 0}
+WEATHER_CACHE_TTL = 1800  # 30 min — suffisant pour des conditions qui évoluent lentement
+weather_history = deque(maxlen=20)   # ~3h20 d'historique (20 x 10 min), pour la tendance baromètre
+weather_history_lock = threading.Lock()
+
+def _closest_snapshot(history, history_lock, seconds_ago, tolerance_s=1800):
+    """Utilitaire générique : snapshot historique le plus proche de 'il y a X secondes'."""
+    target = time.time() - seconds_ago
+    with history_lock:
+        candidates = [(abs(ts - target), snap) for ts, snap in history]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0])
+    best_diff, best_snap = candidates[0]
+    return best_snap if best_diff <= tolerance_s else None
+
+def get_pressure_trend():
+    """Tendance barométrique sur ~2h (hausse/baisse/stable) — un indicateur
+    météorologique réel et bien établi (baisse rapide = risque de dégradation)."""
+    current = weather_cache.get("data")
+    if not current or current.get("pressure_hpa") is None:
+        return None
+    ref = _closest_snapshot(weather_history, weather_history_lock, 7200, tolerance_s=1800)
+    if not ref or ref.get("pressure_hpa") is None:
+        return None
+    delta = round(current["pressure_hpa"] - ref["pressure_hpa"], 1)
+    if delta <= -2:
+        trend = "falling"
+    elif delta >= 2:
+        trend = "rising"
+    else:
+        trend = "stable"
+    return {"trend": trend, "delta_hpa": delta}
+
+def fetch_local_weather():
+    """Interroge Open-Meteo pour la position QTH courante (user_lat/user_lon).
+    Gratuit, sans clé API. Échoue proprement (log + cache inchangé) en cas
+    de souci réseau — ne doit jamais faire planter le worker.
+
+    Inclut des paramètres d'altitude (CAPE, vent 300hPa, température 850hPa)
+    pour une heuristique simplifiée de ducting tropo — cf. compute_tropo_index().
+    NOTE : ces paramètres hourly dépendent du schéma Open-Meteo au moment de
+    l'écriture ; si absents de la réponse, le ducting/CAPE afficheront '—'
+    sans faire planter le reste (dégradation propre, comme pour wspr.live)."""
+    global weather_cache
+    try:
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={user_lat}&longitude={user_lon}"
+            "&current=temperature_2m,pressure_msl,relative_humidity_2m,"
+            "wind_speed_10m,wind_direction_10m,precipitation,weather_code"
+            "&hourly=cape,temperature_850hPa,wind_speed_300hPa,wind_direction_300hPa"
+            "&forecast_days=1&timezone=UTC"
+        )
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        current = data.get("current", {})
+        hourly = data.get("hourly", {})
+
+        # Trouver l'index horaire le plus proche de l'heure courante
+        idx = 0
+        current_time_str = current.get("time")
+        hourly_times = hourly.get("time", [])
+        if current_time_str and hourly_times:
+            try:
+                idx = hourly_times.index(current_time_str)
+            except ValueError:
+                idx = min(int(time.strftime("%H", time.gmtime())), len(hourly_times) - 1) if hourly_times else 0
+
+        def _hourly_at(key):
+            vals = hourly.get(key, [])
+            return vals[idx] if idx < len(vals) else None
+
+        cape = _hourly_at("cape")
+        temp_850 = _hourly_at("temperature_850hPa")
+        wind_300_speed = _hourly_at("wind_speed_300hPa")
+        wind_300_dir = _hourly_at("wind_direction_300hPa")
+        surface_temp = current.get("temperature_2m")
+
+        tropo = compute_tropo_index(surface_temp, temp_850, current.get("relative_humidity_2m"), cape)
+
+        snapshot = {
+            "temp_c": current.get("temperature_2m"),
+            "pressure_hpa": current.get("pressure_msl"),
+            "humidity_pct": current.get("relative_humidity_2m"),
+            "wind_kmh": current.get("wind_speed_10m"),
+            "wind_dir_deg": current.get("wind_direction_10m"),
+            "wind_dir_compass": bearing_to_compass(current.get("wind_direction_10m")),
+            "precipitation_mm": current.get("precipitation"),
+            "weather_code": current.get("weather_code"),
+            "cape": cape,
+            "wind_300hpa_kmh": wind_300_speed,
+            "wind_300hpa_compass": bearing_to_compass(wind_300_dir) if wind_300_dir is not None else None,
+            "tropo_index": tropo["index"],
+            "ducting_risk": tropo["ducting_risk"],
+        }
+        weather_cache["data"] = snapshot
+        weather_cache["ts"] = time.time()
+        with weather_history_lock:
+            weather_history.append((time.time(), snapshot))
+        logger.debug(f"WeatherWorker: MAJ conditions locales — {snapshot}")
+    except Exception as e:
+        logger.warning(f"WeatherWorker: échec fetch Open-Meteo ({e}) — cache conservé")
+
+def compute_tropo_index(surface_temp, temp_850hpa, humidity_pct, cape):
+    """Heuristique SIMPLIFIÉE (pas un modèle physique complet) de risque de
+    ducting tropo, basée sur la détection d'inversion de température entre
+    la surface et ~1500m (850hPa) : en air normal, la température baisse
+    d'environ 8-9°C entre le sol et 850hPa. Une baisse plus faible (ou une
+    hausse) indique une inversion — condition classique favorable au ducting
+    troposphérique en VHF/UHF. Volontairement présenté comme un indice
+    indicatif (0-10), jamais comme une prévision certaine."""
+    if surface_temp is None or temp_850hpa is None:
+        return {"index": None, "ducting_risk": None}
+
+    expected_normal_drop = 8.5  # °C, atmosphère standard entre surface et ~1500m
+    actual_drop = surface_temp - temp_850hpa
+    inversion_strength = expected_normal_drop - actual_drop  # positif = inversion
+
+    score = 0
+    if inversion_strength >= 6:
+        score += 4
+    elif inversion_strength >= 3:
+        score += 2
+    elif inversion_strength >= 0:
+        score += 1
+
+    if humidity_pct is not None and humidity_pct >= 80:
+        score += 2
+    if cape is not None and cape < 100:  # air stable, peu convectif — favorable au ducting
+        score += 1
+
+    index = min(score * 10 // 7, 10)
+    if index >= 7:
+        risk = "élevé"
+    elif index >= 4:
+        risk = "modéré"
+    else:
+        risk = "faible"
+    return {"index": index, "ducting_risk": risk}
+
+def weather_worker():
+    threading.current_thread().name = 'WeatherWorker'
+    logger.info("WeatherWorker démarré (update météo locale toutes les 10 min).")
+    fetch_local_weather()
+    while True:
+        time.sleep(WEATHER_CACHE_TTL)
+        fetch_local_weather()
+
+# ── Foudre (Blitzortung, via le pont MQTT communautaire) ────────────────
+lightning_buffer = deque(maxlen=500)
+lightning_lock = threading.Lock()
+LIGHTNING_RETENTION_S = 3600  # on ne garde qu'1h en mémoire
+LIGHTNING_RADIUS_KM = 300     # rayon d'intérêt autour du QTH
+
+def _lightning_geohash(lat, lon, precision=3):
+    """Encodage geohash standard (base32), utilisé pour filtrer le flux MQTT
+    par zone géographique plutôt que de recevoir le flux mondial complet."""
+    base32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+    lat_range = [-90.0, 90.0]
+    lon_range = [-180.0, 180.0]
+    geohash = []
+    bits = [16, 8, 4, 2, 1]
+    bit = 0
+    ch = 0
+    even = True
+    while len(geohash) < precision:
+        if even:
+            mid = (lon_range[0] + lon_range[1]) / 2
+            if lon > mid:
+                ch |= bits[bit]
+                lon_range[0] = mid
+            else:
+                lon_range[1] = mid
+        else:
+            mid = (lat_range[0] + lat_range[1]) / 2
+            if lat > mid:
+                ch |= bits[bit]
+                lat_range[0] = mid
+            else:
+                lat_range[1] = mid
+        even = not even
+        if bit < 4:
+            bit += 1
+        else:
+            geohash.append(base32[ch])
+            bit = 0
+            ch = 0
+    return "".join(geohash)
+
+def _lightning_geohash_neighbors(lat, lon, precision=3):
+    """Retourne le geohash du QTH + ses 8 cellules voisines (grille 3x3).
+    INDISPENSABLE : une cellule geohash de précision 3 mesure ~156x156km.
+    S'abonner à une seule cellule laisse passer tout impact tombant dans
+    une cellule voisine, même à quelques dizaines de km du QTH — Blitzortung
+    publie par cellule d'origine du point, pas par distance au QTH."""
+    bits_lon = (precision * 5 + 1) // 2
+    bits_lat = (precision * 5) // 2
+    lat_step = 180.0 / (2 ** bits_lat)
+    lon_step = 360.0 / (2 ** bits_lon)
+    hashes = set()
+    for dlat in (-1, 0, 1):
+        for dlon in (-1, 0, 1):
+            nlat = max(-90.0, min(90.0, lat + dlat * lat_step))
+            nlon = ((lon + dlon * lon_step + 180) % 360) - 180
+            hashes.add(_lightning_geohash(nlat, nlon, precision))
+    return hashes
+
+def _lightning_on_message(client, userdata, msg):
+    """Callback MQTT — un message = un impact de foudre détecté par le réseau
+    communautaire Blitzortung. Format JSON : {"time":..., "lat":..., "lon":...}."""
+    try:
+        payload = json.loads(msg.payload.decode("utf-8"))
+        lat = payload.get("lat")
+        lon = payload.get("lon")
+        if lat is None or lon is None:
+            return
+        dist_km = calculate_distance(user_lat, user_lon, lat, lon)
+        if dist_km > LIGHTNING_RADIUS_KM:
+            return  # hors zone d'intérêt, on ignore
+        bearing = calculate_bearing(user_lat, user_lon, lat, lon)
+        with lightning_lock:
+            lightning_buffer.append({
+                "ts": payload.get("time", time.time() * 1e9) / 1e9 if payload.get("time", 0) > 1e12 else time.time(),
+                "lat": lat, "lon": lon,
+                "dist_km": round(dist_km, 1),
+                "bearing_deg": round(bearing, 0),
+                "bearing_compass": bearing_to_compass(bearing),
+            })
+    except Exception as e:
+        logger.debug(f"LightningWorker: message ignoré ({e})")
+
+def _lightning_on_connect(client, userdata, flags, rc, properties=None):
+    if rc == 0:
+        geohashes = _lightning_geohash_neighbors(user_lat, user_lon, precision=3)
+        for gh in sorted(geohashes):
+            client.subscribe(f"blitzortung/1.1/{gh}/#")
+        logger.info(f"LightningWorker: connecté, abonné à {len(geohashes)} cellules geohash autour du QTH : {sorted(geohashes)}")
+    else:
+        logger.warning(f"LightningWorker: échec connexion MQTT (rc={rc})")
+
+def lightning_worker():
+    """Écoute le pont MQTT communautaire Blitzortung en continu, reconnexion
+    automatique en cas de coupure. Dégrade proprement (log + retry) si le
+    service est indisponible — ne doit jamais planter le processus Flask.
+
+    NOTE IMPORTANTE : ce pont communautaire (blitzortung.ha.sed.pl, utilisé
+    par l'intégration Home Assistant "blitzortung") n'a pas de garantie de
+    service officielle. Si aucun impact n'apparaît après plusieurs heures
+    d'orage visible ailleurs, vérifier :
+      1. Que les geohash calculés correspondent bien à la bonne zone (logs
+         INFO — 9 cellules doivent être listées : QTH + 8 voisines)
+      2. Que le port 1883 sortant n'est pas bloqué par le pare-feu/routeur
+      3. Envisager d'élargir LIGHTNING_RADIUS_KM ou réduire la précision
+         du geohash (2 au lieu de 3) si la zone couverte est trop petite
+    """
+    threading.current_thread().name = 'LightningWorker'
+    logger.info("LightningWorker démarré (pont MQTT Blitzortung communautaire).")
+    try:
+        import paho.mqtt.client as mqtt
+    except ImportError:
+        logger.warning("LightningWorker: paho-mqtt non installé — module foudre désactivé. "
+                        "Installer avec: pip install paho-mqtt --break-system-packages")
+        return
+
+    while True:
+        try:
+            client = mqtt.Client()
+            client.on_connect = _lightning_on_connect
+            client.on_message = _lightning_on_message
+            client.connect("blitzortung.ha.sed.pl", 1883, keepalive=60)
+            client.loop_forever()  # bloque ici, reconnexion gérée par la boucle while externe
+        except Exception as e:
+            logger.warning(f"LightningWorker: connexion perdue ou échouée ({e}), retry dans 30s")
+            time.sleep(30)
+
+def _lightning_prune():
+    """Retire les impacts trop anciens du buffer (appelé à chaque lecture)."""
+    cutoff = time.time() - LIGHTNING_RETENTION_S
+    with lightning_lock:
+        while lightning_buffer and lightning_buffer[0]["ts"] < cutoff:
+            lightning_buffer.popleft()
+
+# ── WSPR (wspr.live) — SOURCE PRIORITAIRE pour l'indicateur d'activité ambiante ──
+# Contrairement au SNR WSJT-X (qui exige que WSJT-X soit ouvert et connecté),
+# le réseau WSPR tourne en continu 24/7 grâce aux balises d'autres opérateurs.
+# On interroge ici les rapports de réception captés par des stations proches
+# du QTH (peu importe qui transmet) : ça donne une image de l'activité radio
+# ambiante dans la région, disponible même quand l'utilisateur n'est pas au poste.
+WSPR_CACHE_TTL = 600       # 10 min — un nouveau cycle WSPR toutes les 2 min, pas besoin de plus
+WSPR_RADIUS_KM = 500       # rayon plus large que la foudre : le réseau WSPR est plus épars
+WSPR_2M_CONFIRM_RADIUS_KM = 300  # rayon plus serré pour la confirmation tropo 2m (cf. fetch_wspr_2m_confirmation)
+wspr_cache = {"data": None, "ts": 0}
+wspr_history = deque(maxlen=20)   # ~3h20 d'historique (20 x 10 min) pour les tendances
+wspr_history_lock = threading.Lock()
+
+WSPR_BAND_CODES = {
+    -1: "2200m", 0: "630m", 1: "160m", 3: "80m", 5: "60m", 7: "40m",
+    10: "30m", 14: "20m", 18: "17m", 21: "15m", 24: "12m", 28: "10m",
+    50: "6m", 70: "4m", 144: "2m", 432: "70cm", 1296: "23cm",
+}
+
+def fetch_wspr_nearby():
+    """Interroge wspr.live (base ClickHouse publique, gratuite, sans clé) pour
+    les rapports de réception captés par des stations dans WSPR_RADIUS_KM du QTH,
+    sur les 30 dernières minutes. Échoue proprement (log + cache conservé) en
+    cas de souci réseau ou de schéma de données différent de celui documenté.
+
+    Sépare volontairement HF et VHF+ : les deux ont des dynamiques de bruit
+    et de propagation très différentes (ionosphérique/atmosphérique pour HF,
+    troposphérique/Es et surtout QRM local pour VHF), donc les mélanger dans
+    une seule moyenne masquerait l'information plutôt que de l'éclairer —
+    en particulier pour une app qui suit activement le 6m/sporadic-E.
+
+    NOTE : le schéma de table utilisé ici (wspr.rx avec colonnes rx_lat/rx_lon/
+    band/snr/time) correspond à la documentation publique de wspr.live au
+    moment de l'écriture. Si l'API ne répond pas comme attendu, vérifier le
+    schéma actuel sur https://wspr.live et ajuster la requête SQL ci-dessous."""
+    global wspr_cache
+    try:
+        lat_delta = WSPR_RADIUS_KM / 111.0
+        lon_delta = WSPR_RADIUS_KM / (111.0 * max(math.cos(math.radians(user_lat)), 0.1))
+        lat_min, lat_max = user_lat - lat_delta, user_lat + lat_delta
+        lon_min, lon_max = user_lon - lon_delta, user_lon + lon_delta
+
+        sql = (
+            "SELECT band, count() AS spot_count, avg(snr) AS avg_snr, avg(distance) AS avg_dist "
+            "FROM wspr.rx "
+            "WHERE time > now() - INTERVAL 30 MINUTE "
+            f"AND rx_lat BETWEEN {lat_min:.4f} AND {lat_max:.4f} "
+            f"AND rx_lon BETWEEN {lon_min:.4f} AND {lon_max:.4f} "
+            "GROUP BY band ORDER BY spot_count DESC "
+            "FORMAT JSON"
+        )
+        resp = requests.get("https://db1.wspr.live/", params={"query": sql}, timeout=15)
+        resp.raise_for_status()
+        rows = resp.json().get("data", [])
+
+        total_spots = sum(int(r.get("spot_count", 0)) for r in rows)
+        dominant = rows[0] if rows else None
+        dominant_band = WSPR_BAND_CODES.get(int(dominant["band"]), f"{dominant['band']}MHz") if dominant else None
+        overall_avg_snr = (
+            round(sum(float(r.get("avg_snr", 0)) * int(r.get("spot_count", 0)) for r in rows) / total_spots, 1)
+            if total_spots > 0 else None
+        )
+
+        bands_list = [
+            {"band": WSPR_BAND_CODES.get(int(r["band"]), f"{r['band']}MHz"),
+             "band_code": int(r["band"]),
+             "spot_count": int(r["spot_count"]),
+             "avg_snr": round(float(r["avg_snr"]), 1)}
+            for r in rows
+        ]
+
+        # ── Agrégats séparés HF (≤ 28 : 10m et en-dessous) vs VHF+ (≥ 50 : 6m et au-dessus) ──
+        def _aggregate(subset):
+            n = sum(b["spot_count"] for b in subset)
+            if n == 0:
+                return {"total_spots": 0, "dominant_band": None, "avg_snr": None}
+            dom = max(subset, key=lambda b: b["spot_count"])
+            avg = round(sum(b["avg_snr"] * b["spot_count"] for b in subset) / n, 1)
+            return {"total_spots": n, "dominant_band": dom["band"], "avg_snr": avg}
+
+        hf_bands = [b for b in bands_list if b["band_code"] <= 28]
+        vhf_bands = [b for b in bands_list if b["band_code"] >= 50]
+
+        snapshot = {
+            "total_spots": total_spots,
+            "dominant_band": dominant_band,
+            "avg_snr": overall_avg_snr,
+            "bands": bands_list,
+            "hf": _aggregate(hf_bands),
+            "vhf": _aggregate(vhf_bands),
+        }
+        now = time.time()
+        with wspr_history_lock:
+            wspr_cache["data"] = snapshot
+            wspr_cache["ts"] = now
+            wspr_history.append((now, snapshot))
+        logger.debug(f"WsprWorker: {total_spots} spots WSPR dans {WSPR_RADIUS_KM}km, bande dominante {dominant_band}")
+    except Exception as e:
+        logger.warning(f"WsprWorker: échec fetch wspr.live ({e}) — cache conservé, repli SNR WSJT-X actif")
+
+    fetch_wspr_2m_confirmation()
+
+def fetch_wspr_2m_confirmation():
+    """Confirmation tropo VHF : spots WSPR reçus spécifiquement en 2m (144MHz)
+    dans un rayon plus serré (300km). Un spot 2m local est un signal bien plus
+    parlant qu'un spot 6m pour confirmer un vrai ducting troposphérique — le 6m
+    fonctionne aussi (et surtout) en Sporadic-E sur 1000-2500km, sans rapport
+    avec le ducting local, alors que le 2m WSPR à courte distance est presque
+    toujours d'origine troposphérique.
+
+    IMPORTANT : dépend qu'un opérateur balise activement en 2m WSPR à proximité.
+    Zéro spot ne veut PAS dire 'pas d'ouverture' — juste 'pas de balise
+    disponible pour confirmer'. Ne jamais présenter l'absence de donnée comme
+    une absence de condition favorable (même principe que partout ailleurs
+    dans le module météo : Blitzortung, SNR WSJT-X, etc.)."""
+    global wspr_cache
+    try:
+        lat_delta = WSPR_2M_CONFIRM_RADIUS_KM / 111.0
+        lon_delta = WSPR_2M_CONFIRM_RADIUS_KM / (111.0 * max(math.cos(math.radians(user_lat)), 0.1))
+        lat_min, lat_max = user_lat - lat_delta, user_lat + lat_delta
+        lon_min, lon_max = user_lon - lon_delta, user_lon + lon_delta
+
+        sql = (
+            "SELECT count() AS spot_count, avg(snr) AS avg_snr, avg(distance) AS avg_dist "
+            "FROM wspr.rx "
+            "WHERE band = 144 AND time > now() - INTERVAL 30 MINUTE "
+            f"AND rx_lat BETWEEN {lat_min:.4f} AND {lat_max:.4f} "
+            f"AND rx_lon BETWEEN {lon_min:.4f} AND {lon_max:.4f} "
+            "FORMAT JSON"
+        )
+        resp = requests.get("https://db1.wspr.live/", params={"query": sql}, timeout=15)
+        resp.raise_for_status()
+        rows = resp.json().get("data", [])
+        row = rows[0] if rows else {}
+        spot_count = int(row.get("spot_count", 0) or 0)
+
+        confirmation = {
+            "spot_count": spot_count,
+            "avg_snr": round(float(row["avg_snr"]), 1) if spot_count > 0 and row.get("avg_snr") is not None else None,
+            "avg_dist_km": round(float(row["avg_dist"]), 0) if spot_count > 0 and row.get("avg_dist") is not None else None,
+            "radius_km": WSPR_2M_CONFIRM_RADIUS_KM,
+            "beacon_available": spot_count > 0,
+        }
+        if wspr_cache.get("data") is not None:
+            wspr_cache["data"]["confirmation_2m"] = confirmation
+        logger.debug(f"WsprWorker: confirmation 2m — {spot_count} spot(s) dans {WSPR_2M_CONFIRM_RADIUS_KM}km")
+    except Exception as e:
+        logger.warning(f"WsprWorker: échec fetch confirmation 2m ({e})")
+
+def wspr_worker():
+    threading.current_thread().name = 'WsprWorker'
+    logger.info("WsprWorker démarré (update activité WSPR ambiante toutes les 10 min).")
+    fetch_wspr_nearby()
+    while True:
+        time.sleep(WSPR_CACHE_TTL)
+        fetch_wspr_nearby()
+
+def get_wspr_snapshot_near(seconds_ago, tolerance_s=900):
+    """Retourne le snapshot WSPR historique le plus proche de 'il y a X secondes',
+    ou None si aucun snapshot dans la tolérance donnée."""
+    target = time.time() - seconds_ago
+    with wspr_history_lock:
+        candidates = [(abs(ts - target), snap) for ts, snap in wspr_history]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0])
+    best_diff, best_snap = candidates[0]
+    return best_snap if best_diff <= tolerance_s else None
+
+def get_ambient_activity():
+    """Indicateur d'activité radio ambiante : WSPR en priorité (fonctionne 24/7,
+    aucune dépendance à WSJT-X), repli sur le SNR WSJT-X si WSPR est indisponible
+    ou vide (zone à faible densité de balises). La source utilisée est toujours
+    explicitée pour rester honnête sur l'origine de la donnée affichée.
+
+    Utilise spécifiquement l'agrégat HF (pas le mélange HF+VHF) : le QRN
+    atmosphérique/foudre affecte presque exclusivement le HF (bruit ionosphérique
+    et atmosphérique), le VHF étant dominé par d'autres facteurs (Es, QRM local).
+    Mélanger les deux masquerait le signal plutôt que de l'éclairer."""
+    wspr_now = wspr_cache.get("data")
+    hf_now = wspr_now.get("hf") if wspr_now else None
+    if hf_now and hf_now.get("total_spots", 0) > 0:
+        wspr_1h_ago = get_wspr_snapshot_near(3600, tolerance_s=900)
+        hf_1h_ago = wspr_1h_ago.get("hf") if wspr_1h_ago else None
+        return {
+            "source": "wspr",
+            "band": hf_now.get("dominant_band"),
+            "value_now": hf_now.get("avg_snr"),
+            "spot_count_now": hf_now.get("total_spots"),
+            "value_1h_ago": hf_1h_ago.get("avg_snr") if hf_1h_ago else None,
+            "spot_count_1h_ago": hf_1h_ago.get("total_spots") if hf_1h_ago else None,
+        }
+
+    # Repli : SNR WSJT-X (nécessite WSJT-X ouvert et connecté)
+    snr_now = get_snr_rolling_average(0, 1200)
+    if snr_now is not None:
+        return {
+            "source": "wsjtx",
+            "band": get_snr_reference_band(1200),
+            "value_now": snr_now,
+            "value_1h_ago": get_snr_rolling_average(3600, 4800),
+        }
+
+    return {"source": "none", "band": None, "value_now": None, "value_1h_ago": None}
+
+# ── Corrélation bruit / météo ────────────────────────────────────────────
+def _s_unit_hint(delta_db):
+    """Convertit un écart en dB en équivalent 'points S' (repère radioamateur
+    standard : ~6dB = 1 point S sur la plupart des S-mètres). Purement
+    indicatif — ne prétend pas être une mesure calibrée."""
+    s_points = round(abs(delta_db) / 6)
+    if s_points < 1:
+        return None
+    return s_points
+
+def compute_noise_correlation():
+    """Synthèse factuelle (jamais causale à tort) croisant l'activité radio
+    ambiante et le QRN (bruit électrique/atmosphérique, foudre) récent. Cf.
+    section 4.4 de ARCHITECTURE_METEO.md. Source prioritaire : spots WSPR
+    captés par des stations proches du QTH (fonctionne 24/7, aucune
+    dépendance à WSJT-X). Repli : SNR WSJT-X si WSPR indisponible ou zone à
+    faible densité de balises. La source utilisée est toujours explicitée.
+    Vocabulaire volontairement radioamateur (QRN, points S) pour parler
+    directement aux techniciens plutôt qu'en jargon météo générique."""
+    _lightning_prune()
+
+    activity = get_ambient_activity()
+    source = activity["source"]
+    ref_band = activity.get("band")
+    value_now = activity.get("value_now")
+    value_1h_ago = activity.get("value_1h_ago")
+
+    with lightning_lock:
+        recent_strikes = [s for s in lightning_buffer if time.time() - s["ts"] <= 1800]  # 30 min
+        strikes_close = [s for s in recent_strikes if s["dist_km"] <= 50]
+
+    # ── Bloc activité radio ambiante (bilingue, séparé du QRN) ──────────
+    if source == "wspr":
+        spot_count = activity.get("spot_count_now", 0)
+        if value_1h_ago is not None and value_now is not None:
+            delta = round(value_now - value_1h_ago, 1)
+            s_pts = _s_unit_hint(delta)
+            s_hint_fr = f" (≈ {s_pts} point{'s' if s_pts > 1 else ''} S)" if s_pts else ""
+            s_hint_en = f" (≈ {s_pts} S-point{'s' if s_pts > 1 else ''})" if s_pts else ""
+            if abs(delta) >= 2:
+                sign_fr = "en baisse" if delta < 0 else "en hausse"
+                sign_en = "down" if delta < 0 else "up"
+                activity_fr = (
+                    f"Sur {ref_band}, le SNR moyen des balises WSPR captées près de ton QTH est {sign_fr} "
+                    f"de {abs(delta)} dB en 1h{s_hint_fr} — actuellement {value_now} dB sur {spot_count} rapports."
+                )
+                activity_en = (
+                    f"On {ref_band}, the average SNR of WSPR beacons near your QTH is {sign_en} "
+                    f"{abs(delta)} dB over 1h{s_hint_en} — currently {value_now} dB across {spot_count} reports."
+                )
+            else:
+                activity_fr = f"Sur {ref_band}, SNR WSPR stable ({value_now} dB, {spot_count} rapports) — pas de variation notable."
+                activity_en = f"On {ref_band}, WSPR SNR stable ({value_now} dB, {spot_count} reports) — no notable change."
+        else:
+            activity_fr = f"Sur {ref_band}, {spot_count} rapports WSPR, SNR moyen {value_now} dB (historique insuffisant pour une tendance)."
+            activity_en = f"On {ref_band}, {spot_count} WSPR reports, average SNR {value_now} dB (not enough history for a trend)."
+
+    elif source == "wsjtx":
+        if value_1h_ago is not None and value_now is not None:
+            delta = round(value_now - value_1h_ago, 1)
+            s_pts = _s_unit_hint(delta)
+            s_hint_fr = f" (≈ {s_pts} point{'s' if s_pts > 1 else ''} S)" if s_pts else ""
+            s_hint_en = f" (≈ {s_pts} S-point{'s' if s_pts > 1 else ''})" if s_pts else ""
+            if abs(delta) >= 2:
+                sign_fr = "en baisse" if delta < 0 else "en hausse"
+                sign_en = "down" if delta < 0 else "up"
+                activity_fr = (
+                    f"Pas de balise WSPR à proximité — repli sur ta station : SNR FT8/FT4 sur {ref_band} "
+                    f"{sign_fr} de {abs(delta)} dB en 1h{s_hint_fr} (actuellement {value_now} dB)."
+                )
+                activity_en = (
+                    f"No nearby WSPR beacons — falling back to your station: FT8/FT4 SNR on {ref_band} "
+                    f"{sign_en} {abs(delta)} dB over 1h{s_hint_en} (currently {value_now} dB)."
+                )
+            else:
+                activity_fr = f"Pas de balise WSPR à proximité — SNR FT8/FT4 stable sur {ref_band} ({value_now} dB)."
+                activity_en = f"No nearby WSPR beacons — FT8/FT4 SNR stable on {ref_band} ({value_now} dB)."
+        else:
+            activity_fr = f"Pas de balise WSPR à proximité — SNR FT8/FT4 actuel sur {ref_band} : {value_now} dB."
+            activity_en = f"No nearby WSPR beacons — current FT8/FT4 SNR on {ref_band}: {value_now} dB."
+    else:
+        activity_fr = "Aucune donnée : pas de balise WSPR captée et WSJT-X non connecté."
+        activity_en = "No data: no WSPR beacon received and WSJT-X not connected."
+
+    # ── Bloc VHF/6m (bilingue, distinct du HF — dynamiques différentes) ──
+    wspr_snap = wspr_cache.get("data")
+    vhf_data = wspr_snap.get("vhf") if wspr_snap else None
+    if vhf_data and vhf_data.get("total_spots", 0) > 0:
+        vhf_fr = (
+            f"En VHF, {vhf_data['total_spots']} rapports WSPR captés sur {vhf_data['dominant_band']} "
+            f"(SNR moyen {vhf_data['avg_snr']} dB) — une ouverture Es ou une propagation "
+            f"troposphérique est possible, indépendamment du QRN HF ci-dessus."
+        )
+        vhf_en = (
+            f"On VHF, {vhf_data['total_spots']} WSPR reports received on {vhf_data['dominant_band']} "
+            f"(average SNR {vhf_data['avg_snr']} dB) — an Es opening or tropospheric propagation "
+            f"is possible, independent of the HF QRN above."
+        )
+    else:
+        vhf_fr = "Aucune balise WSPR VHF (6m et au-dessus) captée actuellement dans la zone."
+        vhf_en = "No VHF (6m and above) WSPR beacons currently received in the area."
+
+    # Confirmation tropo 2m (300km) : signal plus fiable que le 6m pour le ducting local,
+    # mais dépend qu'une balise 2m WSPR soit active à proximité — jamais présenté comme
+    # "pas d'ouverture" en son absence, seulement "pas de confirmation disponible".
+    confirm_2m = wspr_snap.get("confirmation_2m") if wspr_snap else None
+    if confirm_2m and confirm_2m.get("beacon_available"):
+        dist_txt = f", à ~{int(confirm_2m['avg_dist_km'])}km" if confirm_2m.get("avg_dist_km") else ""
+        dist_txt_en = f", ~{int(confirm_2m['avg_dist_km'])}km away" if confirm_2m.get("avg_dist_km") else ""
+        vhf_fr += (
+            f" Confirmation 2m (300km) : {confirm_2m['spot_count']} spot"
+            f"{'s' if confirm_2m['spot_count'] > 1 else ''} WSPR reçu{'s' if confirm_2m['spot_count'] > 1 else ''}"
+            f"{dist_txt} (SNR {confirm_2m['avg_snr']} dB) — signe assez fiable d'un vrai ducting tropo local."
+        )
+        vhf_en += (
+            f" 2m confirmation (300km): {confirm_2m['spot_count']} WSPR spot"
+            f"{'s' if confirm_2m['spot_count'] > 1 else ''} received{dist_txt_en} "
+            f"(SNR {confirm_2m['avg_snr']} dB) — a fairly reliable sign of real local tropo ducting."
+        )
+    else:
+        vhf_fr += " Confirmation 2m (300km) : aucune balise 2m disponible pour confirmer (pas d'opérateur actif à proximité — ne signifie pas absence d'ouverture)."
+        vhf_en += " 2m confirmation (300km): no 2m beacon available to confirm (no active operator nearby — does not mean no opening)."
+
+    # ── Bloc QRN / foudre (bilingue, séparé) ────────────────────────────
+    if strikes_close:
+        closest = min(strikes_close, key=lambda s: s["dist_km"])
+        n = len(strikes_close)
+        lightning_fr = (
+            f"{n} impact{'s' if n > 1 else ''} < 50 km dans les 30 dernières minutes "
+            f"(le plus proche : {closest['dist_km']} km {closest['bearing_compass']}) — "
+            f"un QRN élevé sur les bandes basses (80/40m) est probable."
+        )
+        lightning_en = (
+            f"{n} strike{'s' if n > 1 else ''} within 50 km in the last 30 minutes "
+            f"(closest: {closest['dist_km']} km {closest['bearing_compass']}) — "
+            f"expect elevated QRN on the lower bands (80/40m)."
+        )
+    elif recent_strikes:
+        n = len(recent_strikes)
+        lightning_fr = f"{n} impacts dans un rayon de {LIGHTNING_RADIUS_KM} km, mais > 50 km — QRN local probablement peu affecté."
+        lightning_en = f"{n} strikes within {LIGHTNING_RADIUS_KM} km, but beyond 50 km — local QRN likely not much affected."
+    else:
+        lightning_fr = f"Aucun impact détecté dans un rayon de {LIGHTNING_RADIUS_KM} km — pas de QRN orageux attendu."
+        lightning_en = f"No strikes detected within {LIGHTNING_RADIUS_KM} km — no storm-related QRN expected."
+
+    summary_fr = f"{activity_fr} {vhf_fr} {lightning_fr}"
+    summary_en = f"{activity_en} {vhf_en} {lightning_en}"
+
+    # ── Niveau global (jauge visuelle) ──────────────────────────────────
+    # Score heuristique simple, jamais présenté comme une mesure scientifique :
+    # sert uniquement à donner un repère visuel rapide (calme → orageux).
+    score = 0
+    if value_now is not None and value_1h_ago is not None:
+        delta = value_now - value_1h_ago
+        if delta <= -6:
+            score += 3
+        elif delta <= -3:
+            score += 2
+        elif delta <= -1.5:
+            score += 1
+    if strikes_close:
+        score += min(len(strikes_close), 3)
+    elif recent_strikes:
+        score += 1
+
+    if score >= 5:
+        level, level_fr, level_en = "stormy", "Orageux", "Stormy"
+    elif score >= 3:
+        level, level_fr, level_en = "disturbed", "Perturbé", "Disturbed"
+    elif score >= 1:
+        level, level_fr, level_en = "elevated", "Élevé", "Elevated"
+    else:
+        level, level_fr, level_en = "calm", "Calme", "Calm"
+
+    return {
+        "summary_fr": summary_fr,
+        "summary_en": summary_en,
+        "summary": summary_fr,  # rétrocompatibilité : garder une clé simple = FR par défaut
+        "activity_fr": activity_fr,
+        "activity_en": activity_en,
+        "vhf_fr": vhf_fr,
+        "vhf_en": vhf_en,
+        "vhf_data": vhf_data,
+        "lightning_fr": lightning_fr,
+        "lightning_en": lightning_en,
+        "source": source,
+        "reference_band": ref_band,
+        "value_now": value_now,
+        "value_1h_ago": value_1h_ago,
+        "lightning_count_30min": len(recent_strikes),
+        "lightning_count_close_50km": len(strikes_close),
+        "level": level,
+        "level_label_fr": level_fr,
+        "level_label_en": level_en,
+        "ts": time.time(),
+    }
+
+def compute_global_synthesis():
+    """Jauge de synthèse HF/VHF — heuristique transparente, PAS une mesure
+    physique calibrée. HF dérivé du niveau QRN (compute_noise_correlation).
+    VHF dérivé de la présence/qualité des spots WSPR VHF + de l'indice tropo.
+    Si une donnée manque, retourne None pour cette composante plutôt que
+    d'inventer un chiffre — le frontend doit afficher '—' dans ce cas."""
+    correlation = compute_noise_correlation()
+    level_to_pct = {"calm": 92, "elevated": 70, "disturbed": 45, "stormy": 20}
+    hf_pct = level_to_pct.get(correlation.get("level"))
+
+    vhf_pct = None
+    wspr_snap = wspr_cache.get("data")
+    vhf_data = wspr_snap.get("vhf") if wspr_snap else None
+    weather = weather_cache.get("data") or {}
+    tropo_index = weather.get("tropo_index")
+
+    if vhf_data and vhf_data.get("total_spots", 0) > 0:
+        snr = vhf_data.get("avg_snr") or -20
+        vhf_pct = max(0, min(100, round((snr + 25) * 4)))
+        if tropo_index is not None:
+            vhf_pct = round(vhf_pct * 0.7 + (tropo_index * 10) * 0.3)
+    elif tropo_index is not None:
+        vhf_pct = round(tropo_index * 10 * 0.6)
+
+    components = [p for p in (hf_pct, vhf_pct) if p is not None]
+    global_pct = round(sum(components) / len(components)) if components else None
+
+    return {
+        "global_pct": global_pct,
+        "hf_pct": hf_pct,
+        "vhf_pct": vhf_pct,
+        "hf_level": correlation.get("level"),
+        "hf_level_label_fr": correlation.get("level_label_fr"),
+        "note": "Indice heuristique, pas une mesure physique calibrée.",
+    }
+
+def get_band_activity_24h():
+    """Nombre de spots reçus par bande sur 24h, séparés HF/VHF+, depuis
+    spot_history. Base l'affichage du pavé 'Activité par bande'."""
+    cutoff = time.time() - 86400
+    counts = Counter()
+    with spot_history_lock:
+        for entry in spot_history:
+            if entry.get("ts", 0) >= cutoff and entry.get("band"):
+                counts[entry["band"]] += 1
+
+    hf_order = ["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"]
+    vhf_order = ["6m", "4m", "2m", "70cm", "23cm"]
+
+    hf = [{"band": b, "count": counts.get(b, 0)} for b in hf_order if counts.get(b, 0) > 0]
+    vhf = [{"band": b, "count": counts.get(b, 0)} for b in vhf_order if counts.get(b, 0) > 0]
+    return {"hf": hf, "vhf": vhf, "window_h": 24, "truncated": len(spot_history) >= SPOT_HISTORY_MAX}
+
+def get_weather_alerts():
+    """Alertes dérivées uniquement de données réellement mesurées — jamais
+    de conditions fabriquées (pas d'inversion/ducting annoncée sans que
+    l'indice tropo calculé ne la confirme réellement)."""
+    alerts = []
+    now = time.time()
+
+    correlation = compute_noise_correlation()
+    if correlation.get("level") in ("disturbed", "stormy"):
+        alerts.append({
+            "type": "storm", "icon": "⚡",
+            "title": "QRN élevé" if correlation["level"] == "disturbed" else "QRN fort",
+            "detail": "Impact possible sur le HF (bruit de fond)",
+            "ts": now,
+        })
+
+    wspr_snap = wspr_cache.get("data")
+    vhf_data = wspr_snap.get("vhf") if wspr_snap else None
+    if vhf_data and vhf_data.get("total_spots", 0) >= 5:
+        alerts.append({
+            "type": "opening", "icon": "📡",
+            "title": "Activité VHF détectée",
+            "detail": f"{vhf_data['total_spots']} spots WSPR sur {vhf_data.get('dominant_band', 'VHF')} — ouverture possible",
+            "ts": now,
+        })
+
+    weather = weather_cache.get("data") or {}
+    if weather.get("ducting_risk") == "élevé":
+        alerts.append({
+            "type": "ducting", "icon": "🌫️",
+            "title": "Ducting tropo probable",
+            "detail": "Inversion de température détectée — conditions VHF/UHF potentiellement favorables",
+            "ts": now,
+        })
+
+    pressure_trend = get_pressure_trend()
+    if pressure_trend and pressure_trend.get("trend") == "falling" and pressure_trend.get("delta_hpa", 0) <= -4:
+        alerts.append({
+            "type": "pressure", "icon": "🔽",
+            "title": "Baisse barométrique rapide",
+            "detail": f"{pressure_trend['delta_hpa']} hPa/2h — dégradation météo possible",
+            "ts": now,
+        })
+
+    return alerts
+
+# ══════════════════════════════════════════════════════════════════════════
+# FIN MODULE MÉTÉO
+# ══════════════════════════════════════════════════════════════════════════
+
+
 
 
 def cluster_spots(spots, max_dist_km=800):
@@ -3024,16 +3840,52 @@ def _load_briefing_sources():
             pass
     return BRIEFING_DEFAULT_SOURCES
 
-def _fetch_feed(url: str):
-    req = urllib.request.Request(url, headers={"User-Agent": BRIEFING_USER_AGENT, "Accept": "*/*"})
-    with urllib.request.urlopen(req, timeout=BRIEFING_FEED_TIMEOUT) as r:
-        data = r.read()
-    return feedparser.parse(data)
+def _fetch_feed(url: str, retries: int = 2, retry_delay_s: float = 2.0):
+    last_exc = None
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(url, headers={"User-Agent": BRIEFING_USER_AGENT, "Accept": "*/*"})
+        try:
+            with urllib.request.urlopen(req, timeout=BRIEFING_FEED_TIMEOUT) as r:
+                data = r.read()
+            return feedparser.parse(data)
+        except Exception as e:
+            last_exc = e
+            is_dns_error = "name resolution" in str(e) or "Errno -3" in str(e) or "Errno -2" in str(e)
+            if attempt < retries and is_dns_error:
+                logger.warning(f"_fetch_feed: échec DNS/réseau sur {url} ({e}) — retry {attempt+1}/{retries} dans {retry_delay_s}s")
+                time.sleep(retry_delay_s)
+                continue
+            raise
+    raise last_exc
 
-def _fetch_html(url: str):
-    req = urllib.request.Request(url, headers={"User-Agent": BRIEFING_USER_AGENT, "Accept": "text/html,*/*"})
-    with urllib.request.urlopen(req, timeout=BRIEFING_FEED_TIMEOUT) as r:
-        return r.read().decode("utf-8", errors="ignore")
+def _fetch_html(url: str, retries: int = 2, retry_delay_s: float = 2.0):
+    """Fetch HTML avec retry sur erreurs réseau transitoires (DNS, timeout).
+    Une résolution DNS qui échoue une fois n'est pas forcément un vrai
+    problème — un court retry évite de perdre tout un cycle de refresh
+    pour un blip réseau passager."""
+    last_exc = None
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(url, headers={
+            "User-Agent": BRIEFING_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,*/*",
+            "Accept-Language": "en-US,en;q=0.9,fr-FR;q=0.8",
+        })
+        try:
+            with urllib.request.urlopen(req, timeout=BRIEFING_FEED_TIMEOUT) as r:
+                return r.read().decode("utf-8", errors="ignore")
+        except urllib.error.HTTPError as e:
+            logger.warning(f"_fetch_html: HTTP {e.code} sur {url} — probable blocage anti-bot (User-Agent/Cloudflare)")
+            raise  # une erreur HTTP (403 etc.) ne se résoudra pas avec un retry immédiat
+        except Exception as e:
+            last_exc = e
+            is_dns_error = "name resolution" in str(e) or "Errno -3" in str(e) or "Errno -2" in str(e)
+            if attempt < retries and is_dns_error:
+                logger.warning(f"_fetch_html: échec DNS/réseau sur {url} ({e}) — retry {attempt+1}/{retries} dans {retry_delay_s}s")
+                time.sleep(retry_delay_s)
+                continue
+            logger.warning(f"_fetch_html: échec sur {url} ({e})")
+            raise
+    raise last_exc
 
 def fetch_qo100_news(timeout: int = 10):
     """
@@ -3299,6 +4151,13 @@ def _build_briefing_payload(limit: int = BRIEFING_ITEM_LIMIT):
                 if source_id != "qo100dx":
                     html_text = _fetch_html(src["url"])
                 extracted = _extract_html_items(source_id, html_text, limit)
+                if html_text and not extracted:
+                    logger.warning(
+                        f"_build_briefing_payload: source '{source_id}' — fetch OK "
+                        f"({len(html_text)} octets reçus) mais 0 article extrait. "
+                        f"Les sélecteurs CSS dans _extract_html_items() sont probablement "
+                        f"obsolètes (structure HTML du site changée) — à vérifier."
+                    )
                 for entry in extracted:
                     items.append({
                         "title": entry.get("title") or "Sans titre",
@@ -3390,6 +4249,37 @@ wsjtx_state = {
 
 # Buffer spécifique spots WSJT-X (pour affichage dédié)
 wsjtx_spots = deque(maxlen=200)
+
+# ── Module Météo : échantillon SNR non filtré (tous décodages, pas seulement CQ/calling_me) ──
+# Utilisé pour la moyenne glissante SNR (indicateur de bruit local), cf. compute_noise_correlation()
+snr_buffer = deque(maxlen=600)  # ~ jusqu'à 20-30 min de décodages selon le débit
+snr_buffer_lock = threading.Lock()
+
+def get_snr_rolling_average(window_start_s=0, window_end_s=1200):
+    """Moyenne SNR sur une fenêtre glissante définie en secondes dans le passé.
+    Par défaut : moyenne sur les 20 dernières minutes (0 à 1200s en arrière).
+    Pour comparer avec 'il y a 1h', appeler avec window_start_s=3600, window_end_s=4200."""
+    now = time.time()
+    lo = now - window_end_s
+    hi = now - window_start_s
+    with snr_buffer_lock:
+        values = [snr for (ts, snr, mode, band) in snr_buffer if lo <= ts <= hi]
+    if not values:
+        return None
+    return round(sum(values) / len(values), 1)
+
+def get_snr_reference_band(window_s=1200):
+    """Bande la plus représentée dans l'échantillon SNR récent (20 min par défaut).
+    C'est LA bande à laquelle se rapporte la moyenne SNR affichée — indispensable
+    pour que l'utilisateur sache de quoi parle le pavé corrélation (le SNR n'a pas
+    le même sens/niveau de bruit d'une bande à l'autre)."""
+    now = time.time()
+    lo = now - window_s
+    with snr_buffer_lock:
+        bands = [band for (ts, snr, mode, band) in snr_buffer if ts >= lo and band]
+    if not bands:
+        return None
+    return Counter(bands).most_common(1)[0][0]
 
 # ── Constantes message type WSJT-X ──
 WSJTX_MAGIC   = 0xadbccbda
@@ -3802,6 +4692,18 @@ def wsjtx_worker():
                         wsjtx_state["last_decode"] = dec
                         dial_freq = wsjtx_state["dial_freq"]
                         wsjtx_mode = wsjtx_state["mode"]
+
+                    # Accumule TOUS les décodages (pas seulement CQ/calling_me) pour la
+                    # moyenne glissante SNR utilisée par le module Météo (corrélation bruit).
+                    # La bande est dérivée du dial_freq courant — c'est la bande de référence
+                    # affichée dans le pavé "Corrélation bruit/météo".
+                    try:
+                        snr_band = find_band((dial_freq or 0) / 1000.0) if dial_freq else None
+                        with snr_buffer_lock:
+                            snr_buffer.append((time.time(), dec.get("snr", 0), wsjtx_mode, snr_band))
+                    except Exception:
+                        pass
+
                     _wsjtx_inject_spot(dec, dial_freq, wsjtx_mode)
 
                 elif msg_type == MSG_QSOLOG:
@@ -3956,6 +4858,89 @@ def api_briefing():
         briefing_cache["payload"] = payload
     return jsonify(payload)
 
+
+
+@app.route("/api/weather/local.json")
+def api_weather_local():
+    """Snapshot des conditions locales (Open-Meteo, cache 10 min) + tendance
+    barométrique sur ~2h (indicateur météo réel : une baisse rapide de
+    pression est un signe fiable de dégradation à venir)."""
+    data = weather_cache.get("data")
+    if data is None:
+        return jsonify({"ok": False, "error": "Pas encore de données météo disponibles"}), 503
+    return jsonify({
+        "ok": True,
+        **data,
+        "pressure_trend": get_pressure_trend(),
+        "fetched_at": weather_cache.get("ts"),
+        "age_s": int(time.time() - weather_cache.get("ts", time.time())),
+    })
+
+
+@app.route("/api/weather/lightning.json")
+def api_weather_lightning():
+    """Impacts de foudre de la dernière heure dans le rayon d'intérêt."""
+    _lightning_prune()
+    with lightning_lock:
+        strikes = sorted(lightning_buffer, key=lambda s: s["ts"], reverse=True)
+    now = time.time()
+    for s in strikes:
+        s["age_s"] = int(now - s["ts"])
+    return jsonify({
+        "ok": True,
+        "count_1h": len(strikes),
+        "strikes": strikes[:100],  # cap raisonnable pour le payload JSON
+        "radius_km": LIGHTNING_RADIUS_KM,
+        "ts": now,
+    })
+
+
+@app.route("/api/weather/wspr.json")
+def api_weather_wspr():
+    """Snapshot WSPR courant (débogage/transparence — source prioritaire
+    de la corrélation bruit/météo)."""
+    data = wspr_cache.get("data")
+    if data is None:
+        return jsonify({"ok": False, "error": "Pas encore de données WSPR disponibles"}), 503
+    return jsonify({
+        "ok": True,
+        **data,
+        "radius_km": WSPR_RADIUS_KM,
+        "fetched_at": wspr_cache.get("ts"),
+        "age_s": int(time.time() - wspr_cache.get("ts", time.time())),
+    })
+
+
+@app.route("/api/weather/synthesis.json")
+def api_weather_synthesis():
+    """Jauge de synthèse HF/VHF pour le nouveau dashboard météo."""
+    return jsonify(compute_global_synthesis())
+
+
+@app.route("/api/weather/band_activity.json")
+def api_weather_band_activity():
+    """Activité par bande (spots/24h), séparée HF/VHF."""
+    return jsonify(get_band_activity_24h())
+
+
+@app.route("/api/weather/alerts.json")
+def api_weather_alerts():
+    """Alertes dérivées des données réelles (QRN, VHF, ducting, pression)."""
+    return jsonify({"alerts": get_weather_alerts(), "ts": time.time()})
+
+
+@app.route("/api/weather/correlation.json")
+def api_weather_correlation():
+    """Synthèse texte de corrélation bruit local / activité électrique."""
+    return jsonify(compute_noise_correlation())
+
+
+@app.route("/weather")
+def weather_page():
+    return render_template("weather.html", version=APP_VERSION, my_call=MY_CALL,
+                           qth_lat=user_lat, qth_lon=user_lon,
+                           lightning_radius_km=LIGHTNING_RADIUS_KM,
+                           band_colors=BAND_COLORS)
 
 
 @app.route('/history.json')
@@ -5896,6 +6881,9 @@ if __name__ == "__main__":
     threading.Thread(target=history_maintenance_worker, daemon=True).start()
     threading.Thread(target=briefing_refresh_worker, daemon=True).start()
     threading.Thread(target=wsjtx_worker, daemon=True).start()
+    threading.Thread(target=weather_worker, daemon=True).start()
+    threading.Thread(target=lightning_worker, daemon=True).start()
+    threading.Thread(target=wspr_worker, daemon=True).start()
 
     def _freq_preload_worker():
         """

@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v11.5
+# ⚡ Neural DX Watcher — v12.0
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -224,6 +224,37 @@ Aucune dépendance cloud.
 ---
 
 ## 🗂️ Historique des versions
+
+### v12.0 — Refonte majeure : historique enrichi, module Météo, config persistante
+
+- **Pavé HISTORIQUE refondu** : passage de "30min/12h" à **"5 dernières heures"**, avec affichage des **calls marquants par score SPD** (top 5 par tranche horaire, triés par rareté), caractères agrandis et thème orange pour une meilleure lisibilité
+- **Configuration persistante** : MY_CALL et user_qra sauvegardés dans `data/config.json`, restaurés automatiquement à chaque redémarrage — plus besoin de ressaisir
+- **Opportunités DXCC** : polling automatique toutes les 30 min (LoTW actif + panel visible)
+- **Fix titre onglet navigateur** : le `<title>` de la page était hardcodé en "v11.3" depuis plusieurs versions, ne suivait jamais `APP_VERSION` — corrigé pour afficher dynamiquement la version courante
+
+#### 🌦️ Nouveau : Module Météo (Phase 1)
+
+Nouvel onglet **⛈️ MÉTÉO** — première phase du module décrit dans
+`ARCHITECTURE_METEO.md`. Objectif : répondre à "les conditions météo
+expliquent-elles ce que j'observe sur les bandes ?"
+
+- **Conditions locales** (Open-Meteo, gratuit, sans clé) : température, pression, humidité, vent, précipitations — position QTH réutilisée automatiquement, aucune config supplémentaire
+- **Activité électrique** (pont MQTT communautaire Blitzortung) : impacts de foudre dans un rayon de 300 km, distance et direction (cap + point cardinal), historique 1h
+- **Corrélation bruit/météo bilingue FR/EN** : synthèse factuelle et explicative de l'activité radio ambiante, croisée avec l'activité électrique récente — **indique toujours la source et la bande de référence** utilisées (un SNR de 12dB n'a pas le même sens sur 40m que sur 10m) — formulée en observations, jamais en affirmations causales non prouvées
+  - **Source prioritaire : spots WSPR** captés par des stations proches du QTH (via [wspr.live](https://wspr.live), gratuit, sans clé) — fonctionne **24/7**, aucune dépendance à WSJT-X ouvert
+  - **Repli automatique : SNR WSJT-X** (nouveau `snr_buffer`, alimenté par *tous* les décodages FT8/FT4 reçus, pas seulement ceux affichés dans le DX Feed) si aucune balise WSPR n'est captée dans la zone
+- Nouvelle route API : `/api/weather/local.json`, `/api/weather/lightning.json`, `/api/weather/wspr.json`, `/api/weather/correlation.json`
+- Nouvelle page : `/weather`
+
+**⚠️ Nouvelle dépendance Python** : `paho-mqtt` (pour le flux foudre)
+```bash
+pip install paho-mqtt --break-system-packages
+```
+Sans cette dépendance, l'application démarre normalement — le module foudre se désactive proprement (log d'avertissement) et le reste de l'app n'est pas affecté.
+
+**⚠️ Fiabilité du flux foudre** : le pont Blitzortung communautaire n'a pas de garantie de service officielle. Si aucun impact n'apparaît malgré un orage visible ailleurs, voir les notes de dépannage dans les commentaires de `lightning_worker()` (webapp.py).
+
+Phases 2 (radar pluie sur carte) et 3 (synthèse IA, historique long terme) non incluses — voir `ARCHITECTURE_METEO.md`.
 
 ### v11.5 — Configuration persistante · MY_CALL & QRA en data/config.json
 
