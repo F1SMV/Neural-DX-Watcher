@@ -1,4 +1,4 @@
-# ⚡ Neural DX Watcher — v12.0
+# ⚡ Neural DX Watcher — v12.1
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
@@ -46,7 +46,8 @@ Sauvegarde et relance Flask.
 - intègre les **indices solaires** (SFI, A, Kp…)
 - conserve une **mémoire exploitable** de l'activité
 - propose **plusieurs niveaux de lecture**, du live à l'analyse stratégique
-- **prédit** les ouvertures probables selon ton activité et tes DXCC manquants, avec une **fiabilité mesurée** (pas affichée arbitrairement)
+- **prédit** les ouvertures probables selon ton activité et tes DXCC manquants
+- inclut un **module Météo Radio** complet (propagation, foudre, WSPR, balises)
 - accessible via **HTTPS sécurisé** (reverse proxy + Let's Encrypt) pour un usage distant
 
 > L'objectif n'est pas de voir beaucoup,  
@@ -65,95 +66,115 @@ Page d'observation immédiate. Elle affiche :
 - les indices solaires (SFI, A-index, K-index)
 - les signaux de **surge** d'activité (HF, 6m et 2m)
 
-👉 **Objectif : savoir ce qui se passe maintenant.**
-
----
-
 ### 📡 Pavé **WATCHLIST · Tracking**
 
-Fonction introduite pour répondre à un besoin simple :
 > *« Je n'étais pas devant l'écran : qu'ai-je raté ? »*
 
 - basé sur la watchlist
 - exploite un historique en mémoire
 - affiche les derniers spots par indicatif
 
-Philosophie :
-- ❌ pas un log brut
-- ❌ pas un dump massif
-- ✅ un outil de rattrapage
-- ✅ pensé pour l'opérateur humain
-
----
-
-### 📶 Pavé **MY SIGNAL** — Self-monitoring PSK Reporter *(v10.5)*
+### 📶 Pavé **MY SIGNAL** — Self-monitoring PSK Reporter
 
 > *« Qui m'entend, où, avec quel SNR ? »* — sans jamais quitter l'application.
 
-- Source : API PSK Reporter, interrogée en JSONP
+- Source : API PSK Reporter (JSONP), cache 5 min (limite serveur officielle)
 - Toutes bandes HF/VHF/UHF, tous modes digitaux (FT8/FT4/WSPR/JT65/JS8/MSK144)
 - Indicatif receveur, mode, fréquence, distance, âge du rapport, SNR coloré
-- **Affichage de fraîcheur** : "MàJ PSK il y a Xs · prochaine possible dans Ys" *(v11.3)*
-- Intégré dans les **3 modes** (CLASSIC, SMART, COCKPIT)
-
-👉 **Test d'antenne instantané, vérification avant de lancer un appel dans un pileup.**
 
 ---
 
-### 2️⃣ Page **Map** — Carte d'observation (micro-lecture)
+### 2️⃣ Page **Map** — Carte d'observation
 
 Carte classique des **spots individuels** :
 - chaque point = **une station**
-- représentation géographique immédiate
-- vision instantanée
-- **filtre par bande** : n'affiche que la bande sélectionnée *(v11.3)*
+- **filtre par bande** : n'affiche que la bande sélectionnée
 - mode **"QUI M'ENTEND"** : stations qui te reçoivent avec enveloppe grand cercle
-
-👉 **Objectif : voir où ça se passe.** La page Map est un **outil d'exécution**.
 
 ---
 
-### 3️⃣ Page **AI Insight** — Analyse & META ANALYSE différée *(anciennement "Analyse", renommée v10.2)*
+### 3️⃣ Page **AI Insight** — Analyse différée
 
-Outil volontairement **non temps réel**, basé sur l'analyse du log applicatif. Accessible via `/ai-insight`.
-
-👉 **Outil de recul**, pas un gadget.
+Outil volontairement **non temps réel**, basé sur l'analyse du log applicatif.
 
 ---
 
 ### 4️⃣ Page **World** — Forecast & Anomalies
 
-La page **World** est **fondamentalement différente** de la page Map.
-
-| Page  | Nature              | Question                                       |
+| Page  | Nature              | Question                                        |
 | ----- | ------------------- | ----------------------------------------------- |
-| Map   | Observation brute   | Qui est actif maintenant ?                     |
-| World | Analyse interprétée | Où la propagation est anormalement favorable ? |
-
-- affichage de **zones**, pas de stations
-- clustering spatio-temporel
-- filtrage du bruit
-- rafraîchissement contrôlé
-
-👉 **World décide, Map exécute.**
+| Map   | Observation brute   | Qui est actif maintenant ?                      |
+| World | Analyse interprétée | Où la propagation est anormalement favorable ?  |
 
 ---
 
 ### 5️⃣ Page **Briefing**
 
-Se met à jour toutes les 12 heures, reprenant les infos DX essentielles. Possibilité d'ajouter automatiquement les calls dans la watchlist de la page Index. Vous ne raterez aucune expédition : dès qu'un call est spotté, il s'affiche en jaune dans le pavé DX spots.
+Mise à jour automatique toutes les 12 heures. Intégration directe des calls dans la watchlist.
 
 ---
 
 ### 6️⃣ Page **Satellites**
 
-Suivi temps réel des satellites amateurs (AO-73, AO-91, AO-92, ISS, RS-44, SO-50, FO-29, PO-101…). Calcul local via **sgp4**, prochains passages (AOS/TCA/LOS), **fréquences uplink/downlink** depuis SatNOGS *(v10.1)*, type de satellite auto-détecté *(v10.1)*, calcul d'azimut corrigé *(v10.1)*, TLE au format JSON OMM compatible post-2026 *(v10.2)*, **clipping de latitude 70°N/S** sur enveloppe MY SIGNAL *(v11.3)*.
+Suivi temps réel des satellites amateurs. Calcul local via sgp4, prochains passages AOS/TCA/LOS, fréquences uplink/downlink depuis SatNOGS, TLE au format JSON OMM.
 
 ---
 
-📸 Aperçu
+### 7️⃣ Page **⛈️ Météo Radio** *(v12.0–v12.1)*
 
-![Apercu du Dashboard](apercu.png)
+Module complet de corrélation météo / propagation. Voir section dédiée ci-dessous.
+
+---
+
+## 🌦️ Module Météo Radio — `/weather`
+
+### Objectif
+
+Répondre à : *« Les conditions météo expliquent-elles ce que j'observe sur les bandes ? »*
+
+### Pavés disponibles
+
+**Synthèse globale** — Jauge HF/VHF heuristique (cadran S-mètre analogique). Affiche `—` si une donnée manque, jamais un chiffre inventé. Indice heuristique, pas une mesure physique calibrée.
+
+**Activité électrique** — Impacts de foudre Blitzortung dans un rayon de 300 km, carte Leaflet centrée sur le QTH, marqueurs dynamiques par âge (rouge pulsant < 5 min, orange < 30 min, gris > 30 min). Abonnement MQTT à 9 cellules geohash (grille 3×3 autour du QTH) pour ne rater aucun impact des cellules voisines.
+
+**Conditions actuelles** — Deux onglets :
+- *HF* : température (rouge ≥ 30°C, orange ≥ 25°C), pression (rouge < 1000 hPa), tendance barométrique sur 2h (↓ chute rapide = risque de dégradation), humidité, vent, précipitations
+- *VHF/UHF* : indice tropo/ducting (heuristique inversion surface/850hPa + humidité + CAPE), vent à 300hPa, CAPE, confirmation WSPR 2m dans 300 km
+
+**Bruit / QRN** — Corrélation bruit/foudre avec vocabulaire radioamateur (QRN, équivalence points S). Jauge 4 niveaux : Calme / Élevé / Perturbé / Orageux. **Source prioritaire : spots WSPR captés par des stations proches du QTH** (wspr.live, 24/7, sans dépendance à WSJT-X). Repli automatique sur SNR WSJT-X si zone pauvre en balises. WSPR HF et VHF séparés (dynamiques différentes).
+
+**VOACAP Rapide** — Prédiction MUF/LUF pour un trajet précis (sélecteur de zone : Europe, Amériques, Asie, Océanie, Afrique). Mini-barres de fiabilité par bande HF colorées. Note explicite : cette prédiction concerne un trajet unique et peut légitimement différer de l'activité globale observée.
+
+**Activité par bande (24h)** — Comptage réel depuis le flux cluster, HF et VHF séparés, barres colorées par bande.
+
+**Balises VHF/UHF/SHF reçues** — Balises spotées par des stations à moins de 300 km du QTH sur les 3 dernières heures, issues du flux DX cluster. Mise à jour automatique mensuelle de la liste de référence depuis [dl0tud.tu-dresden.de/beacons](https://dl0tud.tu-dresden.de/beacons) (DJ5CW, Fabian Kurz, TU Dresden). Les balises connues sont marquées ★. En cas d'échec de la MAJ, le fichier local est conservé et un message d'avertissement est affiché.
+
+### Sources de données
+
+| Source | Usage | Coût |
+|--------|-------|------|
+| [Open-Meteo](https://open-meteo.com) | Conditions locales (temp, pression, CAPE, vent 300hPa…) | Gratuit, sans clé |
+| Blitzortung MQTT | Foudre temps réel | Gratuit, communautaire |
+| [wspr.live](https://wspr.live) | Activité WSPR HF/VHF (ClickHouse SQL) | Gratuit, sans clé |
+| VOACAP Online | Prédiction de propagation HF | Gratuit |
+| dl0tud.tu-dresden.de | Liste de référence balises VHF/UHF/SHF | Gratuit |
+
+### Dépendance supplémentaire
+
+```bash
+pip install paho-mqtt --break-system-packages
+```
+
+Sans `paho-mqtt`, l'application démarre normalement — le module foudre se désactive proprement (log d'avertissement).
+
+### Points d'honnêteté importants
+
+- L'indice tropo/ducting est une **heuristique simplifiée** (pas un modèle physique complet)
+- La jauge Synthèse est un **repère visuel**, pas une mesure calibrée
+- Si 0 spot WSPR et WSJT-X non connecté → affiche `—`, jamais un chiffre inventé
+- Si 0 impact de foudre → **peut signifier une zone sans orage ou un broker MQTT temporairement indisponible** (Blitzortung est un service communautaire non-officiel)
+- Si 0 balise reçue dans le pavé Balises → **pas d'opérateur proche ayant spotté une balise, ne signifie pas absence d'ouverture**
 
 ---
 
@@ -168,11 +189,11 @@ chmod +x start.sh
 
 L'application sera accessible sur `http://localhost:8000`
 
-> 💡 Un **Raspberry Pi** est recommandé pour la faible consommation électrique, mais le programme fonctionne sur n'importe quel PC sous Linux.
+> 💡 Un **Raspberry Pi** est recommandé pour la faible consommation électrique.
 
 ---
 
-## 🔐 Installation HTTPS sécurisée (accès distant) — *v11.3*
+## 🔐 Installation HTTPS sécurisée (accès distant)
 
 ### 1. Obtenir un domaine DDNS
 Va sur [duckdns.org](https://www.duckdns.org), crée un sous-domaine gratuit, récupère ton token.
@@ -198,26 +219,23 @@ sudo mkdir -p /etc/nginx/ssl
   --fullchain-file /etc/nginx/ssl/dxwatcher.crt \
   --reloadcmd      "sudo systemctl reload nginx"
 
-sudo htpasswd -c /etc/nginx/.htpasswd f1smv   # mot de passe
+sudo htpasswd -c /etc/nginx/.htpasswd f1smv
 ```
 
-Créer `/etc/nginx/sites-available/neuraldx` avec la configuration reverse proxy sur le port **8443** (n'interfère pas avec ton NAS sur 443).
-
-### 5. Routeur
-Forward du port externe **8443** vers `192.168.1.81:8443` (TCP).
-
-**Accès distant :** `https://f1smv-dxwatcher.duckdns.org:8443` — TLS valide, Basic Auth nginx + token API applicatif.
+Forward du port externe **8443** vers `192.168.1.81:8443` (TCP).  
+**Accès distant :** `https://f1smv-dxwatcher.duckdns.org:8443`
 
 ---
 
 ## ⚙️ Architecture technique
 
 - Backend : Python / Flask
-- Frontend : HTML / CSS / JavaScript
+- Frontend : HTML / CSS / JavaScript (SortableJS, Leaflet, IBM Plex Mono, Space Grotesk)
 - Cluster : Telnet DX Cluster
-- Analyse : scripts Python dédiés (`predictor.py`, `dxcc_resolver.py`)
-- Stockage : mémoire + JSON locaux + **SQLite**
-- Sécurité : token API local + reverse proxy nginx (v11.3)
+- Analyse : `predictor.py`, `dxcc_resolver.py`
+- Stockage : mémoire + JSON locaux + SQLite
+- Sécurité : token API local + reverse proxy nginx
+- MQTT : paho-mqtt (foudre Blitzortung)
 
 Aucune dépendance cloud.
 
@@ -225,129 +243,68 @@ Aucune dépendance cloud.
 
 ## 🗂️ Historique des versions
 
-### v12.0 — Refonte majeure : historique enrichi, module Météo, config persistante
+### v12.1 — Module Météo : corrections critiques et balises VHF/UHF/SHF
 
-- **Pavé HISTORIQUE refondu** : passage de "30min/12h" à **"5 dernières heures"**, avec affichage des **calls marquants par score SPD** (top 5 par tranche horaire, triés par rareté), caractères agrandis et thème orange pour une meilleure lisibilité
-- **Configuration persistante** : MY_CALL et user_qra sauvegardés dans `data/config.json`, restaurés automatiquement à chaque redémarrage — plus besoin de ressaisir
-- **Opportunités DXCC** : polling automatique toutes les 30 min (LoTW actif + panel visible)
-- **Fix titre onglet navigateur** : le `<title>` de la page était hardcodé en "v11.3" depuis plusieurs versions, ne suivait jamais `APP_VERSION` — corrigé pour afficher dynamiquement la version courante
+#### 🌩️ Fix critique : Topic MQTT Blitzortung (2026-08-14)
 
-#### 🌦️ Nouveau : Module Météo (Phase 1)
+Le broker Blitzortung a changé son format de topic MQTT en production — les cellules geohash sont maintenant séparées par des slashes (`blitzortung/1.1/s/p/e/#`) au lieu d'être concaténées (`blitzortung/1.1/spe/#`). Le broker acceptait la connexion et renvoyait CONNACK=0 mais ne publiait **rien** sur les anciens topics — illusion de fonctionnement, zéro donnée reçue. Fix : `"/".join(gh)` dans `_lightning_on_connect()`.
 
-Nouvel onglet **⛈️ MÉTÉO** — première phase du module décrit dans
-`ARCHITECTURE_METEO.md`. Objectif : répondre à "les conditions météo
-expliquent-elles ce que j'observe sur les bandes ?"
+#### 🌩️ Fix géohash voisins (cellules adjacentes)
 
-- **Conditions locales** (Open-Meteo, gratuit, sans clé) : température, pression, humidité, vent, précipitations — position QTH réutilisée automatiquement, aucune config supplémentaire
-- **Activité électrique** (pont MQTT communautaire Blitzortung) : impacts de foudre dans un rayon de 300 km, distance et direction (cap + point cardinal), historique 1h
-- **Corrélation bruit/météo bilingue FR/EN** : synthèse factuelle et explicative de l'activité radio ambiante, croisée avec l'activité électrique récente — **indique toujours la source et la bande de référence** utilisées (un SNR de 12dB n'a pas le même sens sur 40m que sur 10m) — formulée en observations, jamais en affirmations causales non prouvées
-  - **Source prioritaire : spots WSPR** captés par des stations proches du QTH (via [wspr.live](https://wspr.live), gratuit, sans clé) — fonctionne **24/7**, aucune dépendance à WSJT-X ouvert
-  - **Repli automatique : SNR WSJT-X** (nouveau `snr_buffer`, alimenté par *tous* les décodages FT8/FT4 reçus, pas seulement ceux affichés dans le DX Feed) si aucune balise WSPR n'est captée dans la zone
-- Nouvelle route API : `/api/weather/local.json`, `/api/weather/lightning.json`, `/api/weather/wspr.json`, `/api/weather/correlation.json`
-- Nouvelle page : `/weather`
+Une cellule geohash de précision 3 couvre ~156×156 km. S'abonner à une seule cellule laissait passer tout impact tombant dans une cellule voisine, même à 60 km du QTH. Fix : abonnement à une grille 3×3 (QTH + 8 cellules voisines, 9 topics MQTT au total).
 
-**⚠️ Nouvelle dépendance Python** : `paho-mqtt` (pour le flux foudre)
-```bash
-pip install paho-mqtt --break-system-packages
-```
-Sans cette dépendance, l'application démarre normalement — le module foudre se désactive proprement (log d'avertissement) et le reste de l'app n'est pas affecté.
+#### 🛰️ Pavé Balises VHF/UHF/SHF
 
-**⚠️ Fiabilité du flux foudre** : le pont Blitzortung communautaire n'a pas de garantie de service officielle. Si aucun impact n'apparaît malgré un orage visible ailleurs, voir les notes de dépannage dans les commentaires de `lightning_worker()` (webapp.py).
+Nouveau pavé dans la page Météo affichant les balises **réellement spotées** par des stations à moins de 300 km du QTH :
 
-Phases 2 (radar pluie sur carte) et 3 (synthèse IA, historique long terme) non incluses — voir `ARCHITECTURE_METEO.md`.
+- **Données temps réel** : issues du flux DX cluster déjà connecté. Fix associé : `spot_history` hardcodait `"de": None` — capture maintenant le callsign du spotter (`de_call`) et sa distance au QTH (`de_dist_km`) depuis la ligne cluster `DX de <SPOTTER>:`
+- **Liste de référence** : mise à jour automatique mensuelle depuis [dl0tud.tu-dresden.de/beacons](https://dl0tud.tu-dresden.de/beacons) (CSV de DJ5CW / Fabian Kurz, TU Dresden). Parsing `;`-séparé, déduplication par call, filtre QRT. En cas d'échec, le fichier local est conservé et un message d'erreur s'affiche dans l'interface
+- Les balises connues (dans la liste de référence) sont marquées ★ dans l'affichage
 
-### v11.5 — Configuration persistante · MY_CALL & QRA en data/config.json
+#### 🧭 Fix `spot_history` spotter
 
-- **Persistance config** : MY_CALL et user_qra sont maintenant sauvegardés dans `data/config.json` (persistent entre redémarrages)
-- Plus besoin de ressaisir le call ou le locator à chaque redéploiement ou restart Flask
-- Fichier auto-créé au premier lancement avec les defaults
-- Deux façons de configurer : éditer `webapp.py` OU `data/config.json` directement
-- Nouvelle route API `/api/update_mycall` pour changer le call via API (futur : intégrer dans l'interface)
+La colonne `"de"` de `spot_history` était hardcodée à `None` depuis l'origine, alors que le callsign du spotter est disponible dans la ligne brute du cluster. Fix complet : extraction de `de_call` et calcul de `de_dist_km` (distance spotter ↔ QTH). Améliore non seulement le pavé Balises mais toute analyse future nécessitant la géolocalisation du spotter.
 
-### v11.4 — Opportunités DXCC · Polling automatique
+#### 🎨 Refonte visuelle weather.html
 
-- Ajout polling automatique toutes les 30 min pour le pavé "Opportunités DXCC" (quand LoTW actif + panel visible)
-- Auparavant figé sans action utilisateur ; détecte maintenant les nouvelles expéditions automatiquement
+Direction "Instrument Panel" : fond graphite + bicolore ambre/teal (au lieu du cyan unique), polices Space Grotesk + IBM Plex Mono, panneaux façon bezel d'instrument (ligne de lumière haute, rivets). Jauge Synthèse Globale transformée en cadran S-mètre analogique (arc 180°, zones colorées, aiguille animée).
+
+#### 🔗 Navigation
+
+Lien `⛈️ Météo` ajouté dans les pages `ai_insight.html`, `briefing.html`, `map.html`, `world.html`, `satellites.html`. Au passage, correction du lien `/briefing.html` → `/briefing` dans `map.html` et `world.html`.
+
+#### 🔢 Fix version index.html
+
+Un second endroit hardcodé `V11.3` dans le header visible de `index.html` (différent du `<title>` déjà corrigé en v12.0) — corrigé pour suivre `{{ version }}`.
 
 ---
 
-### v11.3 — Infrastructure HTTPS · K-index fixé · Filtrage cartes · Fraîcheur PSK Reporter
+### v12.0 — Module Météo Phase 1, configuration persistante, WSPR
 
-#### 🔐 Reverse proxy nginx + DuckDNS + Let's Encrypt (sécurité v11.3)
+- **Module Météo** (page `/weather`) : conditions locales Open-Meteo, foudre Blitzortung MQTT, corrélation bruit/QRN WSPR, VOACAP Rapide, activité par bande 24h
+- **WSPR source prioritaire** : spots captés par des stations proches du QTH via wspr.live (24/7, sans WSJT-X). HF et VHF séparés. Repli automatique sur SNR WSJT-X
+- **Configuration persistante** : MY_CALL et user_qra dans `data/config.json`
+- **Fix titre** : `<title>` hardcodé en `v11.3` corrigé
 
-- Configuration complète reverse proxy sur port **8443** (sans conflits avec le 443 du NAS)
-- Challenge DNS acme.sh : aucun port 80/443 requis
-- Basic Auth nginx + token API applicatif (double couche)
-- Flask reste local 127.0.0.1:8000 (inaccessible depuis Internet)
-- Accès distant HTTPS sécurisé : `https://f1smv-dxwatcher.duckdns.org:8443`
+### v11.3 — HTTPS · K-index · PSK Reporter · Filtres bande
 
-#### 🗺️ Filtre bande sur cartes (v11.3)
+- Reverse proxy nginx + DuckDNS + Let's Encrypt (port 8443)
+- Fix parsing K-index NOAA (format dict vs tableaux)
+- Cache PSK Reporter 300s (limite officielle)
+- Filtre par bande sur les cartes Map/World
+- Token API local `X-API-Token`
 
-Quand tu sélectionnes une bande dans le pavé **DX SPOTS HF/VHF**, la carte n'affiche **que cette bande** (pas toutes les bandes) → meilleure lisibilité en un coup d'œil.
+### v11.0–v11.2 — Sécurité, corrections critiques
 
-#### 📶 Affichage fraîcheur MY SIGNAL (v11.3)
+- Refonte `predictor.py` et `dxcc_resolver.py`
+- Token API local, reverse proxy nginx
+- Fix META ANALYSE (script manquant)
+- Fix AI Insight (popups natifs)
+- Indicateur de chargement Satellites
 
-- Texte explicite : *"MàJ PSK il y a Xs · prochaine possible dans Ys"*
-- Rend transparent le délai de 5 min qui semblait "figé"
-- Affiché dans le panel MY SIGNAL et près des boutons "QUI M'ENTEND"
+### v10.0–v10.5 — Versions antérieures
 
-#### 🔮 K-index enfin visible (v11.3)
-
-**Bug racine :** le parsing NOAA attendait `[ ["time_tag","Kp",...], [...], ... ]` (tableaux de tableaux), mais NOAA envoie `[ {"time_tag":"...","Kp":3.67,...}, ... ]` (objets dict). Résultat : Kp renvoyait `None` silencieusement, le K-index restait "N/A" indéfiniment.
-
-**Fix complet :**
-- Parsing NOAA accepte maintenant les deux formats (dict ET tableaux)
-- Fallback A-index si Kp NOAA indisponible : Kp ≈ A/3
-- Logging amélioré pour tracer les échecs de fetch
-
-#### 📊 Cache PSK Reporter ajusté (v11.3)
-
-- TTL : 90s → **300s** (5 min = limite officielle NOAA)
-- 90s = 3.3× sur-sollicitation → throttling silencieux après quelques semaines
-- Polling frontend : 90s → 20s (interroge le cache backend local, pas PSK Reporter directement)
-- Récalcul dynamique de `age_s` : même en fallback, l'âge des rapports grandit correctement
-
-#### 📍 Clipping latitude enveloppe MY SIGNAL (v11.3)
-
-- Enveloppe grand cercle coupée à **70°N/S**
-- Élimine l'effet "toile" au-dessus du Groenland en projection Mercator
-
-#### 🎨 Corrections interface (v11.3)
-
-- Label "Analyse" → "AI Insight" dans `briefing.html` (cohérence)
-- Favicon ajouté à `briefing.html`
-- Interception token API corrigée sur `briefing.html` (cassait les POST watchlist silencieusement)
-- Setup ⚙ complet : 31 pavés listés à plat (labels FR), persistance backend partagée
-
----
-
-### v11.2 — Corrections critiques : META ANALYSE, AI Insight, Satellites
-
-#### 🐛 Erreur 500 sur META ANALYSE — script analyseur manquant
-
-Le dossier `tools/` et le script `tools/log_meta_analyzer.py` n'existaient pas sur le serveur — la route `POST /api/meta/run` échouait systématiquement. Écriture complète du script manquant.
-
-#### 🔧 Page AI Insight — `confirm()`/`alert()` natifs enfin remplacés
-
-Les popups navigateur natifs (`confirm()`, `alert()`) étaient toujours présents en production. Corrigé : dialog HTML inline.
-
-#### ⏳ Page Satellites — indicateur de chargement
-
-Le premier appel de calcul de position (TLE + sgp4) peut prendre jusqu'à 45 secondes après un démarrage serveur. Ajout d'un indicateur de chargement explicite.
-
----
-
-### v11.1 — Sécurité niveau 2
-
-- Token API local (`X-API-Token`), généré dans `data/api_token.txt` (chmod 600)
-- Intercepteur `fetch()` global côté frontend
-
-### v11.0 — Refonte predictor.py, dxcc_resolver.py, durcissement sécurité
-
-### v10.5 → v10.0 — Versions antérieures
-
-Les versions antérieures à v10.0 ne figurent pas ici pour éviter de surcharger la documentation.  
-Consulter l'historique complet sur GitHub : 👉 https://github.com/F1SMV/Neural-DX-Watcher/commits/main
+Consulter l'historique complet : 👉 https://github.com/F1SMV/Neural-DX-Watcher/commits/main
 
 ---
 

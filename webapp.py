@@ -87,7 +87,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '12.0'
+APP_VERSION = '12.1'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -678,8 +678,9 @@ def _lightning_on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         geohashes = _lightning_geohash_neighbors(user_lat, user_lon, precision=3)
         for gh in sorted(geohashes):
-            client.subscribe(f"blitzortung/1.1/{gh}/#")
-        logger.info(f"LightningWorker: connecté, abonné à {len(geohashes)} cellules geohash autour du QTH : {sorted(geohashes)}")
+            topic = "blitzortung/1.1/" + "/".join(gh) + "/#"
+            client.subscribe(topic)
+        logger.info(f"LightningWorker: connecté, abonné à {len(geohashes)} cellules (format /s/p/e/) : {sorted(geohashes)}")
     else:
         logger.warning(f"LightningWorker: échec connexion MQTT (rc={rc})")
 
@@ -1179,6 +1180,242 @@ def get_band_activity_24h():
     hf = [{"band": b, "count": counts.get(b, 0)} for b in hf_order if counts.get(b, 0) > 0]
     vhf = [{"band": b, "count": counts.get(b, 0)} for b in vhf_order if counts.get(b, 0) > 0]
     return {"hf": hf, "vhf": vhf, "window_h": 24, "truncated": len(spot_history) >= SPOT_HISTORY_MAX}
+
+# ══════════════════════════════════════════════════════════════════════════
+# BALISES VHF/UHF/SHF — pavé "Balises" de la page météo
+#
+# Deux sources volontairement séparées, jamais mélangées :
+#
+#   A) RÉFÉRENCE AUTO-MISE À JOUR depuis dl0tud.tu-dresden.de (base de
+#      rapports de réception, gérée par DJ5CW / Fabian Kurz, TU Dresden).
+#      Mise à jour automatique une fois par mois. En cas d'échec, le dernier
+#      fichier valide est conservé et un message apparaît dans l'interface.
+#
+#   B) CONFIRMATION RÉELLE via le flux DX cluster : si le callsign d'une
+#      balise de la liste A est spotté par une station proche de ton QTH
+#      (<300km), c'est une preuve réelle de propagation locale.
+# ══════════════════════════════════════════════════════════════════════════
+
+BEACON_REFERENCE_FILE   = Path("data/beacons_reference.json")
+BEACON_REFERENCE_META   = Path("data/beacons_reference.meta.json")
+BEACON_SOURCE_URL       = "https://dl0tud.tu-dresden.de/beacons/csv.php"
+BEACON_SOURCE_LABEL     = "dl0tud.tu-dresden.de/beacons (DJ5CW, Fabian Kurz, TU Dresden)"
+BEACON_UPDATE_INTERVAL  = 30 * 24 * 3600   # 30 jours
+VHF_UHF_SHF_BEACON_BANDS = ["6m", "4m", "2m", "70cm", "23cm", "13cm",
+                              "9cm", "6cm", "3cm", "12mm", "6mm", "4mm"]
+BEACON_MAX_RANGE_KM = {
+    "6m": 3000, "4m": 1500, "2m": 800, "70cm": 500,
+    "23cm": 300, "13cm": 200, "9cm": 150, "6cm": 100,
+    "3cm": 80, "12mm": 50, "6mm": 30, "4mm": 20,
+}
+
+beacon_update_status = {
+    "last_attempt": None, "last_success": None, "count": 0,
+    "source": BEACON_SOURCE_LABEL, "source_url": BEACON_SOURCE_URL,
+    "error": None, "meta_file_date": None,
+}
+beacon_update_lock = threading.Lock()
+
+
+def _parse_beacon_csv(text):
+    """Parse le CSV de dl0tud.tu-dresden.de (séparateur ';').
+    Colonnes : QRG;CALL;LOC;RST;RX IN;KM;DEG;RX BY;REM;DATE
+    QRG=fréquence MHz, CALL=indicatif balise, LOC=locator balise,
+    REM=remarques, DATE=date du dernier rapport reçu.
+    Déduplique par CALL (entrée la plus récente), filtre QRT."""
+    import csv, io, re as _re
+    FREQ_BANDS = [
+        (28.0,30.0,"10m"),(50.0,54.0,"6m"),(70.0,71.0,"4m"),
+        (144.0,148.0,"2m"),(430.0,440.0,"70cm"),(1240.0,1300.0,"23cm"),
+        (2300.0,2450.0,"13cm"),(3300.0,3500.0,"9cm"),(5650.0,5850.0,"6cm"),
+        (10000.0,10500.0,"3cm"),(24000.0,24250.0,"12mm"),
+        (47000.0,47200.0,"6mm"),(75500.0,81000.0,"4mm"),
+    ]
+    def freq_to_band(mhz):
+        for lo, hi, band in FREQ_BANDS:
+            if lo <= mhz <= hi:
+                return band
+        return None
+
+    QRT_KW = ["qrt","license cancelled","not qrv","dismantled","off air",
+               "switched off","permanently off","qrt for ever"]
+    def is_qrt(r):
+        return any(k in r.lower() for k in QRT_KW)
+
+    reader = csv.reader(io.StringIO(text), delimiter=";")
+    header = None
+    by_call = {}
+    for row in reader:
+        if header is None:
+            header = [h.strip().lower() for h in row]
+            continue
+        if len(row) < 3:
+            continue
+        def cell(n):
+            try: return row[header.index(n)].strip()
+            except: return ""
+        call    = cell("call").upper().replace(" ","")
+        qrg_raw = cell("qrg").replace(",",".")
+        loc     = cell("loc").strip().upper()
+        remark  = cell("rem")
+        date_s  = cell("date")
+        if not call or not qrg_raw or not loc: continue
+        if is_qrt(remark): continue
+        try: freq_mhz = float(qrg_raw)
+        except: continue
+        band = freq_to_band(freq_mhz)
+        if band not in VHF_UHF_SHF_BEACON_BANDS: continue
+        if not _re.match(r'^[A-R]{2}[0-9]{2}', loc): continue
+        entry = {"call": call, "freq_mhz": round(freq_mhz, 4),
+                 "band": band, "locator": loc[:6], "last_report": date_s}
+        if call not in by_call or date_s > by_call[call]["last_report"]:
+            by_call[call] = entry
+    return sorted(by_call.values(), key=lambda b: (b["band"], b["freq_mhz"]))
+def fetch_beacon_reference():
+    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    with beacon_update_lock:
+        beacon_update_status["last_attempt"] = now_iso
+        beacon_update_status["error"] = None
+    try:
+        req = urllib.request.Request(
+            BEACON_SOURCE_URL,
+            headers={"User-Agent": BRIEFING_USER_AGENT, "Accept": "text/csv,*/*"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            text = r.read().decode("utf-8", errors="ignore")
+        beacons = _parse_beacon_csv(text)
+        if len(beacons) < 10:
+            raise ValueError(f"Seulement {len(beacons)} balises parsees — CSV suspect")
+        BEACON_REFERENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        BEACON_REFERENCE_FILE.write_text(
+            json.dumps(beacons, ensure_ascii=False, indent=2), encoding="utf-8")
+        meta = {"source": BEACON_SOURCE_LABEL, "source_url": BEACON_SOURCE_URL,
+                "updated_at": now_iso, "count": len(beacons)}
+        BEACON_REFERENCE_META.write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        with beacon_update_lock:
+            beacon_update_status.update({
+                "last_success": now_iso, "count": len(beacons),
+                "error": None, "meta_file_date": now_iso,
+            })
+        logger.info(f"BeaconUpdate: {len(beacons)} balises mises a jour depuis {BEACON_SOURCE_LABEL}")
+    except Exception as e:
+        msg = str(e)
+        with beacon_update_lock:
+            beacon_update_status["error"] = msg
+        logger.warning(f"BeaconUpdate: echec MAJ balises ({msg}) — fichier local conserve")
+
+
+def beacon_update_worker():
+    threading.current_thread().name = "BeaconUpdateWorker"
+    needs_immediate = True
+    if BEACON_REFERENCE_META.exists():
+        try:
+            import datetime as _dt
+            meta = json.loads(BEACON_REFERENCE_META.read_text(encoding="utf-8"))
+            updated_at = meta.get("updated_at", "")
+            if updated_at:
+                last = _dt.datetime.strptime(updated_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+                    tzinfo=_dt.timezone.utc)
+                age_s = (_dt.datetime.now(_dt.timezone.utc) - last).total_seconds()
+                if age_s < BEACON_UPDATE_INTERVAL:
+                    needs_immediate = False
+                    logger.info(
+                        f"BeaconUpdateWorker: fichier local ok ({int(age_s/3600)}h), "
+                        f"prochaine MAJ dans {int((BEACON_UPDATE_INTERVAL-age_s)/3600)}h"
+                    )
+                    with beacon_update_lock:
+                        beacon_update_status["last_success"] = updated_at
+                        beacon_update_status["count"] = meta.get("count", 0)
+        except Exception:
+            pass
+    if needs_immediate:
+        logger.info("BeaconUpdateWorker: MAJ initiale de la liste des balises")
+        fetch_beacon_reference()
+    while True:
+        time.sleep(BEACON_UPDATE_INTERVAL)
+        logger.info("BeaconUpdateWorker: MAJ mensuelle automatique de la liste des balises")
+        fetch_beacon_reference()
+
+
+def load_beacon_reference():
+    if not BEACON_REFERENCE_FILE.exists():
+        return []
+    try:
+        data = json.loads(BEACON_REFERENCE_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        logger.warning(f"load_beacon_reference: fichier invalide ({e})")
+        return []
+
+
+def get_beacons_in_range():
+    """Approche A : balises de la liste utilisateur théoriquement à portée
+    du QTH (distance/direction calculées), triées par distance. Portée
+    indicative par bande (BEACON_MAX_RANGE_KM) — large car VHF/UHF/SHF
+    peuvent s'ouvrir très au-delà de la portée troposphérique habituelle
+    (Es, tropo exceptionnel). Aucune confirmation de réception ici."""
+    beacons = load_beacon_reference()
+    if not beacons:
+        return {"beacons": [], "info": BEACON_REFERENCE_INFO}
+
+    results = []
+    for b in beacons:
+        try:
+            call = b.get("call")
+            band = b.get("band")
+            locator = b.get("locator")
+            if not (call and band and locator):
+                continue
+            b_lat, b_lon = qra_to_lat_lon(locator)
+            if b_lat is None:
+                continue
+            dist_km = calculate_distance(user_lat, user_lon, b_lat, b_lon)
+            bearing = calculate_bearing(user_lat, user_lon, b_lat, b_lon)
+            max_range = BEACON_MAX_RANGE_KM.get(band, 1000)
+            results.append({
+                "call": call, "band": band, "freq_mhz": b.get("freq_mhz"),
+                "locator": locator, "dist_km": round(dist_km, 0),
+                "bearing_compass": bearing_to_compass(bearing),
+                "in_typical_range": dist_km <= max_range,
+            })
+        except Exception:
+            continue
+    results.sort(key=lambda r: r["dist_km"])
+    return {"beacons": results, "info": None}
+
+def get_beacon_reception_events(window_min=180):
+    """Balises VHF/UHF/SHF réellement spotées par des stations dans TON
+    locator ou un locator adjacent (rayon effectif ~300km autour du QTH).
+    Ne dépend PAS de la liste de référence — remonte tout spot VHF/UHF/SHF
+    dont le spotter est proche de toi. Déduplique par callsign (meilleur
+    événement = le plus récent)."""
+    cutoff = time.time() - window_min * 60
+    known_calls = {b.get("call", "").upper() for b in load_beacon_reference() if b.get("call")}
+    seen = {}
+    with spot_history_lock:
+        for entry in spot_history:
+            if entry.get("ts", 0) < cutoff:
+                continue
+            if entry.get("band") not in VHF_UHF_SHF_BEACON_BANDS:
+                continue
+            de_dist = entry.get("de_dist_km")
+            if de_dist is None or de_dist > 300:
+                continue
+            call = (entry.get("dx") or "").upper()
+            if not call:
+                continue
+            age_min = int((time.time() - entry.get("ts", time.time())) / 60)
+            if call not in seen or age_min < seen[call]["age_min"]:
+                seen[call] = {
+                    "call": call, "band": entry.get("band"),
+                    "mode": entry.get("mode"), "spotter": entry.get("de"),
+                    "spotter_dist_km": round(de_dist, 0), "age_min": age_min,
+                    "in_reference": call in known_calls,
+                }
+    events = sorted(seen.values(), key=lambda e: e["age_min"])
+    info = None if events else "Aucune balise VHF/UHF/SHF spotée par une station à moins de 300km de ton QTH sur les 3 dernières heures."
+    return {"events": events, "info": info}
 
 def get_weather_alerts():
     """Alertes dérivées uniquement de données réellement mesurées — jamais
@@ -2253,6 +2490,7 @@ def telnet_worker():
                         parts = content.split()
                         if len(parts) < 3:
                             continue
+                        de_call = parts[0].rstrip(':').upper()
                         freq_str = parts[1]
                         dx_call = parts[2].upper()
                         comment = " ".join(parts[3:]).upper()
@@ -2272,6 +2510,19 @@ def telnet_worker():
                         if lat != 0.0 and lon != 0.0:
                             dist_km = calculate_distance(user_lat, user_lon, lat, lon)
 
+                        # Position du spotter (DE) — nécessaire pour savoir si CE spot a été
+                        # fait par une station proche de notre propre QTH (cf. pavé Balises).
+                        de_dist_km = None
+                        try:
+                            de_lat, de_lon, _de_precise = get_precise_latlon(de_call)
+                            if not de_lat and not de_lon:
+                                de_info = get_country_info(de_call)
+                                de_lat, de_lon = de_info['lat'], de_info['lon']
+                            if de_lat and de_lon:
+                                de_dist_km = calculate_distance(user_lat, user_lon, de_lat, de_lon)
+                        except Exception:
+                            pass
+
                         spd_score = calculate_spd_score(dx_call, band, mode, comment, info['c'], dist_km)
                         color = BAND_COLORS.get(band, '#00f3ff')
                         
@@ -2282,7 +2533,8 @@ def telnet_worker():
 
                         spot_obj = {
                             "timestamp": time.time(), "time": time.strftime("%H:%M"),
-                            "freq": freq_str, "dx_call": dx_call, "band": band, "mode": mode,
+                            "freq": freq_str, "dx_call": dx_call, "de_call": de_call,
+                            "de_dist_km": de_dist_km, "band": band, "mode": mode,
                             "country": info['c'], "lat": lat, "lon": lon,
                             "score": spd_score,
                             "is_wanted": spd_score >= SPD_THRESHOLD,
@@ -2333,7 +2585,8 @@ def telnet_worker():
                                 spot_history.append({
                                     "ts": spot_obj.get("timestamp", time.time()),
                                     "dx": spot_obj.get("dx_call"),
-                                    "de": None,
+                                    "de": spot_obj.get("de_call"),
+                                    "de_dist_km": spot_obj.get("de_dist_km"),
                                     "band": spot_obj.get("band"),
                                     "mode": spot_obj.get("mode"),
                                     "score": spd_score,
@@ -4923,6 +5176,20 @@ def api_weather_band_activity():
     return jsonify(get_band_activity_24h())
 
 
+@app.route("/api/weather/beacons.json")
+def api_weather_beacons():
+    """Balises VHF/UHF/SHF réellement spotées par des stations proches du QTH."""
+    events = get_beacon_reception_events()
+    with beacon_update_lock:
+        status = dict(beacon_update_status)
+    return jsonify({
+        "received": events["events"],
+        "info": events["info"],
+        "update_status": status,
+        "ts": time.time(),
+    })
+
+
 @app.route("/api/weather/alerts.json")
 def api_weather_alerts():
     """Alertes dérivées des données réelles (QRN, VHF, ducting, pression)."""
@@ -6884,6 +7151,7 @@ if __name__ == "__main__":
     threading.Thread(target=weather_worker, daemon=True).start()
     threading.Thread(target=lightning_worker, daemon=True).start()
     threading.Thread(target=wspr_worker, daemon=True).start()
+    threading.Thread(target=beacon_update_worker, daemon=True).start()
 
     def _freq_preload_worker():
         """

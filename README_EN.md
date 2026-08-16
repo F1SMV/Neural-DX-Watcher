@@ -1,25 +1,25 @@
-# ⚡ Neural DX Watcher — v12.0
+# ⚡ Neural DX Watcher — v12.1
 
 **DX Cluster Dashboard & Advanced Radio Analysis Engine**
 
-A local web application for DX monitoring and radio analysis, designed for the demanding amateur radio operator.  
-Built to **observe**, **understand** and **step back** — not to generate visual noise.
+A local web application for DX monitoring and radio analysis, built for demanding amateur radio operators.  
+Designed to **observe**, **understand**, and **step back** — not to generate visual noise.
 
 ---
 
 ## ⚙️ Initial Setup — Set Your Callsign
 
-Before launching the application, you can **either**:
+Before launching the application, you can **either** :
 
-### Option 1: Edit webapp.py (one time only)
+### Option 1: Edit webapp.py (once)
 
-Edit `webapp.py` and modify this line (around line ~89):
+Edit `webapp.py` and change this line (~line 89):
 
 ```python
 MY_CALL = "F1SMV"  # ← Replace with YOUR callsign
 ```
 
-Then restart Flask. Your configuration is now **saved locally** in `data/config.json` — it persists across restarts and updates.
+Then restart Flask. Configuration is now **saved locally** in `data/config.json` — it persists across restarts and updates.
 
 ### Option 2: Edit data/config.json directly
 
@@ -44,118 +44,137 @@ Save and restart Flask.
 - connects to one or more **DX Clusters (Telnet)**
 - displays **real-time spots** (HF / VHF / UHF)
 - integrates **solar indices** (SFI, A, Kp…)
-- maintains a **usable memory** of activity
-- offers **multiple reading levels**, from live monitoring to strategic analysis
-- **predicts** probable openings based on your activity and missing DXCCs, with **measured reliability** (not an arbitrary display)
+- maintains an **actionable memory** of activity
+- offers **multiple reading levels**, from live to strategic analysis
+- **predicts** probable openings based on your activity and missing DXCCs
+- includes a complete **Weather Radio module** (propagation, lightning, WSPR, beacons)
 - accessible via **secure HTTPS** (reverse proxy + Let's Encrypt) for remote use
 
 > The goal is not to see a lot,  
-> but to **see clearly**.
+> but to **see accurately**.
 
 ---
 
 ## 🖥️ Main Pages
 
-### 1️⃣ **Index** — Real-time & Operator Tracking
+### 1️⃣ **Index** — Real-time & operator tracking
 
-Immediate observation page. It displays:
-- the live spot stream
+Immediate observation page displaying:
+- live spot feed
 - active bands
 - wanted DX
 - solar indices (SFI, A-index, K-index)
-- **surge** activity signals (HF, 6m and 2m)
+- activity **surge** signals (HF, 6m and 2m)
 
-👉 **Goal: know what's happening right now.**
+### 📡 **WATCHLIST · Tracking**
 
----
+> *"I wasn't at the screen: what did I miss?"*
 
-### 📡 **WATCHLIST · Tracking** Panel
-
-Built to answer a simple need:
-> *"I wasn't at my desk — what did I miss?"*
-
-- based on the watchlist
+- watchlist-based
 - uses in-memory history
-- shows the latest spots per callsign
+- displays last spots by callsign
 
-Philosophy:
-- ❌ not a raw log
-- ❌ not a massive dump
-- ✅ a catch-up tool
-- ✅ designed for the human operator
+### 📶 **MY SIGNAL** — PSK Reporter self-monitoring
 
----
+> *"Who hears me, where, with what SNR?"* — without leaving the application.
 
-### 📶 **MY SIGNAL** Panel — PSK Reporter Self-monitoring *(v10.5)*
-
-> *"Who's hearing me, where, with what SNR?"* — without ever leaving the app.
-
-- Source: PSK Reporter API, queried via JSONP
-- All bands HF/VHF/UHF, all digital modes (FT8/FT4/WSPR/JT65/JS8/MSK144)
+- Source: PSK Reporter API (JSONP), 5-min cache (official server limit)
+- All HF/VHF/UHF bands, all digital modes (FT8/FT4/WSPR/JT65/JS8/MSK144)
 - Receiver callsign, mode, frequency, distance, report age, color-coded SNR
-- **Data freshness display**: "PSK update Xs ago · next possible in Ys" *(v11.3)*
-- Integrated in **all 3 modes** (CLASSIC, SMART, COCKPIT)
-
-**⏱️ Délai temps réel :** Après un QSO, ton call apparaît typiquement en **2-3 minutes** (limité par l'agrégation PSK Reporter elle-même, pas par Neural DX Watcher). Le backend interroge PSK Reporter toutes les 90 secondes.
-
-👉 **Instant antenna testing, verification before calling into a pileup.**
 
 ---
 
-### 2️⃣ **Map** — Observation Map (micro-reading)
+### 2️⃣ **Map** — Observation map
 
-Classic map of individual spots:
+Classic **individual spot** map:
 - each point = **one station**
-- immediate geographic representation
-- instant vision
-- **band filter**: displays only selected band *(v11.3)*
-- **"WHO HEARS ME"** mode: stations receiving you with great-circle envelope
-
-👉 **Goal: see where it's happening.** The Map page is an **execution tool**.
+- **band filter**: shows only the selected band
+- **"WHO HEARS ME"** mode: receiving stations with great circle envelope
 
 ---
 
-### 3️⃣ **AI Insight** — Analysis & Deferred META ANALYSIS *(formerly "Analysis", renamed in v10.2)*
+### 3️⃣ **AI Insight** — Deferred analysis
 
-A deliberately **non-real-time** tool, based on application log analysis. Available at `/ai-insight`.
-
-👉 **A tool for stepping back**, not a gimmick.
+Deliberately **non-real-time** tool, based on log analysis.
 
 ---
 
 ### 4️⃣ **World** — Forecast & Anomalies
 
-The **World** page is **fundamentally different** from the Map page.
-
-| Page  | Nature                | Question                                        |
-| ----- | --------------------- | ------------------------------------------------ |
-| Map   | Raw observation       | Who is active right now?                        |
-| World | Interpreted analysis  | Where is propagation abnormally favorable?      |
-
-- displays **zones**, not stations
-- spatio-temporal clustering
-- noise filtering
-- controlled refresh
-
-👉 **World decides, Map executes.**
+| Page  | Nature                | Question                                          |
+| ----- | --------------------- | ------------------------------------------------- |
+| Map   | Raw observation       | Who is active right now?                         |
+| World | Interpreted analysis  | Where is propagation unusually favorable?        |
 
 ---
 
 ### 5️⃣ **Briefing**
 
-Updated every 12 hours with essential DX information. Callsigns can be added to the watchlist automatically. You won't miss any expedition: as soon as a call is spotted, it appears in yellow in the DX spots panel.
+Automatic update every 12 hours. Direct integration of calls into the watchlist.
 
 ---
 
 ### 6️⃣ **Satellites**
 
-Real-time tracking of amateur satellites (AO-73, AO-91, AO-92, ISS, RS-44, SO-50, FO-29, PO-101…). Local computation via **sgp4**, next passes (AOS/TCA/LOS), **uplink/downlink frequencies** from SatNOGS *(v10.1)*, auto-detected satellite type *(v10.1)*, fixed azimuth calculation *(v10.1)*, JSON OMM TLE format compatible with post-2026 catalog *(v10.2)*, **latitude clipping 70°N/S** on MY SIGNAL envelope *(v11.3)*.
+Real-time amateur satellite tracking. Local calculation via sgp4, next passes AOS/TCA/LOS, uplink/downlink frequencies from SatNOGS, JSON OMM TLE format.
 
 ---
 
-📸 Preview
+### 7️⃣ **⛈️ Weather Radio** *(v12.0–v12.1)*
 
-![Dashboard Preview](apercu.png)
+Full weather / propagation correlation module. See dedicated section below.
+
+---
+
+## 🌦️ Weather Radio Module — `/weather`
+
+### Purpose
+
+Answer: *"Do current weather conditions explain what I'm observing on the bands?"*
+
+### Available Panels
+
+**Global Synthesis** — HF/VHF heuristic gauge (analog S-meter dial). Displays `—` if a data source is missing, never an invented value. Heuristic index, not a calibrated physical measurement.
+
+**Electrical Activity** — Blitzortung lightning strikes within 300 km radius, Leaflet map centered on QTH, dynamic markers by age (pulsing red < 5 min, orange < 30 min, grey > 30 min). MQTT subscription to 9 geohash cells (3×3 grid around QTH) to catch strikes in neighboring cells.
+
+**Current Conditions** — Two tabs:
+- *HF*: temperature (red ≥ 30°C, orange ≥ 25°C), pressure (red < 1000 hPa), 2h barometric trend (↓ rapid drop = degradation risk), humidity, wind, precipitation
+- *VHF/UHF*: tropo/ducting index (heuristic: surface/850hPa temperature inversion + humidity + CAPE), 300hPa wind, CAPE, WSPR 2m confirmation within 300 km
+
+**Noise / QRN** — Noise/lightning correlation with ham radio vocabulary (QRN, S-point equivalents). 4-level gauge: Calm / Elevated / Disturbed / Stormy. **Priority source: WSPR spots from stations near QTH** (wspr.live, 24/7, no WSJT-X dependency). Automatic fallback to WSJT-X SNR if sparse beacon area. HF and VHF WSPR separated (different dynamics).
+
+**Quick VOACAP** — MUF/LUF prediction for a specific path (zone selector: Europe, Americas, Asia, Oceania, Africa). Color-coded reliability mini-bars by HF band. Explicit note: this prediction concerns a single path and may legitimately differ from observed global activity.
+
+**Band Activity (24h)** — Real count from the cluster feed, HF and VHF separated, color-coded bars by band.
+
+**VHF/UHF/SHF Beacons Received** — Beacons spotted by stations within 300 km of QTH over the last 3 hours, from the DX cluster feed. Monthly automatic update of the reference list from [dl0tud.tu-dresden.de/beacons](https://dl0tud.tu-dresden.de/beacons) (DJ5CW, Fabian Kurz, TU Dresden). Known beacons are marked ★. If the update fails, the local file is preserved and a warning is displayed.
+
+### Data Sources
+
+| Source | Usage | Cost |
+|--------|-------|------|
+| [Open-Meteo](https://open-meteo.com) | Local conditions (temp, pressure, CAPE, 300hPa wind…) | Free, no key |
+| Blitzortung MQTT | Real-time lightning | Free, community |
+| [wspr.live](https://wspr.live) | HF/VHF WSPR activity (ClickHouse SQL) | Free, no key |
+| VOACAP Online | HF propagation prediction | Free |
+| dl0tud.tu-dresden.de | VHF/UHF/SHF beacon reference list | Free |
+
+### Additional Dependency
+
+```bash
+pip install paho-mqtt --break-system-packages
+```
+
+Without `paho-mqtt`, the application starts normally — the lightning module disables cleanly (warning log).
+
+### Important Honesty Notes
+
+- The tropo/ducting index is a **simplified heuristic** (not a complete physical model)
+- The Synthesis gauge is a **visual reference**, not a calibrated measurement
+- If 0 WSPR spots and WSJT-X not connected → displays `—`, never an invented value
+- If 0 lightning strikes → **may mean no storm in range OR the community MQTT broker temporarily unavailable** (Blitzortung is an unofficial community service)
+- If 0 beacons in the Beacons panel → **no nearby operator has spotted a known beacon — does not mean no opening**
 
 ---
 
@@ -168,13 +187,13 @@ chmod +x start.sh
 ./start.sh
 ```
 
-Available at `http://localhost:8000`
+The application will be accessible at `http://localhost:8000`
 
-> 💡 A **Raspberry Pi** is recommended for its low power consumption, but the program runs on any Linux PC.
+> 💡 A **Raspberry Pi** is recommended for low power consumption.
 
 ---
 
-## 🔐 Secure HTTPS Installation (Remote Access) — *v11.3*
+## 🔐 Secure HTTPS Installation (remote access)
 
 ### 1. Get a DDNS domain
 Go to [duckdns.org](https://www.duckdns.org), create a free subdomain, get your token.
@@ -200,156 +219,92 @@ sudo mkdir -p /etc/nginx/ssl
   --fullchain-file /etc/nginx/ssl/dxwatcher.crt \
   --reloadcmd      "sudo systemctl reload nginx"
 
-sudo htpasswd -c /etc/nginx/.htpasswd f1smv   # personal password
+sudo htpasswd -c /etc/nginx/.htpasswd f1smv
 ```
 
-Create `/etc/nginx/sites-available/neuraldx` with reverse proxy configuration on port **8443** (no conflict with your NAS on 443).
-
-### 5. Router
-Forward external port **8443** to `192.168.1.81:8443` (TCP).
-
-**Remote access:** `https://f1smv-dxwatcher.duckdns.org:8443` — valid TLS, Nginx Basic Auth + app-level API token.
+Forward external port **8443** to `192.168.1.81:8443` (TCP).  
+**Remote access:** `https://f1smv-dxwatcher.duckdns.org:8443`
 
 ---
 
 ## ⚙️ Technical Architecture
 
 - Backend: Python / Flask
-- Frontend: HTML / CSS / JavaScript
+- Frontend: HTML / CSS / JavaScript (SortableJS, Leaflet, IBM Plex Mono, Space Grotesk)
 - Cluster: Telnet DX Cluster
-- Analysis: dedicated Python scripts (`predictor.py`, `dxcc_resolver.py`)
-- Storage: memory + local JSON + **SQLite**
-- Security: local API token + nginx reverse proxy (v11.3)
+- Analysis: `predictor.py`, `dxcc_resolver.py`
+- Storage: memory + local JSON + SQLite
+- Security: local API token + nginx reverse proxy
+- MQTT: paho-mqtt (Blitzortung lightning)
 
-No cloud dependency.
+No cloud dependencies.
 
 ---
 
 ## 🗂️ Version History
 
-### v12.0 — Major overhaul: enriched history, Weather module, persistent config
+### v12.1 — Weather Module: Critical Fixes & VHF/UHF/SHF Beacons
 
-- **HISTORY panel redesigned**: switched from "30min/12h" to **"last 5 hours"**, now showing **standout calls by SPD score** (top 5 per hour slot, sorted by rarity), larger characters and orange theme for better readability
-- **Persistent configuration**: MY_CALL and user_qra saved to `data/config.json`, automatically restored on every restart — no more re-entering
-- **DXCC Opportunities**: automatic polling every 30 min (LoTW active + panel visible)
-- **Browser tab title fix**: the page `<title>` was hardcoded to "v11.3" for several versions, never following `APP_VERSION` — fixed to display the current version dynamically
+#### 🌩️ Critical Fix: Blitzortung MQTT Topic Format (2026-08-14)
 
-#### 🌦️ New: Weather Module (Phase 1)
+The Blitzortung broker changed its MQTT topic format in production — geohash characters are now slash-separated (`blitzortung/1.1/s/p/e/#`) instead of concatenated (`blitzortung/1.1/spe/#`). The broker accepted the TCP connection and returned CONNACK=0 but published **nothing** on the old topics — silent failure, zero data received. Fix: `"/".join(gh)` in `_lightning_on_connect()`.
 
-New **⛈️ WEATHER** tab — first phase of the module described in
-`ARCHITECTURE_METEO.md`. Goal: answer "do weather conditions explain
-what I'm observing on the bands?"
+#### 🌩️ Fix: Geohash Neighbor Cells
 
-- **Local conditions** (Open-Meteo, free, no API key): temperature, pressure, humidity, wind, precipitation — QTH position reused automatically, zero extra setup
-- **Electrical activity** (community Blitzortung MQTT bridge): lightning strikes within a 300 km radius, distance and direction (bearing + compass point), 1h history
-- **Bilingual FR/EN noise/weather correlation**: factual and explanatory summary of ambient radio activity, crossed with recent electrical activity — **always shows the source and reference band** used (a 12dB SNR doesn't mean the same thing on 40m as on 10m) — phrased as observations, never as unproven causal claims
-  - **Priority source: WSPR spots** received by stations near the QTH (via [wspr.live](https://wspr.live), free, no API key) — works **24/7**, no dependency on WSJT-X being open
-  - **Automatic fallback: WSJT-X SNR** (new `snr_buffer`, fed by *all* received FT8/FT4 decodes, not just the ones shown in the DX Feed) if no WSPR beacons are received in the area
-- New API routes: `/api/weather/local.json`, `/api/weather/lightning.json`, `/api/weather/wspr.json`, `/api/weather/correlation.json`
-- New page: `/weather`
+A precision-3 geohash cell covers ~156×156 km. Subscribing to only one cell missed strikes in adjacent cells, even 60 km from QTH. Fix: subscription to a 3×3 grid (QTH + 8 neighboring cells, 9 MQTT topics total).
 
-**⚠️ New Python dependency**: `paho-mqtt` (for the lightning feed)
-```bash
-pip install paho-mqtt --break-system-packages
-```
-Without this dependency the app still starts normally — the lightning module disables itself cleanly (warning logged) without affecting the rest of the app.
+#### 🛰️ VHF/UHF/SHF Beacons Panel
 
-**⚠️ Lightning feed reliability**: the community Blitzortung bridge has no official service guarantee. If no strikes appear despite a visible storm elsewhere, see the troubleshooting notes in the `lightning_worker()` comments (webapp.py).
+New panel in the Weather page showing beacons **actually spotted** by stations within 300 km of QTH:
 
-Phase 2 (rain radar on map) and Phase 3 (AI synthesis, long-term history) not included — see `ARCHITECTURE_METEO.md`.
+- **Real-time data**: from the already-connected DX cluster feed. Associated fix: `spot_history` was hardcoding `"de": None` — now captures the spotter's callsign (`de_call`) and distance to QTH (`de_dist_km`) from the cluster line `DX de <SPOTTER>:`
+- **Reference list**: monthly automatic update from [dl0tud.tu-dresden.de/beacons](https://dl0tud.tu-dresden.de/beacons) (CSV by DJ5CW / Fabian Kurz, TU Dresden). Semicolon-separated parsing, deduplication by call, QRT filtering. On failure, local file is preserved and an error message appears in the interface
+- Known beacons (in the reference list) are marked ★
 
-### v11.5 — Persistent Configuration · MY_CALL & QRA in data/config.json
+#### 🧭 Fix: `spot_history` Spotter Field
 
-- **Config persistence** : MY_CALL and user_qra are now saved to `data/config.json` (persists across restarts)
-- No need to re-enter your callsign or locator on every restart or redeploy
-- File auto-created on first launch with defaults
-- Two configuration methods: edit `webapp.py` OR edit `data/config.json` directly
-- New API route `/api/update_mycall` for changing callsign via API (future: integrate in UI)
+The `"de"` column in `spot_history` had been hardcoded to `None` since the beginning, even though the spotter's callsign is available in the raw cluster line. Full fix: extraction of `de_call` and calculation of `de_dist_km` (spotter ↔ QTH distance). Improves not only the Beacons panel but any future analysis requiring spotter geolocation.
 
-### v11.4 — DXCC Opportunities · Automatic Polling
+#### 🎨 Weather Page Visual Redesign
 
-- Added automatic polling every 30 minutes for the "DXCC Opportunities" panel (when LoTW active + panel visible)
-- Previously frozen without user action; now detects new expeditions automatically
+"Instrument Panel" direction: graphite background + amber/teal dual accent (replacing the single cyan), Space Grotesk + IBM Plex Mono fonts, instrument-bezel style panels (top highlight line, rivets). Global Synthesis gauge replaced by an analog S-meter dial (180° arc, colored zones, animated needle).
+
+#### 🔗 Navigation
+
+`⛈️ Météo` link added to `ai_insight.html`, `briefing.html`, `map.html`, `world.html`, `satellites.html`. Also fixed `/briefing.html` → `/briefing` route in `map.html` and `world.html`.
+
+#### 🔢 Fix: index.html Version
+
+A second hardcoded `V11.3` in the visible header of `index.html` (different from the `<title>` already fixed in v12.0) — fixed to follow `{{ version }}`.
 
 ---
 
-### v11.3 — HTTPS Infrastructure · K-index Fixed · Map Filtering · PSK Freshness
+### v12.0 — Weather Module Phase 1, Persistent Config, WSPR
 
-#### 🔐 Nginx Reverse Proxy + DuckDNS + Let's Encrypt (Security v11.3)
+- **Weather Module** (`/weather` page): local Open-Meteo conditions, Blitzortung MQTT lightning, WSPR noise/QRN correlation, Quick VOACAP, 24h band activity
+- **WSPR as priority source**: spots from stations near QTH via wspr.live (24/7, no WSJT-X needed). HF and VHF separated. Automatic fallback to WSJT-X SNR
+- **Persistent config**: MY_CALL and user_qra in `data/config.json`
+- **Title fix**: hardcoded `<title>` as `v11.3` corrected
 
-- Complete reverse proxy configuration on port **8443** (no conflict with NAS 443)
-- DNS challenge acme.sh: no port 80/443 required
-- Nginx Basic Auth + app-level API token (dual layer)
-- Flask remains local 127.0.0.1:8000 (unreachable from Internet)
-- Secure remote HTTPS access: `https://f1smv-dxwatcher.duckdns.org:8443`
+### v11.3 — HTTPS · K-index · PSK Reporter · Band Filters
 
-#### 🗺️ Band Filter on Maps (v11.3)
+- nginx reverse proxy + DuckDNS + Let's Encrypt (port 8443)
+- Fix NOAA K-index parsing (dict vs array format)
+- PSK Reporter 300s cache (official limit)
+- Band filter on Map/World maps
+- Local API token `X-API-Token`
 
-When you select a band in the **DX SPOTS HF/VHF** panel, the map displays **only that band** (not all bands) → better clarity at a glance.
+### v11.0–v11.2 — Security, Critical Fixes
 
-#### 📶 MY SIGNAL Freshness Display (v11.3)
+- Refactored `predictor.py` and `dxcc_resolver.py`
+- Local API token, nginx reverse proxy
+- Fix META ANALYSE (missing script)
+- Fix AI Insight (native popups)
+- Satellite loading indicator
 
-- Explicit text: *"PSK update Xs ago · next possible in Ys"*
-- Makes transparent the 5-min delay that seemed "frozen"
-- Displayed in the MY SIGNAL panel and near "WHO HEARS ME" buttons
+### v10.0–v10.5 — Earlier Versions
 
-#### 🔮 K-index Finally Visible (v11.3)
-
-**Root bug:** NOAA parsing expected `[ ["time_tag","Kp",...], [...], ... ]` (table arrays), but NOAA sends `[ {"time_tag":"...","Kp":3.67,...}, ... ]` (dict objects). Result: Kp returned `None` silently, K-index stayed "N/A" indefinitely.
-
-**Complete fix:**
-- NOAA parsing now accepts both formats (dict AND arrays)
-- A-index fallback if Kp NOAA unavailable: Kp ≈ A/3
-- Improved logging to trace fetch failures
-
-#### 📊 PSK Reporter Cache Adjusted (v11.3)
-
-- TTL: 90s → **300s** (5 min = official NOAA policy)
-- 90s = 3.3× over-solicitation → silent throttling after weeks
-- Frontend polling: 90s → 20s (queries local backend cache, not PSK Reporter directly)
-- Dynamic `age_s` recalculation: even in fallback, report age increments correctly
-
-#### 📍 MY SIGNAL Envelope Latitude Clipping (v11.3)
-
-- Great-circle envelope clipped at **70°N/S**
-- Eliminates "web effect" over Greenland in Mercator projection
-
-#### 🎨 Interface Corrections (v11.3)
-
-- Label "Analyse" → "AI Insight" in `briefing.html` (consistency)
-- Favicon added to `briefing.html`
-- API token interception fixed on `briefing.html` (was silently breaking watchlist POSTs)
-- Setup ⚙ complete: 31 tiles listed flat (FR labels), backend persistence shared
-
----
-
-### v11.2 — Critical Fixes: META ANALYSIS, AI Insight, Satellites
-
-#### 🐛 500 Error on META ANALYSIS — Missing Analyzer Script
-
-The `tools/` directory and `tools/log_meta_analyzer.py` script simply didn't exist on the server — the `POST /api/meta/run` route was failing systematically. Complete rewrite of the missing script.
-
-#### 🔧 AI Insight Page — Native `confirm()`/`alert()` Finally Replaced
-
-Native browser popups (`confirm()`, `alert()`) were still present in production. Fixed: inline HTML dialog.
-
-#### ⏳ Satellites Page — Loading Indicator
-
-The first position computation call (TLE + sgp4) can take up to 45 seconds after a server restart. Added an explicit loading indicator.
-
----
-
-### v11.1 — Security Level 2
-
-- Local API token (`X-API-Token`), generated in `data/api_token.txt` (chmod 600)
-- Global `fetch()` interceptor on frontend
-
-### v11.0 — Predictor.py Refactor, dxcc_resolver.py, Security Hardening
-
-### v10.5 → v10.0 — Previous Versions
-
-Earlier versions are not documented here to avoid cluttering the documentation.  
-See the full commit history on GitHub: 👉 https://github.com/F1SMV/Neural-DX-Watcher/commits/main
+Full history: 👉 https://github.com/F1SMV/Neural-DX-Watcher/commits/main
 
 ---
 
@@ -357,5 +312,5 @@ See the full commit history on GitHub: 👉 https://github.com/F1SMV/Neural-DX-W
 
 Developed by **F1SMV – Eric**  
 with the assistance of Claude (Anthropic)  
-for the amateur radio community.  
+in service of the amateur radio community.  
 Contact: @f1smv on X

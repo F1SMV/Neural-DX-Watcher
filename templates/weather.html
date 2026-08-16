@@ -203,6 +203,12 @@
 
     /* ═══ Activité par bande ═══ */
     .band-table-title { font-size: 0.85em; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 6px; }
+    .beacon-item { display:flex; align-items:center; gap:10px; padding:7px 10px; margin-bottom:5px; background:rgba(255,255,255,0.02); border:1px solid rgba(120,120,120,0.12); border-radius:5px; font-size:0.9em; }
+    .beacon-item.confirmed { border-left:3px solid var(--ok); }
+    .beacon-item .beacon-call { font-family:var(--font-display); font-weight:700; min-width:90px; }
+    .beacon-item .beacon-band-tag { font-size:0.75em; padding:1px 7px; border-radius:3px; }
+    .beacon-item .beacon-meta { color:var(--text-soft); font-size:0.85em; margin-left:auto; text-align:right; }
+    .beacon-item.out-of-range { opacity:0.5; }
     .band-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.85em; }
     .band-row .band-name { width: 44px; color: var(--text-soft); }
     .band-row .band-bar-track { flex: 1; height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px; overflow: hidden; }
@@ -390,10 +396,19 @@
 
     </div>
 
+    <!-- Pavé Balises VHF/UHF/SHF -->
+    <div class="panel" id="panel-beacons" style="margin-top:0;">
+        <div class="panel-header"><span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 📡 BALISES VHF/UHF/SHF REÇUES</span></div>
+        <div class="panel-subtitle">Balises spotées par des stations à moins de 300km de ton QTH sur les 3 dernières heures. Source : flux DX cluster.</div>
+        <div id="beacons-update-status" style="margin-bottom:8px;"></div>
+        <div id="beacons-received"><div class="loading">Chargement…</div></div>
+    </div>
+
 </div>
 
 <script>
 const QTH_LAT = {{ qth_lat }};
+const BAND_COLORS_JS = {{ band_colors | tojson | safe }};
 const QTH_LON = {{ qth_lon }};
 const LIGHTNING_RADIUS_KM = {{ lightning_radius_km }};
 
@@ -561,6 +576,8 @@ function initLightningMap() {
     L.circle([QTH_LAT, QTH_LON], { radius: LIGHTNING_RADIUS_KM * 1000, color: '#ff9500', weight: 1, fillColor: '#ff9500', fillOpacity: 0.04, dashArray: '4,6' }).addTo(lightningMap);
     L.marker([QTH_LAT, QTH_LON], { icon: L.divIcon({ className: '', html: '<div class="qth-marker"></div>', iconSize: [14, 14] }) }).addTo(lightningMap);
     lightningLayerGroup = L.layerGroup().addTo(lightningMap);
+    setTimeout(() => { lightningMap.invalidateSize(); lightningMap.setView([QTH_LAT, QTH_LON], 6); }, 500);
+    setTimeout(() => { lightningMap.invalidateSize(); lightningMap.setView([QTH_LAT, QTH_LON], 6); }, 1500);
 }
 async function loadLightning() {
     const summaryRow = document.getElementById('lightning-summary-row');
@@ -677,8 +694,6 @@ async function loadVoacap() {
 }
 
 // ── Activité par bande ──
-const BAND_COLORS_JS = JSON.parse('{{ band_colors | tojson }}');
-
 function renderBandRows(bands, containerId) {
     const el = document.getElementById(containerId);
     if (!bands || bands.length === 0) { el.innerHTML = `<div class="empty-state">Aucun spot sur 24h</div>`; return; }
@@ -733,6 +748,39 @@ function initPanelSorting() {
     });
 }
 
+// ── Balises VHF/UHF/SHF ──
+async function loadBeacons() {
+    const statusEl = document.getElementById('beacons-update-status');
+    const receivedEl = document.getElementById('beacons-received');
+    try {
+        const resp = await fetch('/api/weather/beacons.json');
+        const data = await resp.json();
+        const st = data.update_status || {};
+        // Statut MAJ (source de la liste de référence, en petit)
+        if (st.last_success) {
+            const d = new Date(st.last_success).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'});
+            statusEl.innerHTML = `<div style="font-size:0.78em;color:var(--text-soft);">Liste de référence : ${st.count||0} balises · MAJ ${d}</div>`;
+        } else if (st.error) {
+            statusEl.innerHTML = `<div style="font-size:0.78em;color:var(--alert);">⚠️ MAJ liste échouée : ${st.error}</div>`;
+        }
+        if (data.received && data.received.length > 0) {
+            receivedEl.innerHTML = data.received.map(e => {
+                const color = BAND_COLORS_JS[e.band] || 'var(--ok)';
+                const ref = e.in_reference ? ' ★' : '';
+                return `<div class="beacon-item confirmed">
+                    <span class="beacon-call" style="color:${color};">${e.call}${ref}</span>
+                    <span class="beacon-band-tag" style="color:${color};border:1px solid ${color}55;background:${color}22;">${e.band}${e.mode?' · '+e.mode:''}</span>
+                    <span class="beacon-meta">via ${e.spotter||'?'} ~${e.spotter_dist_km}km · il y a ${e.age_min}min</span>
+                </div>`;
+            }).join('');
+        } else {
+            receivedEl.innerHTML = `<div class="empty-state">${data.info||'Aucune balise VHF/UHF/SHF reçue dans la zone (3h)'}</div>`;
+        }
+    } catch(e) {
+        if(receivedEl) receivedEl.innerHTML=`<div class="empty-state">Indisponible</div>`;
+    }
+}
+
 // ── Thème (softtech / dark / matrix) — identique à satellites.html ──
 function toggleTheme() {
     const t = ['softtech', 'dark', 'matrix'];
@@ -754,6 +802,7 @@ loadLightning();
 loadCorrelation();
 loadVoacap();
 loadBandActivity();
+loadBeacons();
 
 setInterval(loadHeaderSolar, 300000);
 setInterval(loadSynthesis, 60000);
@@ -762,6 +811,7 @@ setInterval(loadConditions, 1800000);
 setInterval(loadLightning, 60000);
 setInterval(loadCorrelation, 60000);
 setInterval(loadBandActivity, 300000);
+setInterval(loadBeacons, 120000);
 </script>
 
 </body>
