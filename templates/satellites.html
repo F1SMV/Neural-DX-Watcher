@@ -213,6 +213,25 @@
     </div>
 </div>
 
+<!-- Co-visibilité satellite (inspiré HamClock 4.28) -->
+<div class="panel" id="panel-covis" style="margin-top:14px;">
+    <div class="panel-hdr" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span>🛰️↔️🛰️ CO-VISIBILITÉ SATELLITE</span>
+        <span style="font-size:.7em;color:#556;font-weight:normal;">Créneaux où un satellite est visible depuis ton QTH ET chez un correspondant</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;padding:10px 12px;flex-wrap:wrap;border-bottom:1px solid #111;">
+        <label style="font-size:.78em;color:#889;">Satellite :</label>
+        <select id="covis-sat-select" style="background:#0a0f1e;color:#ccc;border:1px solid #333;border-radius:4px;padding:4px 8px;font-size:.85em;"></select>
+        <label style="font-size:.78em;color:#889;margin-left:8px;">Locator correspondant :</label>
+        <input id="covis-locator-input" type="text" placeholder="ex: IO91" maxlength="6"
+               style="background:#0a0f1e;color:#ccc;border:1px solid #333;border-radius:4px;padding:4px 8px;font-size:.85em;width:90px;text-transform:uppercase;">
+        <button class="btn" onclick="loadCovisibility()" style="font-size:.78em;padding:5px 12px;">Calculer</button>
+    </div>
+    <div id="covis-result" style="padding:12px;">
+        <div class="pass-empty">Sélectionne un satellite et saisis le locator d'un correspondant.</div>
+    </div>
+</div>
+
 <!-- SÉLECTION SATELLITES -->
 <div class="panel" style="margin-top:14px;">
     <div class="panel-hdr">⚙️ GESTION DES SATELLITES SUIVIS</div>
@@ -239,6 +258,18 @@
                        color:#ccc;border-radius:4px;font-family:monospace;font-size:0.78em;">
             <div id="sat-catalog-list" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;">
                 <div style="color:#444;font-size:0.78em;font-style:italic;">Chargement du catalogue…</div>
+            </div>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #222;">
+                <div style="font-size:0.68em;color:#556;margin-bottom:5px;">
+                    Satellite absent du catalogue ? (tout juste lancé, pas encore classé par CelesTrak)
+                </div>
+                <div style="display:flex;gap:5px;">
+                    <input id="sat-norad-lookup" type="text" placeholder="NORAD ID (ex: 60000)" inputmode="numeric"
+                        style="flex:1;padding:5px 8px;background:#111;border:1px solid #333;
+                               color:#ccc;border-radius:4px;font-family:monospace;font-size:0.78em;">
+                    <button class="btn" onclick="lookupSatByNorad()" style="font-size:0.75em;padding:5px 10px;">Chercher</button>
+                </div>
+                <div id="sat-norad-lookup-result" style="font-size:0.72em;margin-top:5px;"></div>
             </div>
         </div>
     </div>
@@ -515,12 +546,21 @@ async function loadPositions() {
         const r = await fetch('/api/satellites/positions');
         const d = await r.json();
 
-        // Détecter erreur sgp4 et afficher le message réel
-        const sgp4err = d.positions?.find(p=>p.error);
-        if(sgp4err) {
-            const warn = document.getElementById('sgp4-warning');
-            warn.style.display='block';
-            warn.innerHTML = `⚠ Erreur satellite: <code>${sgp4err.error}</code>`;
+        // Détecter les satellites sans TLE (probablement désorbités) et lister TOUS
+        // les cas, pas juste le premier — sinon un satellite en erreur peut en
+        // masquer un autre.
+        const sgp4errs = (d.positions||[]).filter(p => p.error);
+        const warn = document.getElementById('sgp4-warning');
+        if(sgp4errs.length > 0) {
+            const names = sgp4errs.map(p => `${p.icon||'🛰️'} ${p.name} (NORAD ${p.norad})`).join(', ');
+            const plural = sgp4errs.length > 1;
+            const verbe = plural ? "n'ont" : "n'a";
+            warn.style.display = 'block';
+            warn.innerHTML = `⚠ ${sgp4errs.length} satellite${plural?'s':''} de ta liste ${verbe} plus de TLE disponible — probablement désorbité${plural?'s':''} : <strong>${names}</strong><br>
+                <span style="font-size:0.9em;opacity:0.85;">Pour le${plural?'s':''} retirer : ouvre <strong>⚙ Gérer les satellites</strong> (bouton en haut), colonne <strong>« Satellites suivis »</strong> (à gauche, pas le Catalogue à droite), puis clique sur <strong>✕</strong> à côté du satellite concerné.</span><br>
+                <span style="font-size:0.85em;opacity:0.7;">💡 Nouveautés 2026 côté satellites amateurs : SO-127 (HADES-SA/SpinnyOne, désigné juin 2026), KNACKSAT-2 (actif depuis février 2026, digipeater APRS 145.825), JAMX01 et BY70-4 (lancement prévu 25 août 2026). Vérifie leur NORAD sur amsat.org avant ajout au catalogue.</span>`;
+        } else if(warn) {
+            warn.style.display = 'none';
         }
 
         positions = d.positions||[];
@@ -599,6 +639,74 @@ function renderPassesSatSelector() {
         `<button onclick="document.querySelector('#sat-active-list')?.closest('.panel')?.scrollIntoView({behavior:'smooth'})"
             title="Gérer les satellites" style="padding:2px 9px;font-size:0.7em;cursor:pointer;
             border-radius:4px;background:rgba(0,243,255,0.06);border:1px solid #333;color:#555;">⚙</button>`;
+    renderCovisSatSelector();
+}
+
+function renderCovisSatSelector() {
+    const sel = document.getElementById('covis-sat-select');
+    if(!sel) return;
+    const avail = positions.filter(p => !p.error && p.lat !== undefined);
+    const prevValue = sel.value;
+    sel.innerHTML = avail.map(s => `<option value="${s.norad}">${s.icon||'🛰️'} ${s.name}</option>`).join('');
+    if(avail.some(s => String(s.norad) === prevValue)) sel.value = prevValue;
+}
+
+async function loadCovisibility() {
+    const sel = document.getElementById('covis-sat-select');
+    const input = document.getElementById('covis-locator-input');
+    const resultEl = document.getElementById('covis-result');
+    const norad = sel?.value;
+    const locator = (input?.value || '').trim().toUpperCase();
+
+    if(!norad) { resultEl.innerHTML = '<div class="pass-empty">Aucun satellite disponible.</div>'; return; }
+    if(!locator) { resultEl.innerHTML = '<div class="pass-empty">Saisis le locator du correspondant (ex: IO91).</div>'; return; }
+
+    resultEl.innerHTML = '<div class="pass-empty"><span class="spinner"></span>Calcul de la co-visibilité…</div>';
+
+    try {
+        const resp = await fetch(`/api/satellites/covisibility/${norad}?locator=${encodeURIComponent(locator)}`);
+        const d = await resp.json();
+
+        if(d.error) {
+            resultEl.innerHTML = `<div class="pass-empty" style="color:#f87171;">⚠ ${d.error}</div>`;
+            return;
+        }
+
+        if(!d.windows || d.windows.length === 0) {
+            resultEl.innerHTML = `<div class="pass-empty">
+                Aucune fenêtre de co-visibilité pour <strong>${d.name}</strong> entre
+                ${d.observer_a.call} (${d.observer_a.lat}, ${d.observer_a.lon}) et
+                ${d.observer_b.locator} (${d.observer_b.lat}, ${d.observer_b.lon}) sur les prochaines 48h.
+            </div>`;
+            return;
+        }
+
+        resultEl.innerHTML = `
+            <div style="font-size:.8em;color:#889;margin-bottom:8px;">
+                <strong>${d.name}</strong> — ${d.observer_a.call} ↔ ${d.observer_b.locator}
+                (${d.windows.length} fenêtre${d.windows.length>1?'s':''} sur 48h)
+            </div>
+            <table class="ptable">
+                <thead><tr>
+                    <th>Début (UTC)</th>
+                    <th>Fin (UTC)</th>
+                    <th>Durée</th>
+                    <th>El. max toi</th>
+                    <th>El. max correspondant</th>
+                </tr></thead>
+                <tbody>
+                ${d.windows.map(w => `<tr>
+                    <td>${w.start}</td>
+                    <td>${w.end}</td>
+                    <td>${Math.floor(w.duration_s/60)}min ${w.duration_s%60}s</td>
+                    <td class="${elClass(w.max_el_a)}">${w.max_el_a}°</td>
+                    <td class="${elClass(w.max_el_b)}">${w.max_el_b}°</td>
+                </tr>`).join('')}
+                </tbody>
+            </table>`;
+    } catch(e) {
+        resultEl.innerHTML = '<div class="pass-empty" style="color:#f87171;">⚠ Erreur réseau lors du calcul.</div>';
+    }
 }
 
 function togglePassSat(norad) {
@@ -958,6 +1066,52 @@ async function addSat(norad) {
     await saveActiveSats();
 }
 
+async function lookupSatByNorad() {
+    const input = document.getElementById('sat-norad-lookup');
+    const resultEl = document.getElementById('sat-norad-lookup-result');
+    const norad = parseInt((input?.value || '').trim(), 10);
+
+    if(!norad || norad <= 0) {
+        resultEl.innerHTML = '<span style="color:#f87171;">NORAD ID invalide.</span>';
+        return;
+    }
+    if(catalog.find(s => s.norad === norad)) {
+        resultEl.innerHTML = '<span style="color:#889;">Déjà présent dans le catalogue ci-dessus.</span>';
+        return;
+    }
+
+    resultEl.innerHTML = '<span class="spinner"></span> Recherche sur CelesTrak…';
+    try {
+        const r = await fetch(`/api/satellites/lookup/${norad}`);
+        const d = await r.json();
+        if(!d.ok) {
+            resultEl.innerHTML = `<span style="color:#f87171;">⚠ ${d.error || 'Introuvable'}</span>`;
+            return;
+        }
+        // Ajouter directement à la liste active + au catalogue en mémoire
+        const newSat = {
+            norad: d.norad, name: d.name, type: d.type,
+            color: '#00d4ff', icon: satIcon(d.type), active: true,
+        };
+        catalog.push(newSat);
+        activeSats.push(newSat);
+        const saved = await saveActiveSats();
+        if(!saved) {
+            // Rollback : la sauvegarde a échoué, ne pas laisser un état
+            // incohérent côté client (satellite visible mais non persisté)
+            catalog = catalog.filter(s => s.norad !== d.norad);
+            activeSats = activeSats.filter(s => s.norad !== d.norad);
+            resultEl.innerHTML = '<span style="color:#f87171;">⚠ Trouvé mais échec de la sauvegarde — réessaie.</span>';
+            return;
+        }
+        resultEl.innerHTML = `<span style="color:#4ade80;">✅ ${d.name} (NORAD ${d.norad}) ajouté et suivi.</span>`;
+        input.value = '';
+        document.getElementById('catalog-count').textContent = catalog.length;
+    } catch(e) {
+        resultEl.innerHTML = '<span style="color:#f87171;">⚠ Erreur réseau lors de la recherche.</span>';
+    }
+}
+
 async function removeSat(norad) {
     activeSats = activeSats.filter(s => s.norad !== norad);
     await saveActiveSats();
@@ -978,8 +1132,10 @@ async function saveActiveSats() {
             await loadPositions();
             loadPasses();
             renderSatButtons();
+            return true;
         }
-    } catch(e) { console.error('saveActiveSats:', e); }
+        return false;
+    } catch(e) { console.error('saveActiveSats:', e); return false; }
 }
 
 // ── INIT ──────────────────────────────────────
