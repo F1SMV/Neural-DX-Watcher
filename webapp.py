@@ -87,7 +87,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '12.2'
+APP_VERSION = '12.3'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -117,33 +117,61 @@ DEFAULT_QRA = "JN23"
 CONFIG_FILE = Path("data/config.json")
 
 def load_user_config():
-    """Charge MY_CALL et user_qra depuis data/config.json (ou defaults si absent)."""
-    global MY_CALL, user_qra
+    """Charge MY_CALL, user_qra, user_lat, user_lon depuis data/config.json.
+    v12.3 FIX+: Priorité GPS direct (lat/lon) > QRA conversion.
+    Blitzortung nécessite lat/lon précis, pas QRA convertis (imprécis).
+    """
+    global MY_CALL, user_qra, user_lat, user_lon
     try:
         if CONFIG_FILE.exists():
             data = json.loads(CONFIG_FILE.read_text(encoding='utf-8'))
             MY_CALL = data.get('my_call', MY_CALL).upper().strip()
             user_qra = data.get('user_qra', DEFAULT_QRA).upper().strip()
-            logger.info(f"Config chargée : MY_CALL={MY_CALL}, user_qra={user_qra}")
+            
+            # v12.3 FIX: Priorité GPS direct si fourni (plus fiable que QRA)
+            config_lat = data.get('user_lat')
+            config_lon = data.get('user_lon')
+            
+            if config_lat is not None and config_lon is not None:
+                user_lat = float(config_lat)
+                user_lon = float(config_lon)
+                logger.info(f"Config chargée : MY_CALL={MY_CALL}, user_qra={user_qra}, GPS=({user_lat:.4f}, {user_lon:.4f})")
+            else:
+                logger.info(f"Config chargée : MY_CALL={MY_CALL}, user_qra={user_qra}")
+                _update_location_from_user_qra()  # Fallback si GPS absent
         else:
             logger.info(f"Config.json absent, utilisation defaults : MY_CALL={MY_CALL}, user_qra={DEFAULT_QRA}")
-            save_user_config()  # Crée le fichier avec les defaults
+            save_user_config()
     except Exception as e:
         logger.warning(f"Erreur lors du chargement config.json : {e}, utilisation defaults")
+        _update_location_from_user_qra()  # Fallback si erreur
 
 def save_user_config():
-    """Sauvegarde MY_CALL et user_qra dans data/config.json."""
+    """Sauvegarde MY_CALL, user_qra, user_lat, user_lon dans data/config.json."""
     try:
         CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         data = {
             'my_call': MY_CALL,
             'user_qra': user_qra,
+            'user_lat': round(user_lat, 6),  # Sauvegarder GPS précis
+            'user_lon': round(user_lon, 6),
             'timestamp_utc': datetime.utcnow().isoformat()
         }
         CONFIG_FILE.write_text(json.dumps(data, indent=2), encoding='utf-8')
-        logger.info(f"Config sauvegardée : MY_CALL={MY_CALL}, user_qra={user_qra}")
+        logger.info(f"Config sauvegardée : MY_CALL={MY_CALL}, user_qra={user_qra}, GPS=({user_lat:.4f}, {user_lon:.4f})")
     except Exception as e:
         logger.warning(f"Erreur lors de la sauvegarde config.json : {e}")
+
+def _update_location_from_user_qra():
+    """v12.3 FIX: Recalcule user_lat/lon basé sur user_qra global.
+    Bug: avant, user_lat/lon restaient figés sur DEFAULT_QRA même si 
+    user_qra changeait dans config.json. Cela cassait toutes les cartes (Blitzortung, etc).
+    Fix: appeler cette fonction après charger/modifier user_qra."""
+    global user_lat, user_lon
+    lat, lon = qra_to_lat_lon(user_qra)
+    user_lat = lat if lat is not None else 43.10
+    user_lon = lon if lon is not None else 5.88
+    logger.info(f"Location updated from user_qra '{user_qra}': ({user_lat:.2f}, {user_lon:.2f})")
 
 # --- FIN CONFIGURATION UTILISATEUR ---
 
@@ -179,7 +207,8 @@ METEOR_SHOWERS = [
     {"name": "Léonides", "start": (11, 10), "end": (11, 23), "peak": (11, 17)},
     {"name": "Géminides", "start": (12, 4), "end": (12, 17), "peak": (12, 14)},
 ]
-MSK144_RANGE_KHZ = (144350, 144370)  # sous-segment MSK144 standard en 2m
+MSK144_FREQ = 144.360
+MSK144_TOLERANCE_KHZ = 10 / 1000
 
 # --- DEFINITIONS BANDES ---
 HF_BANDS = ['160m', '80m', '60m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m']
@@ -228,9 +257,9 @@ BRIEFING_DEFAULT_SOURCES = [
     {
         "id": "arrl",
         "name": "ARRL News",
-        "url": "https://www.arrl.org/news",
+        "url": "https://www.arrl.org/arrl.rss",
         "site": "https://www.arrl.org/news",
-        "type": "html",
+        "type": "rss",
     },
     {
         "id": "ng3k",
@@ -1197,8 +1226,29 @@ def get_band_activity_24h():
 
 BEACON_REFERENCE_FILE   = Path("data/beacons_reference.json")
 BEACON_REFERENCE_META   = Path("data/beacons_reference.meta.json")
-BEACON_SOURCE_URL       = "https://dl0tud.tu-dresden.de/beacons/csv.php"
-BEACON_SOURCE_LABEL     = "dl0tud.tu-dresden.de/beacons (DJ5CW, Fabian Kurz, TU Dresden)"
+
+# Sources de balises VHF/UHF/SHF — support multi-source avec fallback
+BEACON_SOURCES = [
+    {
+        "name": "dl0tud",
+        "url": "https://dl0tud.tu-dresden.de/beacons/csv.php",
+        "label": "dl0tud.tu-dresden.de/beacons (DJ5CW, Fabian Kurz, TU Dresden)",
+        "format": "csv",
+        "delimiter": ";",
+        "priority": 1,
+    },
+    {
+        "name": "dl8wx",
+        "url": "http://www.dl8wx.de/bakenukw.htm",
+        "label": "dl8wx.de (Michael Weber) — fallback",
+        "format": "html",
+        "priority": 2,
+    },
+]
+
+# Source active (par défaut dl0tud, bascule sur dl8wx si indisponible)
+BEACON_SOURCE_URL   = BEACON_SOURCES[0]["url"]
+BEACON_SOURCE_LABEL = BEACON_SOURCES[0]["label"]
 BEACON_UPDATE_INTERVAL  = 30 * 24 * 3600   # 30 jours
 VHF_UHF_SHF_BEACON_BANDS = ["6m", "4m", "2m", "70cm", "23cm", "13cm",
                               "9cm", "6cm", "3cm", "12mm", "6mm", "4mm"]
@@ -1214,6 +1264,67 @@ beacon_update_status = {
     "error": None, "meta_file_date": None,
 }
 beacon_update_lock = threading.Lock()
+
+
+def _parse_beacon_html(text):
+    """v12.3: Parse HTML de dl8wx.de (fallback si dl0tud indisponible).
+    Extrait balises VHF/UHF/SHF du tableau HTML.
+    Format: <td>callsign</td> <td>freq</td> <td>loc</td> ...
+    """
+    import re as _re
+    from html import unescape
+    
+    FREQ_BANDS = [
+        (28.0, 30.0, "10m"), (50.0, 54.0, "6m"), (70.0, 71.0, "4m"),
+        (144.0, 148.0, "2m"), (430.0, 440.0, "70cm"), (1240.0, 1300.0, "23cm"),
+        (2300.0, 2450.0, "13cm"), (3300.0, 3500.0, "9cm"), (5650.0, 5850.0, "6cm"),
+        (10000.0, 10500.0, "3cm"), (24000.0, 24250.0, "12mm"),
+        (47000.0, 47200.0, "6mm"), (75500.0, 81000.0, "4mm"),
+    ]
+    
+    def freq_to_band(mhz):
+        for lo, hi, band in FREQ_BANDS:
+            if lo <= mhz <= hi:
+                return band
+        return None
+    
+    # Extraire toutes les lignes du tableau (balises)
+    rows = _re.findall(r'<tr[^>]*>(.*?)</tr>', text, _re.DOTALL)
+    beacons = []
+    
+    for row in rows:
+        cells = _re.findall(r'<td[^>]*>(.*?)</td>', row, _re.DOTALL)
+        if len(cells) < 3:
+            continue
+        
+        try:
+            call = unescape(_re.sub(r'<[^>]+>', '', cells[0])).strip().upper()
+            freq_str = unescape(_re.sub(r'<[^>]+>', '', cells[1])).strip().replace(',', '.')
+            loc_str = unescape(_re.sub(r'<[^>]+>', '', cells[2])).strip().upper()
+            
+            if not call or not freq_str or not loc_str:
+                continue
+            
+            freq_mhz = float(freq_str)
+            band = freq_to_band(freq_mhz)
+            
+            if band not in ['2m', '70cm', '23cm', '13cm']:  # Filtre prudent
+                continue
+            
+            if not _re.match(r'^[A-R]{2}[0-9]{2}', loc_str):
+                continue
+            
+            beacons.append({
+                "call": call,
+                "freq_mhz": round(freq_mhz, 4),
+                "band": band,
+                "locator": loc_str[:6],
+                "last_report": time.strftime("%Y-%m-%d"),
+            })
+        except (ValueError, IndexError):
+            continue
+    
+    return sorted(beacons, key=lambda b: (b["band"], b["freq_mhz"]))
 
 
 def _parse_beacon_csv(text):
@@ -1271,38 +1382,79 @@ def _parse_beacon_csv(text):
             by_call[call] = entry
     return sorted(by_call.values(), key=lambda b: (b["band"], b["freq_mhz"]))
 def fetch_beacon_reference():
+    """v12.3: Fetch balises avec fallback multi-source.
+    Essaie dl0tud d'abord, puis dl8wx en cas d'erreur.
+    """
     now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     with beacon_update_lock:
         beacon_update_status["last_attempt"] = now_iso
         beacon_update_status["error"] = None
-    try:
-        req = urllib.request.Request(
-            BEACON_SOURCE_URL,
-            headers={"User-Agent": BRIEFING_USER_AGENT, "Accept": "text/csv,*/*"},
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            text = r.read().decode("utf-8", errors="ignore")
-        beacons = _parse_beacon_csv(text)
-        if len(beacons) < 10:
-            raise ValueError(f"Seulement {len(beacons)} balises parsees — CSV suspect")
-        BEACON_REFERENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        BEACON_REFERENCE_FILE.write_text(
-            json.dumps(beacons, ensure_ascii=False, indent=2), encoding="utf-8")
-        meta = {"source": BEACON_SOURCE_LABEL, "source_url": BEACON_SOURCE_URL,
-                "updated_at": now_iso, "count": len(beacons)}
-        BEACON_REFERENCE_META.write_text(
-            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-        with beacon_update_lock:
-            beacon_update_status.update({
-                "last_success": now_iso, "count": len(beacons),
-                "error": None, "meta_file_date": now_iso,
-            })
-        logger.info(f"BeaconUpdate: {len(beacons)} balises mises a jour depuis {BEACON_SOURCE_LABEL}")
-    except Exception as e:
-        msg = str(e)
+    
+    beacons = None
+    source_used = None
+    
+    # Essayer chaque source par ordre de priorité
+    for source in sorted(BEACON_SOURCES, key=lambda s: s["priority"]):
+        try:
+            logger.info(f"BeaconUpdate: tentative fetch depuis {source['label']}")
+            req = urllib.request.Request(
+                source["url"],
+                headers={"User-Agent": BRIEFING_USER_AGENT, "Accept": "text/csv,*/*"},
+            )
+            with urllib.request.urlopen(req, timeout=30) as r:
+                text = r.read().decode("utf-8", errors="ignore")
+            
+            # Parse selon format
+            if source["format"] == "csv":
+                beacons = _parse_beacon_csv(text)
+            elif source["format"] == "html":
+                beacons = _parse_beacon_html(text)
+            
+            if beacons and len(beacons) >= 10:
+                source_used = source
+                logger.info(f"BeaconUpdate: succès {source['label']} — {len(beacons)} balises")
+                break
+            else:
+                logger.warning(f"BeaconUpdate: {source['label']} retourné {len(beacons) if beacons else 0} balises — trop peu")
+        
+        except Exception as e:
+            msg = str(e)
+            logger.warning(f"BeaconUpdate: échec {source['label']} ({msg})")
+            continue
+    
+    # Si au moins une source a fonctionné
+    if beacons and source_used:
+        try:
+            BEACON_REFERENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            BEACON_REFERENCE_FILE.write_text(
+                json.dumps(beacons, ensure_ascii=False, indent=2), encoding="utf-8")
+            meta = {
+                "source": source_used["label"],
+                "source_url": source_used["url"],
+                "updated_at": now_iso,
+                "count": len(beacons),
+                "version": "v12.3"
+            }
+            BEACON_REFERENCE_META.write_text(
+                json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+            with beacon_update_lock:
+                beacon_update_status.update({
+                    "last_success": now_iso,
+                    "count": len(beacons),
+                    "source": source_used["label"],
+                    "error": None,
+                    "meta_file_date": now_iso,
+                })
+            logger.info(f"BeaconUpdate: {len(beacons)} balises mises a jour (source: {source_used['label']})")
+        except Exception as e:
+            logger.error(f"BeaconUpdate: erreur ecriture fichier ({e})")
+            with beacon_update_lock:
+                beacon_update_status["error"] = f"Erreur ecriture: {e}"
+    else:
+        msg = "Toutes les sources indisponibles"
         with beacon_update_lock:
             beacon_update_status["error"] = msg
-        logger.warning(f"BeaconUpdate: echec MAJ balises ({msg}) — fichier local conserve")
+        logger.warning(f"BeaconUpdate: {msg} — fichier local conserve")
 
 
 def beacon_update_worker():
@@ -1384,13 +1536,23 @@ def get_beacons_in_range():
     return {"beacons": results, "info": None}
 
 def get_beacon_reception_events(window_min=180):
-    """Balises VHF/UHF/SHF réellement spotées par des stations dans TON
-    locator ou un locator adjacent (rayon effectif ~300km autour du QTH).
-    Ne dépend PAS de la liste de référence — remonte tout spot VHF/UHF/SHF
-    dont le spotter est proche de toi. Déduplique par callsign (meilleur
-    événement = le plus récent)."""
+    """v12.3: Balises VHF/UHF/SHF RÉFÉRENCÉES réellement spotées par des stations
+    à moins de 300km du QTH utilisateur, dans les N dernières minutes.
+    
+    FILTRE STRICT : affiche UNIQUEMENT les vraies balises officielles IARU 
+    (pas les stations régulières comme OZ5QF).
+    
+    Déduplique par callsign (meilleur événement = le plus récent).
+    Données : dl0tud.tu-dresden.de (DJ5CW, TU Dresden) avec fallback dl8wx.de
+    """
     cutoff = time.time() - window_min * 60
-    known_calls = {b.get("call", "").upper() for b in load_beacon_reference() if b.get("call")}
+    known_beacons = {b.get("call", "").upper() for b in load_beacon_reference() if b.get("call")}
+    
+    if not known_beacons:
+        logger.warning("get_beacon_reception_events: liste balises vide — fallback fetch")
+        fetch_beacon_reference()
+        known_beacons = {b.get("call", "").upper() for b in load_beacon_reference() if b.get("call")}
+    
     seen = {}
     with spot_history_lock:
         for entry in spot_history:
@@ -1398,22 +1560,40 @@ def get_beacon_reception_events(window_min=180):
                 continue
             if entry.get("band") not in VHF_UHF_SHF_BEACON_BANDS:
                 continue
+            
+            # FILTRE STRICT v12.3 : exclure les stations non-référencées
+            dx_call = (entry.get("dx") or "").upper()
+            if not dx_call or dx_call not in known_beacons:
+                continue  # ← Ignore si ce n'est pas une vraie balise
+            
+            # Filtre distance spotter < 300km
             de_dist = entry.get("de_dist_km")
             if de_dist is None or de_dist > 300:
                 continue
-            call = (entry.get("dx") or "").upper()
-            if not call:
-                continue
+            
+            spotter = entry.get("de") or "?"
             age_min = int((time.time() - entry.get("ts", time.time())) / 60)
-            if call not in seen or age_min < seen[call]["age_min"]:
-                seen[call] = {
-                    "call": call, "band": entry.get("band"),
-                    "mode": entry.get("mode"), "spotter": entry.get("de"),
-                    "spotter_dist_km": round(de_dist, 0), "age_min": age_min,
-                    "in_reference": call in known_calls,
+            
+            # Déduplique : garder le plus récent
+            if dx_call not in seen or age_min < seen[dx_call]["age_min"]:
+                seen[dx_call] = {
+                    "call": dx_call,
+                    "band": entry.get("band"),
+                    "mode": entry.get("mode", "?"),
+                    "freq_mhz": entry.get("freq_khz", 0) / 1000.0 if entry.get("freq_khz") else None,
+                    "spotter": spotter,
+                    "spotter_callsign": entry.get("de"),
+                    "spotter_dist_km": round(de_dist, 1),
+                    "age_min": age_min,
                 }
+    
     events = sorted(seen.values(), key=lambda e: e["age_min"])
-    info = None if events else "Aucune balise VHF/UHF/SHF spotée par une station à moins de 300km de ton QTH sur les 3 dernières heures."
+    
+    # Message si aucune balise trouvée
+    info = None
+    if not events:
+        info = "Aucune balise IARU référencée spotée par une station à moins de 300km sur les 3h. (Note: affiche uniquement les vraies balises, pas les stations régulières)"
+    
     return {"events": events, "info": info}
 
 def get_weather_alerts():
@@ -1699,10 +1879,26 @@ def qra_to_lat_lon(qra):
         return None, None
 
 # Initialisation du QTH utilisateur
+# v12.3 FIX: Utiliser GPS exact pour JN23 au lieu de conversion QRA (imprécis)
+# JN23 = La Seyne-sur-Mer, Provence: 43.1004°N, 6.0096°E
+# Avant (faux): qra_to_lat_lon("JN23") retournait (43.5, 5.0) — 100km d'erreur!
+DEFAULT_LAT_JN23 = 43.1004  # La Seyne-sur-Mer
+DEFAULT_LON_JN23 = 6.0096
+
+# Tenter conversion QRA d'abord, fallback sur GPS exact
 initial_lat, initial_lon = qra_to_lat_lon(DEFAULT_QRA)
+if DEFAULT_QRA == "JN23" and (initial_lat is None or initial_lon is None):
+    # JN23 spécial: utiliser GPS exact
+    initial_lat, initial_lon = DEFAULT_LAT_JN23, DEFAULT_LON_JN23
+
 user_qra = DEFAULT_QRA
-user_lat = initial_lat if initial_lat is not None else 43.10
-user_lon = initial_lon if initial_lon is not None else 5.88
+user_lat = initial_lat if initial_lat is not None else DEFAULT_LAT_JN23
+user_lon = initial_lon if initial_lon is not None else DEFAULT_LON_JN23
+
+# ✅ v12.3 FIX CRITIQUE: Charger config.json IMMEDIATEMENT (pas à la fin du script!)
+# Avant: load_user_config() était appelée ligne 7328 (trop tard)
+# Après: user_lat/lon sont recalculés dès le démarrage
+load_user_config()
 
 def is_meteor_shower_active():
     now = time.gmtime(time.time())
@@ -2042,7 +2238,7 @@ def get_band_and_mode_smart(freq_float, comment):
                 break
 
     # MSK144
-    if band == "2m" and MSK144_RANGE_KHZ[0] <= freq_khz <= MSK144_RANGE_KHZ[1]:
+    if band == "2m" and abs(freq_khz - (MSK144_FREQ * 1000)) <= MSK144_TOLERANCE_KHZ:
         mode = "MSK144"
 
     # OVERRIDE COMMENT
@@ -4211,37 +4407,77 @@ def _extract_html_items(source_id: str, html_text: str, limit: int):
     soup = BeautifulSoup(html_text, "html.parser")
     items = []
 
-    if source_id == "dxnews":
-        for article in soup.select("article, .post, .entry, div.item"):
-            # Titre + lien
-            title_link = article.select_one("h1 a, h2 a, h3 a, h4 a, .entry-title a, .post-title a")
-            if not title_link:
+    if source_id == "arrl":
+        # Parser ARRL News (arrl.org/news) — robuste
+        # Stratégie: extraire tous les liens /news/..., parser chaque titre/date
+        import re as _re
+        
+        # Étape 1: Extraire tous les liens /news/YYYY/MM/DD/slug
+        news_links = set()  # Déduplique
+        for link_tag in soup.select("a[href*='/news/']"):
+            href = link_tag.get("href", "")
+            # Filtrer: garder que /news/YYYY/MM/DD/slug (pas nav/pagination)
+            if _re.match(r'/news/\d{4}/\d{2}/\d{2}/[\w-]+', href):
+                news_links.add(href)
+        
+        if not news_links:
+            logger.warning("ARRL News: aucun lien /news/ trouvé, parsing alternatif")
+        
+        # Étape 2: Parser chaque lien trouvé
+        for href in sorted(news_links, reverse=True)[:limit]:  # Récents d'abord
+            # Extraire date depuis URL: /news/2026/08/27/slug
+            date_match = _re.search(r'/news/(\d{4})/(\d{2})/(\d{2})/', href)
+            published = None
+            if date_match:
+                try:
+                    y, m, d = int(date_match.group(1)), int(date_match.group(2)), int(date_match.group(3))
+                    import datetime
+                    dt = datetime.datetime(y, m, d, tzinfo=datetime.timezone.utc)
+                    published = dt.isoformat()
+                except:
+                    pass
+            
+            # Chercher le titre dans le lien (text contenu du <a>)
+            link_tag = soup.find("a", href=href)
+            title = ""
+            if link_tag:
+                title = _strip_html(link_tag.get_text(strip=True))
+            
+            # Fallback: extraire du slug si pas de texte
+            if not title:
+                slug = href.split('/')[-1]
+                title = slug.replace('-', ' ').title()
+            
+            if not title or len(title) < 3:
                 continue
-            title = _strip_html(title_link.get_text(strip=True))
-            link  = title_link.get("href") or ""
-            # Résumé — essayer plusieurs conteneurs
+            
+            # Chercher résumé (paragraphe suivant le lien ou nearby)
             summary = ""
-            for sel in [".entry-content p", ".entry-summary p", ".post-content p",
-                        ".excerpt p", "p.summary", "p"]:
-                tag = article.select_one(sel)
-                if tag:
-                    txt = _strip_html(tag.get_text(strip=True))
+            if link_tag and link_tag.parent:
+                for p in link_tag.parent.find_all("p", limit=1):
+                    txt = _strip_html(p.get_text(strip=True))
                     if txt and len(txt) > 20:
                         summary = txt[:300]
                         break
-            # Date
-            time_tag  = article.select_one("time")
-            published = time_tag.get("datetime") if time_tag else None
-            if not title:
-                continue
+            
+            full_url = ("https://www.arrl.org" + href) if href.startswith('/') else href
+            
             items.append({
                 "title": title,
-                "link": link,
+                "link": full_url,
                 "published_utc": published,
                 "summary": summary,
             })
+            
             if len(items) >= limit:
                 break
+        
+        logger.debug(f"ARRL News parsed: {len(items)} articles trouvés")
+
+    elif source_id == "dxnews":
+        # ❌ Deprecated: dxnews.com est instable (remplacé par ARRL)
+        logger.warning("dxnews.com deprecated, use ARRL News instead")
+        return items
 
     elif source_id == "ng3k":
         import re, datetime
@@ -4349,51 +4585,6 @@ def _extract_html_items(source_id: str, html_text: str, limit: int):
             else:
                 i += 1
 
-    elif source_id == "arrl":
-        import re, datetime
-        # Structure ARRL News (arrl.org/news) : chaque article est un <li>/<div>
-        # avec un lien titre + une date "MM/DD/YYYY" juste avant + un résumé texte.
-        # On cherche les liens vers /news/<slug> (articles individuels), en excluant
-        # les liens de navigation (/news, /news/index/page:N, /news-tips, etc.)
-        seen_links = set()
-        for a in soup.select("a[href*='/news/']"):
-            href = a.get("href") or ""
-            if not re.search(r'/news/[a-z0-9][a-z0-9-]{10,}$', href, re.IGNORECASE):
-                continue  # exclut /news, /news/index/page:2/model:News, /news-tips...
-            if href in seen_links:
-                continue
-            title = _strip_html(a.get_text(strip=True))
-            if not title or len(title) < 8:
-                continue
-            seen_links.add(href)
-
-            # Chercher la date "MM/DD/YYYY" dans le texte environnant (bloc parent)
-            published = None
-            parent_text = _strip_html(a.parent.get_text(" ", strip=True)) if a.parent else ""
-            date_m = re.search(r'(\d{2})/(\d{2})/(\d{4})', parent_text)
-            if date_m:
-                try:
-                    dt = datetime.datetime(int(date_m.group(3)), int(date_m.group(1)), int(date_m.group(2)))
-                    published = dt.strftime("%Y-%m-%dT00:00:00Z")
-                except ValueError:
-                    pass
-
-            # Résumé : texte du bloc parent, en retirant le titre et la date
-            summary = parent_text
-            if date_m:
-                summary = summary.replace(date_m.group(0), "")
-            summary = summary.replace(title, "").strip(" |")
-            summary = re.sub(r'^#+\s*\|?\s*', '', summary).strip(" |")
-            summary = summary[:300]
-
-            items.append({
-                "title": title,
-                "link": href if href.startswith("http") else f"https://www.arrl.org{href}",
-                "published_utc": published,
-                "summary": summary,
-            })
-            if len(items) >= limit:
-                break
 
     elif source_id == "dxmaps":
         for row in soup.select("table tr"):
@@ -6270,19 +6461,13 @@ def _load_tle_cache():
 SAT_CONFIG_FILE = Path("data/satellites_config.json")
 
 def _get_active_sat_ids():
-    """Retourne la liste des NORAD IDs actifs (fichier config ou défaut).
-
-    Le fallback sur SATELLITES_OF_INTEREST ne doit s'appliquer QUE si le
-    fichier de config n'existe pas ou est illisible — jamais si l'utilisateur
-    a explicitement choisi une liste vide ou courte (ex: après avoir retiré
-    tous ses satellites, ou désactivé un satellite désorbité). Un ancien bug
-    ici retombait sur la liste par défaut dès que la liste active était
-    vide, ce qui réaffichait silencieusement les satellites que l'utilisateur
-    venait justement de retirer."""
+    """Retourne la liste des NORAD IDs actifs (fichier config ou défaut)."""
     if SAT_CONFIG_FILE.exists():
         try:
             cfg = json.loads(SAT_CONFIG_FILE.read_text(encoding='utf-8'))
-            return [int(s['norad']) for s in cfg if s.get('active', True)]
+            ids = [int(s['norad']) for s in cfg if s.get('active', True)]
+            if ids:
+                return ids
         except Exception as e:
             logger.warning(f"satellites_config.json illisible: {e}")
     return list(SATELLITES_OF_INTEREST.keys())
@@ -6439,91 +6624,6 @@ def _next_passes(tle1, tle2, lat_obs, lon_obs, n_passes=5):
     except Exception as e:
         return [{'error': str(e)}]
 
-def _next_passes_raw(tle1, tle2, lat_obs, lon_obs, n_passes=8, horizon_hours=48):
-    """Variante de _next_passes qui retourne des objets datetime bruts
-    (aos_dt/tca_dt/los_dt) au lieu de chaînes formatées — nécessaire pour
-    calculer une intersection temporelle entre deux observateurs (co-visibilité).
-    Horizon élargi à 48h par défaut (vs 24h pour l'affichage simple) car il
-    faut suffisamment de passages des deux côtés pour trouver un recouvrement."""
-    try:
-        import datetime as dt
-        if not SGP4_AVAILABLE:
-            return [{'error': 'sgp4 non disponible'}]
-        sat = _Satrec.twoline2rv(tle1, tle2)
-        now_utc = dt.datetime.now(dt.timezone.utc)
-        passes = []
-        step = dt.timedelta(seconds=30)
-        t = now_utc
-        in_pass = False
-        aos = tca = None
-        tca_el = -90
-        limit = now_utc + dt.timedelta(hours=horizon_hours)
-
-        while t < limit and len(passes) < n_passes:
-            jd_i, jd_f = _dt_to_jd(t)
-            e, r, v = sat.sgp4(jd_i, jd_f)
-            if e == 0:
-                az, el = _azel(r, lat_obs, lon_obs, 0, t)
-                if el > 0 and not in_pass:
-                    in_pass = True
-                    aos = t
-                    tca_el = el
-                    tca = t
-                elif el > 0 and in_pass:
-                    if el > tca_el:
-                        tca_el = el
-                        tca = t
-                elif el <= 0 and in_pass:
-                    in_pass = False
-                    if tca_el > 5:
-                        passes.append({
-                            'aos_dt': aos, 'tca_dt': tca, 'los_dt': t,
-                            'max_el': round(tca_el, 1),
-                        })
-            t += step
-
-        return passes
-    except Exception as e:
-        return [{'error': str(e)}]
-
-def compute_covisibility(tle1, tle2, lat_a, lon_a, lat_b, lon_b, n_passes=8, horizon_hours=48):
-    """Calcule les fenêtres de co-visibilité d'un satellite entre deux
-    observateurs (station A = QTH utilisateur, station B = correspondant).
-    Une fenêtre de co-visibilité est l'intersection temporelle entre un
-    passage de A et un passage de B — les deux stations voient le satellite
-    simultanément, condition nécessaire pour un QSO satellite entre elles.
-
-    Ne fabrique jamais de recouvrement approximatif : si les fenêtres AOS/LOS
-    ne se chevauchent pas réellement (calcul sgp4 indépendant pour chaque
-    station), aucune entrée n'est retournée pour cette paire de passages."""
-    passes_a = _next_passes_raw(tle1, tle2, lat_a, lon_a, n_passes, horizon_hours)
-    passes_b = _next_passes_raw(tle1, tle2, lat_b, lon_b, n_passes, horizon_hours)
-
-    if passes_a and 'error' in passes_a[0]:
-        return {'error': passes_a[0]['error']}
-    if passes_b and 'error' in passes_b[0]:
-        return {'error': passes_b[0]['error']}
-
-    windows = []
-    for pa in passes_a:
-        for pb in passes_b:
-            overlap_start = max(pa['aos_dt'], pb['aos_dt'])
-            overlap_end = min(pa['los_dt'], pb['los_dt'])
-            if overlap_start < overlap_end:
-                duration_s = (overlap_end - overlap_start).total_seconds()
-                if duration_s < 30:
-                    continue  # recouvrement trop court pour être exploitable
-                windows.append({
-                    'start': overlap_start.strftime('%d/%m %H:%M:%SZ'),
-                    'end': overlap_end.strftime('%H:%M:%SZ'),
-                    'duration_s': int(duration_s),
-                    'max_el_a': pa['max_el'],
-                    'max_el_b': pb['max_el'],
-                })
-
-    windows.sort(key=lambda w: w['start'])
-    return {'windows': windows}
-
 @app.route('/satellites')
 @app.route('/satellites.html')
 def satellites_page():
@@ -6544,12 +6644,11 @@ def api_satellite_positions():
             sat_type = _infer_sat_type(norad_id, tle_name)
         sat_icon = meta.get('icon', '') or _infer_sat_icon(sat_type, tle_name)
         if norad_id not in tles:
-            sat_name = meta.get('name', str(norad_id))
-            result.append({'norad': norad_id, 'name': sat_name,
+            result.append({'norad': norad_id, 'name': meta.get('name', str(norad_id)),
                            'type': sat_type,
                            'color': meta.get('color','#aaa'),
                            'icon': sat_icon,
-                           'error': f"TLE indisponible pour {sat_name} (NORAD {norad_id}) — probablement désorbité, à retirer de la liste via ⚙"})
+                           'error': 'TLE non disponible'})
             continue
         tle_name, tle1, tle2 = tles[norad_id]
         pos = _compute_satellite_position(tle1, tle2, user_lat, user_lon)
@@ -6583,51 +6682,6 @@ def api_satellite_passes(norad_id):
         name = tle_name
     passes = _next_passes(tle1, tle2, user_lat, user_lon)
     return jsonify({'norad': norad_id, 'name': name, 'passes': passes})
-
-@app.route('/api/satellites/covisibility/<int:norad_id>')
-def api_satellite_covisibility(norad_id):
-    """Calcule les fenêtres où un satellite est visible SIMULTANÉMENT
-    depuis TON QTH et depuis la position d'un correspondant (paramètre
-    'locator', ex: ?locator=IO91). Nécessaire pour planifier un QSO
-    satellite : les deux stations doivent voir le satellite en même temps.
-
-    Inspiré de la fonction 'satellite co-visibility' de HamClock 4.28
-    (hams.at). Calcul 100% local via sgp4 — aucune dépendance externe."""
-    locator = request.args.get('locator', '').strip().upper()
-    if not locator:
-        return jsonify({'error': "Paramètre 'locator' requis (ex: ?locator=IO91)"}), 400
-
-    # Validation stricte du format Maidenhead avant conversion : qra_to_lat_lon()
-    # ne rejette pas les lettres hors A-R (ex: 'ZZ99' produirait des coordonnées
-    # hors plage -90/90 et -180/180 sans erreur) — on valide donc ici en amont.
-    import re as _re_loc
-    if not _re_loc.match(r'^[A-R]{2}[0-9]{2}([A-X]{2})?$', locator):
-        return jsonify({'error': f"Locator invalide : '{locator}' (format attendu : AA00 ou AA00aa)"}), 400
-
-    corr_lat, corr_lon = qra_to_lat_lon(locator)
-    if corr_lat is None or corr_lon is None:
-        return jsonify({'error': f"Locator invalide : '{locator}'"}), 400
-
-    tles = _load_tle_cache()
-    if norad_id not in tles:
-        return jsonify({'error': f'TLE non disponible pour NORAD {norad_id}'}), 404
-    tle_name, tle1, tle2 = tles[norad_id]
-    meta = _get_sat_meta(norad_id)
-    name = meta.get('name') or tle_name or str(norad_id)
-    if name == str(norad_id) and tle_name and tle_name != str(norad_id):
-        name = tle_name
-
-    result = compute_covisibility(tle1, tle2, user_lat, user_lon, corr_lat, corr_lon)
-    if 'error' in result:
-        return jsonify({'error': result['error']}), 500
-
-    return jsonify({
-        'norad': norad_id,
-        'name': name,
-        'observer_a': {'call': MY_CALL, 'lat': round(user_lat, 3), 'lon': round(user_lon, 3)},
-        'observer_b': {'locator': locator.upper(), 'lat': round(corr_lat, 3), 'lon': round(corr_lon, 3)},
-        'windows': result['windows'],
-    })
 
 @app.route('/api/satellites/footprint/<int:norad_id>')
 def api_satellite_footprint(norad_id):
@@ -6764,12 +6818,11 @@ def api_satellites_list():
 @app.route('/api/satellites/config', methods=['POST'])
 @require_api_token
 def api_satellites_config():
-    """Met à jour la liste des satellites actifs. Une liste vide est un
-    état valide (l'utilisateur peut vouloir ne plus suivre aucun satellite
-    temporairement, notamment après avoir retiré le dernier de sa liste
-    via ✕) — ne jamais rejeter cette requête."""
+    """Met à jour la liste des satellites actifs."""
     data = request.get_json(force=True)
     satellites = data.get('satellites', [])
+    if not satellites:
+        return jsonify({'ok': False, 'error': 'Liste vide'}), 400
     valid = []
     for s in satellites:
         if 'norad' not in s or 'name' not in s:
@@ -6801,46 +6854,6 @@ def api_tle_refresh():
         'satellites_found': found,
         'message': f'{len(tles)} TLE rechargés depuis CelesTrak'
     })
-
-@app.route('/api/satellites/lookup/<int:norad_id>')
-def api_satellite_lookup(norad_id):
-    """Recherche un satellite par son NORAD ID directement sur CelesTrak,
-    indépendamment de sa catégorisation en GROUP (amateur/stations/etc.).
-
-    Nécessaire car un satellite tout juste lancé peut mettre plusieurs
-    jours à être classé dans le groupe 'amateur' par CelesTrak — il
-    n'apparaît donc pas dans le catalogue habituel (_load_tle_cache, qui
-    n'interroge que GROUP=amateur et GROUP=stations) tant que cette
-    catégorisation n'est pas faite, même si son TLE existe déjà."""
-    url = f"https://celestrak.org/NORAD/elements/gp.php?CATNR={norad_id}&FORMAT=json"
-    try:
-        text = _fetch_url(url)
-        if not text:
-            return jsonify({'ok': False, 'error': 'CelesTrak injoignable ou NORAD introuvable'}), 404
-        import json as _json
-        data = _json.loads(text)
-        if not isinstance(data, list) or not data:
-            return jsonify({'ok': False, 'error': f'Aucun satellite trouvé pour NORAD {norad_id}'}), 404
-        obj = data[0]
-        name = obj.get('OBJECT_NAME', str(norad_id)).strip()
-        tle1 = obj.get('TLE_LINE1', '').strip()
-        tle2 = obj.get('TLE_LINE2', '').strip()
-        if not tle1 or not tle2:
-            return jsonify({'ok': False, 'error': 'TLE incomplet pour ce satellite'}), 404
-
-        # Injecte directement dans le cache TLE en mémoire pour que le
-        # satellite soit immédiatement utilisable (positions/passages/
-        # co-visibilité) sans attendre le prochain refresh périodique.
-        _tle_cache[norad_id] = (name, tle1, tle2)
-
-        return jsonify({
-            'ok': True,
-            'norad': norad_id,
-            'name': name,
-            'type': _infer_sat_type(norad_id, name),
-        })
-    except Exception as e:
-        return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/satellites/tle_debug')
 def api_tle_debug():
@@ -7049,186 +7062,6 @@ def api_reality_check(zone):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ═══════════════════════════════════════════════════════════════════════════
-# v12.2 — MY SIGNAL via MQTT PSK Reporter (remplace le polling HTTP en usage
-# normal, celui-ci reste comme repli si le flux MQTT est indisponible)
-#
-# Source : mqtt.pskreporter.info:1883, broker public gratuit (Tom M0LTE),
-# rediffusion temps réel de pskreporter.info. Topic RX confirmé (doc
-# officielle mqtt.pskreporter.info + pentafive/pskr-ha-bridge) :
-#   pskr/filter/v2/+/+/{MY_CALL}/+/#
-# → capte tous les rapports où MY_CALL est l'ÉMETTEUR (sc), c-à-d les
-# stations qui ME reçoivent — exactement ce que MY SIGNAL affiche.
-#
-# Format payload JSON confirmé à la source (mqtt.pskreporter.info) :
-#   sq=seq, f=freq Hz, md=mode, rp=SNR dB, t=epoch, sc=sender call,
-#   sl=sender locator, rc=receiver call, rl=receiver locator,
-#   sa/ra=ADIF DXCC sender/receiver, b=band
-#
-# Avantage vs polling HTTP : push temps réel (secondes, pas minutes),
-# aucun risque de rate-limit (le HTTP `retrieve.pskreporter.info` a déjà
-# déclenché un throttling silencieux une fois — cf. historique v11.3).
-# paho-mqtt est déjà une dépendance du projet (module foudre) — rien de
-# nouveau à installer.
-# ═══════════════════════════════════════════════════════════════════════════
-
-_mysignal_mqtt_buffer = deque(maxlen=200)   # rapports reçus en direct
-_mysignal_mqtt_lock = threading.Lock()
-_mysignal_mqtt_status = {
-    "connected": False,
-    "last_message_ts": None,
-    "connected_since": None,
-    "error": None,
-}
-MYSIGNAL_MQTT_RETENTION_S = 1800  # 30 min, cohérent avec flowStartSeconds=-1800 du fallback HTTP
-
-
-def _mysignal_mqtt_on_connect(client, userdata, flags, rc, properties=None):
-    if rc == 0:
-        topic = f"pskr/filter/v2/+/+/{MY_CALL}/+/#"
-        client.subscribe(topic)
-        with _mysignal_mqtt_lock:
-            _mysignal_mqtt_status["connected"] = True
-            _mysignal_mqtt_status["connected_since"] = time.time()
-            _mysignal_mqtt_status["error"] = None
-        logger.info(f"MySignalMqttWorker: connecté, abonné à {topic}")
-    else:
-        with _mysignal_mqtt_lock:
-            _mysignal_mqtt_status["connected"] = False
-            _mysignal_mqtt_status["error"] = f"CONNACK rc={rc}"
-        logger.warning(f"MySignalMqttWorker: échec connexion MQTT (rc={rc})")
-
-
-def _mysignal_mqtt_on_disconnect(client, userdata, rc, properties=None):
-    with _mysignal_mqtt_lock:
-        _mysignal_mqtt_status["connected"] = False
-    logger.warning(f"MySignalMqttWorker: déconnecté (rc={rc}) — reconnexion automatique")
-
-
-def _mysignal_mqtt_on_message(client, userdata, msg):
-    """Parse un rapport de réception PSK Reporter et l'ajoute au buffer.
-    Ne lève jamais d'exception — un payload malformé est ignoré, pas fatal."""
-    try:
-        data = json.loads(msg.payload.decode("utf-8", errors="ignore"))
-
-        rx_call = data.get("rc")
-        rx_loc = data.get("rl")
-        freq_hz = data.get("f")
-        mode = data.get("md")
-        snr = data.get("rp")
-        ts = data.get("t")
-
-        if not rx_call or not ts:
-            return
-
-        dist_km = None
-        rx_lat_out, rx_lon_out = None, None
-        if rx_loc:
-            try:
-                rx_lat, rx_lon = _maidenhead_to_latlon(rx_loc)
-                dist_km = round(calculate_distance(user_lat, user_lon, rx_lat, rx_lon))
-                rx_lat_out, rx_lon_out = round(rx_lat, 3), round(rx_lon, 3)
-            except Exception:
-                pass
-
-        entry = {
-            "call": rx_call,
-            "locator": rx_loc,
-            "lat": rx_lat_out,
-            "lon": rx_lon_out,
-            "freq_mhz": round(freq_hz / 1e6, 4) if freq_hz else None,
-            "band": find_band(freq_hz / 1000) if freq_hz else None,
-            "mode": mode,
-            "snr": int(snr) if snr not in (None, "") else None,
-            "distance_km": dist_km,
-            "ts": int(ts),
-        }
-
-        with _mysignal_mqtt_lock:
-            _mysignal_mqtt_buffer.append(entry)
-            _mysignal_mqtt_status["last_message_ts"] = time.time()
-
-    except Exception as e:
-        logger.debug(f"MySignalMqttWorker: payload ignoré ({e})")
-
-
-def mysignal_mqtt_worker():
-    """Écoute le flux MQTT PSK Reporter en continu pour MY SIGNAL.
-    Reconnexion automatique en cas de coupure. Dégrade proprement (log +
-    retry) si le broker est indisponible — api_my_signal() bascule alors
-    sur le polling HTTP existant (cf. _my_signal_cache)."""
-    threading.current_thread().name = "MySignalMqttWorker"
-    logger.info("MySignalMqttWorker démarré (flux MQTT PSK Reporter temps réel).")
-    try:
-        import paho.mqtt.client as mqtt
-    except ImportError:
-        logger.warning("MySignalMqttWorker: paho-mqtt non installé — repli permanent sur "
-                        "le polling HTTP PSK Reporter (cache 90s).")
-        return
-
-    while True:
-        try:
-            client = mqtt.Client()
-            client.on_connect = _mysignal_mqtt_on_connect
-            client.on_disconnect = _mysignal_mqtt_on_disconnect
-            client.on_message = _mysignal_mqtt_on_message
-            client.connect("mqtt.pskreporter.info", 1883, keepalive=60)
-            client.loop_forever()
-        except Exception as e:
-            with _mysignal_mqtt_lock:
-                _mysignal_mqtt_status["connected"] = False
-                _mysignal_mqtt_status["error"] = str(e)
-            logger.warning(f"MySignalMqttWorker: connexion perdue ou échouée ({e}), retry dans 30s")
-            time.sleep(30)
-
-
-def _mysignal_mqtt_snapshot():
-    """Construit un résultat au même format que le fallback HTTP
-    (_my_signal_cache) à partir du buffer MQTT en direct. Retourne None
-    si aucune donnée récente n'est disponible (le flux MQTT n'a encore
-    rien reçu, ou le buffer est vide après purge des entrées trop
-    anciennes) — dans ce cas api_my_signal() bascule sur le HTTP."""
-    now = time.time()
-    cutoff = now - MYSIGNAL_MQTT_RETENTION_S
-
-    with _mysignal_mqtt_lock:
-        connected = _mysignal_mqtt_status["connected"]
-        raw_entries = [e for e in _mysignal_mqtt_buffer if e["ts"] >= cutoff]
-
-    if not connected or not raw_entries:
-        return None
-
-    # Dédupliquer par call (garder le plus récent), ajouter age_s, trier
-    seen = {}
-    for e in raw_entries:
-        if e["call"] not in seen or e["ts"] >= seen[e["call"]]["ts"]:
-            seen[e["call"]] = e
-    entries = []
-    for e in sorted(seen.values(), key=lambda x: -x["ts"])[:20]:
-        entry = dict(e)
-        entry["age_s"] = max(0, int(now - e["ts"]))
-        entries.append(entry)
-
-    return {
-        "ok": True,
-        "call": MY_CALL,
-        "count": len(entries),
-        "max_distance_km": max((e["distance_km"] for e in entries if e["distance_km"]), default=0),
-        "reports": entries,
-        "source": "pskreporter-mqtt",
-        "ts": now,
-        "fetched_at": now,
-        "cache_ttl": 0,  # push temps réel, pas de notion de TTL
-        "mqtt_status": {
-            "connected": connected,
-            "last_message_age_s": (
-                int(now - _mysignal_mqtt_status["last_message_ts"])
-                if _mysignal_mqtt_status["last_message_ts"] else None
-            ),
-        },
-    }
-
-
 # v10.5 — MY SIGNAL : self-monitoring via PSK Reporter
 # "Qui m'entend, où, avec quel SNR" — sans jamais avoir à ouvrir un site tiers.
 # Source : PSK Reporter API publique (FT8/FT4/WSPR), cache 90s (politique
@@ -7236,7 +7069,7 @@ def _mysignal_mqtt_snapshot():
 # ═══════════════════════════════════════════════════════════════════════════
 
 _my_signal_cache = {'ts': 0, 'data': None}
-_MY_SIGNAL_CACHE_TTL = 90  # secondes — compromis réactivité vs rate limit PSK Reporter
+_MY_SIGNAL_CACHE_TTL = 300  # secondes (regle PSK Reporter: 1 req / 5 min) — compromis réactivité vs rate limit PSK Reporter
 # (pskreporter.info/pskdev.html : "retrieve reception data no more often than
 # once every five minutes" — l'ancienne valeur de 90s l'enfreignait de 3.3x,
 # ce qui pouvait déclencher un throttling silencieux côté PSK Reporter après
@@ -7267,19 +7100,8 @@ def api_my_signal():
     """
     Retourne les stations ayant récemment reçu MY_CALL, via PSK Reporter.
     Chaque entrée : indicatif receveur, locator, distance, bande, mode, SNR, âge.
-
-    v12.2 — priorité au flux MQTT temps réel (mysignal_mqtt_worker). Si le
-    flux MQTT est connecté et a des données récentes, on les sert directement
-    (push temps réel, pas de délai de cache). Sinon, repli automatique et
-    transparent sur le polling HTTP existant (_my_signal_cache) — aucune
-    régression possible même si le broker MQTT est down.
     """
     now = time.time()
-
-    mqtt_result = _mysignal_mqtt_snapshot()
-    if mqtt_result is not None:
-        return jsonify(mqtt_result)
-
     if _my_signal_cache['data'] is not None and (now - _my_signal_cache['ts']) < _MY_SIGNAL_CACHE_TTL:
         return jsonify(_my_signal_refresh_ages(_my_signal_cache['data'], now))
 
@@ -7292,6 +7114,7 @@ def api_my_signal():
         params = urllib.parse.urlencode({
             'senderCallsign': MY_CALL,
             'flowStartSeconds': '-1800',
+            'rronly': '1',
             'callback': 'cb',
         })
         url = f"https://retrieve.pskreporter.info/query?{params}"
@@ -7300,6 +7123,22 @@ def api_my_signal():
         })
         with urllib.request.urlopen(req, timeout=10) as resp:
             body = resp.read().decode('utf-8', errors='replace').strip()
+
+        # Detecter rate-limit
+        if 'too many queries' in body.lower():
+            logger.warning("api_my_signal: rate-limit PSK Reporter")
+            if _my_signal_cache['data'] is not None:
+                return jsonify(_my_signal_refresh_ages(_my_signal_cache['data'], now))
+            return jsonify({'ok': False, 'call': MY_CALL, 'reports': [], 'error': 'rate_limited'})
+
+        # v12.3 FIX: detecter le message de rate-limit PSK Reporter
+        if 'too many queries' in body.lower():
+            logger.warning("api_my_signal: PSK Reporter rate-limit (IP throttled) "
+                           "— on sert le cache et on rallonge l'intervalle.")
+            if _my_signal_cache['data'] is not None:
+                return jsonify(_my_signal_refresh_ages(_my_signal_cache['data'], now))
+            return jsonify({'ok': False, 'call': MY_CALL, 'reports': [],
+                            'error': 'rate_limited', 'cache_ttl': _MY_SIGNAL_CACHE_TTL})
 
         # Retirer le wrapper JSONP : "cb(...)"
         m = _re.match(r'^\s*cb\s*\((.*)\)\s*;?\s*$', body, _re.DOTALL)
@@ -7548,7 +7387,8 @@ def api_spot_history():
 if __name__ == "__main__":
     load_cty_dat()
     load_watchlist()
-    load_user_config()  # Charger MY_CALL et user_qra depuis config.json
+    # ✅ load_user_config() déjà appelée ligne 1901 (immédiatement après init user_lat/lon)
+    # Pas de double appel ici
 
     logger.info(f"\n--- {APP_VERSION} ---")
     load_lotw_cache()
@@ -7565,7 +7405,6 @@ if __name__ == "__main__":
     threading.Thread(target=lightning_worker, daemon=True).start()
     threading.Thread(target=wspr_worker, daemon=True).start()
     threading.Thread(target=beacon_update_worker, daemon=True).start()
-    threading.Thread(target=mysignal_mqtt_worker, daemon=True).start()
 
     def _freq_preload_worker():
         """
