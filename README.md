@@ -6,7 +6,8 @@
 
 ---
 
-## 📸 Aperçu apercu.png
+## 📸 Aperçu 
+![Apercu du Dashboard](apercu.png)
 
 L'interface principale combine **quatre dashboards intégrés** :
 
