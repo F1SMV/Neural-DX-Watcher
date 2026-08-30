@@ -1,4 +1,3 @@
-[README..md](https://github.com/user-attachments/files/31608816/README.md)
 # 🛰️ Neural DX Watcher — v12.3
 
 **Système de monitoring DX cluster personnel + prévision propagation VHF/UHF sur Raspberry Pi**
