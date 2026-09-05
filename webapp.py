@@ -62,6 +62,22 @@ except ImportError:
         def get_status(self): return {"enabled": False}
         def _send(self, **kw): pass
 
+try:
+    from dxcc_hunt import compute_hunt_list
+    _HUNT_OK = True
+except ImportError:
+    _HUNT_OK = False
+    def compute_hunt_list(*a, **kw):
+        return [], 0
+
+try:
+    from country_meta import get_country_meta
+    _COUNTRY_META_OK = True
+except ImportError:
+    _COUNTRY_META_OK = False
+    def get_country_meta(*a, **kw):
+        return None
+
 META_DIR = Path("data/meta")
 META_SUMMARY = META_DIR / "summary.json"
 LOTW_CACHE_FILE = Path("data/lotw_cache.json")
@@ -87,7 +103,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '12.3'
+APP_VERSION = '12.4'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -6235,6 +6251,79 @@ def lotw_opportunities():
         unique_opps.append(o)
 
     return jsonify({'logged_in': True, 'opportunities': unique_opps[:20]})
+
+# ============================================================
+# MODE CHASSE DXCC (v12.4) — dashboard actif : uniquement ce qui manque,
+# croisé en direct avec spots_buffer + lotw_data. Complémentaire de
+# /api/lotw/opportunities (qui lui porte sur les DXpeditions à venir
+# via le briefing RSS, pas sur les spots live du cluster).
+# ============================================================
+
+@app.route('/hunt')
+@app.route('/hunt.html')
+def hunt_page():
+    return render_template('hunt.html', my_call=MY_CALL,
+                            user_lat=user_lat, user_lon=user_lon)
+
+@app.route('/api/hunt/data')
+def api_hunt_data():
+    """Retourne le classement des DXCC 'à chasser' actuellement sur l'air."""
+    band_filter = request.args.get('band')
+    if band_filter == 'All':
+        band_filter = None
+
+    try:
+        limit = int(request.args.get('limit', 15))
+    except (TypeError, ValueError):
+        limit = 15
+    limit = max(1, min(limit, 50))
+
+    with lotw_lock:
+        if not lotw_session['logged_in']:
+            return jsonify({'logged_in': False, 'hunt': [], 'total_found': 0})
+        confirmed_dxcc = set(lotw_data['confirmed_dxcc'])
+        worked_dxcc    = set(lotw_data['worked_dxcc'])
+        dxcc_by_band   = {b: set(v) for b, v in lotw_data.get('dxcc_by_band', {}).items()}
+
+    now = time.time()
+    active_spots = [s for s in spots_buffer if (now - s.get('timestamp', 0)) < SPOT_LIFETIME]
+
+    hunt_list, total_found = compute_hunt_list(
+        spots=active_spots,
+        confirmed_dxcc=confirmed_dxcc,
+        worked_dxcc=worked_dxcc,
+        dxcc_by_band=dxcc_by_band,
+        user_lat=user_lat,
+        user_lon=user_lon,
+        calculate_bearing_fn=calculate_bearing,
+        bearing_to_compass_fn=bearing_to_compass,
+        is_rare_fn=is_rare_prefix,
+        band_filter=band_filter,
+        limit=limit,
+        now=now,
+    )
+
+    # Enrichissement pays (drapeau, capitale, population, décalage horaire)
+    # UNIQUEMENT pour la cible n°1 — pas pour les secondaires, pour limiter
+    # les appels réseau à un par refresh (cache 30 jours côté country_meta).
+    country_meta = None
+    if hunt_list:
+        try:
+            local_utc_offset = datetime.now().astimezone().utcoffset().total_seconds() / 3600
+            country_meta = get_country_meta(
+                hunt_list[0]['country'], requests.get, local_utc_offset=local_utc_offset
+            )
+        except Exception as e:
+            logger.debug(f"api_hunt_data: country_meta lookup échoué: {e}")
+            country_meta = None
+
+    return jsonify({
+        'logged_in': True,
+        'hunt': hunt_list,
+        'total_found': total_found,
+        'timestamp': now,
+        'country_meta': country_meta,
+    })
 
 # ============================================================
 # PAGE SATELLITES — Tracking orbital temps réel

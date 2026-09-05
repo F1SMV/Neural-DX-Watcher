@@ -196,6 +196,27 @@
             background: rgba(0,243,255,0.08) !important;
             box-shadow: 0 0 10px rgba(0,243,255,0.1);
         }
+        /* ── Alerte clignotante bouton HUNT — nouvelle opportunité DXCC ──
+           Déclenchée par checkHuntAlert() (v12.4). Dure 20s puis s'arrête
+           automatiquement (voir hunt-alert-nav.js inline plus bas). */
+        @keyframes hunt-blink {
+            0%, 100% {
+                background: rgba(255, 200, 0, 0.08) !important;
+                border-color: rgba(255, 200, 0, 0.25) !important;
+                color: #778 !important;
+                box-shadow: none;
+            }
+            50% {
+                background: rgba(255, 200, 0, 0.45) !important;
+                border-color: #ffc800 !important;
+                color: #1a1400 !important;
+                box-shadow: 0 0 14px rgba(255, 200, 0, 0.7);
+            }
+        }
+        .icon-button.hunt-alert {
+            animation: hunt-blink 0.9s ease-in-out infinite;
+            font-weight: bold;
+        }
         @media (max-width: 600px) {
             #title { font-size: 0.85em; letter-spacing: 1px; }
         }
@@ -4321,6 +4342,7 @@
       <a class="icon-button" href="/briefing" title="Briefing DX">📰 BRIEFING</a>
       <a class="icon-button" href="/map" title="DX Activity Map">🗺 MAP</a>
       <a class="icon-button" href="/world" title="World">🌍 WORLD</a>
+      <a class="icon-button" id="nav-hunt-link" href="/hunt" title="Mode Chasse DXCC — Ce qu'il te manque, en direct">🎯 HUNT</a>
       <a class="icon-button" href="/satellites" title="Satellite Tracker">🛰️ SATELLITES</a>
       <a class="icon-button" href="/weather" title="Corrélation météo / propagation">⛈️ MÉTÉO</a>
     </div>
@@ -4722,8 +4744,14 @@
       <option value="10" selected>10</option>
     </select>
     <button id="wl-track-refresh"
-            style="padding:6px 10px; background:var(--accent); color:var(--panel-bg); border:none;">
+            style="padding:6px 10px; background:var(--accent); color:var(--panel-bg); border:none;"
+            title="Rafraîchir">
       ⟳
+    </button>
+    <button id="wl-track-clear"
+            style="padding:6px 10px; background:rgba(255,100,100,0.2); color:#ff6666; border:1px solid #ff4444; cursor:pointer;"
+            title="Effacer le call mémorisé">
+      ✕
     </button>
   </div>
   <div id="wl-track-status" style="font-size:0.8em; opacity:.8; margin-bottom:6px;">
@@ -9316,10 +9344,36 @@ async function loadWatchlistTracking(){
 
 document.getElementById('wl-track-refresh').onclick = loadWatchlistTracking;
 document.getElementById('wl-track-filter').oninput = () => {
+  // Sauvegarder le call tapé dans localStorage
+  const call = document.getElementById('wl-track-filter').value;
+  localStorage.setItem('wl_tracking_call', call);
   clearTimeout(window._wlTrackDebounce);
   window._wlTrackDebounce = setTimeout(loadWatchlistTracking, 400);
 };
 document.getElementById('wl-track-limit').onchange = loadWatchlistTracking;
+
+// Restaurer le call sauvegardé au chargement de la page
+window.addEventListener('DOMContentLoaded', () => {
+  const savedCall = localStorage.getItem('wl_tracking_call');
+  if (savedCall) {
+    const filterEl = document.getElementById('wl-track-filter');
+    if (filterEl) {
+      filterEl.value = savedCall;
+      loadWatchlistTracking(); // Charger immédiatement les résultats
+    }
+  }
+});
+
+// Bouton Effacer : vide localStorage et réinitialise le filtre
+document.getElementById('wl-track-clear').onclick = () => {
+  localStorage.removeItem('wl_tracking_call');
+  const filterEl = document.getElementById('wl-track-filter');
+  if (filterEl) {
+    filterEl.value = '';
+    filterEl.focus();
+    loadWatchlistTracking(); // Recharger avec filtre vide
+  }
+};
 
 setInterval(loadWatchlistTracking, 30000);
 
@@ -10486,6 +10540,85 @@ fetch('/api/check_update')
     };
   }
 
+})();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     HUNT ALERT (v12.4) — Fait clignoter le bouton nav 🎯 HUNT en jaune
+     pendant 20s quand une NOUVELLE opportunité DXCC apparaît. Utile car
+     l'opérateur ne reste généralement pas sur /hunt — il faut l'alerter
+     depuis n'importe quelle page. Ce bloc est volontairement autonome
+     (aucune dépendance aux autres scripts de la page) pour pouvoir être
+     copié tel quel sur toutes les pages (map, world, weather, satellites,
+     briefing, ai_insight...).
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+(function huntAlertWatcher() {
+  const NAV_ID           = 'nav-hunt-link';
+  const BLINK_MS          = 20000;   // durée du clignotement
+  const POLL_MS           = 60000;   // fréquence de vérification
+  const STORAGE_KEY       = 'hunt_seen_keys';
+  const STORAGE_MAX_KEYS  = 500;     // évite une croissance illimitée du localStorage
+
+  function getSeenKeys() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  function saveSeenKeys(set) {
+    try {
+      let arr = Array.from(set);
+      if (arr.length > STORAGE_MAX_KEYS) {
+        arr = arr.slice(arr.length - STORAGE_MAX_KEYS); // garde les plus récentes
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    } catch (e) { /* quota localStorage dépassé — pas bloquant */ }
+  }
+
+  function triggerBlink() {
+    const link = document.getElementById(NAV_ID);
+    if (!link) return; // page sans nav hunt — no-op silencieux
+    link.classList.add('hunt-alert');
+    clearTimeout(link._huntBlinkTimeout);
+    link._huntBlinkTimeout = setTimeout(() => {
+      link.classList.remove('hunt-alert');
+    }, BLINK_MS);
+  }
+
+  async function checkHuntOpportunities() {
+    try {
+      const r = await fetch('/api/hunt/data?limit=10', { cache: 'no-store' });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data.logged_in || !Array.isArray(data.hunt) || data.hunt.length === 0) return;
+
+      const seen = getSeenKeys();
+      let hasNew = false;
+
+      for (const entry of data.hunt) {
+        const key = `${entry.country}|${entry.band}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          hasNew = true;
+        }
+      }
+
+      if (hasNew) {
+        triggerBlink();
+        saveSeenKeys(seen);
+      }
+    } catch (e) {
+      // Silencieux : pas de spam console si l'API est temporairement indisponible
+    }
+  }
+
+  // Vérification immédiate au chargement, puis toutes les POLL_MS
+  checkHuntOpportunities();
+  setInterval(checkHuntOpportunities, POLL_MS);
 })();
 </script>
 

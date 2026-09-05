@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mode Chasse DXCC — Neural DX Watcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<style>
+  :root {
+    --bg: #0a0f1c;
+    --panel: rgba(15, 22, 38, 0.85);
+    --border: rgba(0, 243, 255, 0.18);
+    --cyan: #00f3ff;
+    --text: #d9e4f5;
+    --muted: #7c8aa5;
+    --new: #e74c3c;
+    --unconfirmed: #f39c12;
+    --band-missing: #3498db;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse at top, #0f1830 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--cyan);
+    margin: 0;
+    letter-spacing: 0.5px;
+  }
+  h1 .sub { color: var(--muted); font-weight: 400; font-size: 0.9rem; margin-left: 10px; }
+
+  /* ═══════════ Navigation — absente jusqu'ici, /hunt était un cul-de-sac ═══════════ */
+  nav.top-nav {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  nav.top-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: border-color .15s, color .15s, background .15s;
+    white-space: nowrap;
+  }
+  nav.top-nav a:hover {
+    border-color: rgba(0,243,255,0.35);
+    color: var(--cyan);
+    background: rgba(0,243,255,0.06);
+  }
+  nav.top-nav a.active {
+    border-color: rgba(255,107,94,0.5);
+    color: #ff6b5e;
+    background: rgba(255,107,94,0.08);
+  }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+  .refresh-badge { color: var(--muted); font-size: 0.85rem; }
+  .status-banner {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .status-banner strong { color: var(--cyan); }
+  .status-banner.error { border-color: rgba(231,76,60,0.4); color: #ff8a80; }
+
+  /* ═══════════ HERO — Top 1 opportunité ═══════════ */
+  .hero {
+    position: relative;
+    background: linear-gradient(160deg, rgba(20,28,48,0.95) 0%, rgba(8,12,24,0.98) 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -40%; left: -20%;
+    width: 60%; height: 180%;
+    background: radial-gradient(ellipse, rgba(0,243,255,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero.rare::before {
+    background: radial-gradient(ellipse, rgba(231,76,60,0.10) 0%, transparent 70%);
+  }
+  .hero-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    position: relative;
+  }
+  .hero-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .hero-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .hero-badge.new { background: rgba(231,76,60,0.18); color: var(--new); }
+  .hero-badge.worked_unconfirmed { background: rgba(243,156,18,0.18); color: var(--unconfirmed); }
+  .hero-badge.band_missing { background: rgba(52,152,219,0.18); color: var(--band-missing); }
+  .hero-country {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 800;
+    font-size: 2.2rem;
+    color: var(--text);
+    line-height: 1.1;
+    margin: 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .hero-country .flag { font-size: 1.7rem; line-height: 1; }
+  .country-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 2px 0 4px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .country-meta-row span b { color: var(--text); font-weight: 600; }
+  .hero-call {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: var(--cyan);
+  }
+  .hero-call.rare { color: #ff6b5e; text-shadow: 0 0 14px rgba(231,76,60,0.6); }
+  .hero-rare-tag {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 0.65rem;
+    background: rgba(231,76,60,0.15);
+    color: #ff6b5e;
+    padding: 2px 8px;
+    border-radius: 4px;
+    vertical-align: middle;
+    font-weight: 700;
+  }
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 14px;
+    font-size: 0.88rem;
+  }
+  .hero-meta-item { color: var(--muted); }
+  .hero-meta-item b { color: var(--text); font-weight: 600; }
+
+  /* Mini-carte hero (Leaflet) — v2 : plus grande, multi-cibles pondérées SPD */
+  .hero-map-wrap { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .hero-map {
+    width: 100%; height: 320px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,243,255,0.25);
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    background: #0d1320;
+  }
+  .hero-map-empty {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 0.8rem; text-align: center;
+    width: 100%; height: 320px;
+  }
+  .hero-map-legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    font-size: 0.72rem; color: var(--muted);
+    align-items: center;
+  }
+  .hero-map-legend .dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    margin-right: 5px; vertical-align: middle;
+  }
+  .bearing-readout { font-size: 0.85rem; color: var(--text); font-weight: 600; }
+  .bearing-readout .compass-abbr { color: var(--cyan); }
+  .distance-readout { font-size: 0.75rem; color: var(--muted); }
+  /* Icônes markers Leaflet custom (QTH / cible principale / cibles SPD) */
+  .hunt-marker-qth {
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 50%; font-size: 15px;
+    background: rgba(0,243,255,0.9); box-shadow: 0 0 10px rgba(0,243,255,0.7);
+  }
+  .hunt-marker-dx {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%; font-size: 17px;
+    background: rgba(255,107,94,0.95); box-shadow: 0 0 14px rgba(255,107,94,0.8);
+    animation: hunt-marker-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes hunt-marker-pulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(255,107,94,0.7); }
+    50%      { box-shadow: 0 0 22px rgba(255,107,94,1); }
+  }
+  .hunt-marker-sec {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; color: #0b0f18; font-weight: 700;
+    box-shadow: 0 0 8px rgba(0,0,0,0.5);
+  }
+  .hunt-marker-sec.spd-hot   { background: #ffb020; }
+  .hunt-marker-sec.spd-warm  { background: #f0d030; }
+  .hunt-marker-sec.spd-cool  { background: #7fd6e0; }
+  @media (max-width: 720px) {
+    .hero-map, .hero-map-empty { height: 240px; }
+  }
+
+  /* ═══════════ Liste secondaire ═══════════ */
+  .secondary-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .secondary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sec-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto auto auto;
+    align-items: center;
+    gap: 12px;
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    transition: border-color .15s, background .15s;
+    cursor: pointer;
+  }
+  .sec-row:hover { border-color: rgba(0,243,255,0.35); background: rgba(0,243,255,0.05); }
+  .sec-row.no-coords { cursor: default; }
+  .sec-row.no-coords:hover { border-color: rgba(255,255,255,0.05); background: var(--panel); }
+  .sec-rank { color: var(--muted); font-weight: 700; text-align: center; }
+  .sec-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .sec-call { font-weight: 600; color: var(--cyan); font-family: 'Space Grotesk', sans-serif; }
+  .sec-call.rare { color: #ff6b5e; }
+  .sec-country { color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sec-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 0.66rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .sec-badge.new { background: rgba(231,76,60,0.15); color: var(--new); }
+  .sec-badge.worked_unconfirmed { background: rgba(243,156,18,0.15); color: var(--unconfirmed); }
+  .sec-badge.band_missing { background: rgba(52,152,219,0.15); color: var(--band-missing); }
+  .sec-band { color: var(--muted); white-space: nowrap; font-size: 0.78rem; }
+  .sec-age { color: var(--muted); font-size: 0.75rem; text-align: right; white-space: nowrap; }
+
+  .empty-state, .login-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .empty-state .icon, .login-state .icon { font-size: 2.4rem; margin-bottom: 10px; display: block; }
+  .login-state a {
+    color: var(--cyan); text-decoration: none;
+    border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px;
+    display: inline-block; margin-top: 10px;
+  }
+  .login-state a:hover { background: rgba(0,243,255,0.08); }
+
+  @media (max-width: 720px) {
+    .hero-top-row { flex-direction: column; text-align: center; }
+    .hero-meta { justify-content: center; }
+    .sec-row { grid-template-columns: 20px 1fr auto; }
+    .sec-band, .sec-age { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="/">🏠 ACCUEIL</a>
+  <a href="/briefing">📰 BRIEFING</a>
+  <a href="/map">🗺 MAP</a>
+  <a href="/world">🌍 WORLD</a>
+  <a href="/hunt" class="active">🎯 HUNT</a>
+  <a href="/satellites">🛰️ SATELLITES</a>
+  <a href="/weather">⛈️ MÉTÉO</a>
+  <a href="/ai-insight">📊 AI INSIGHT</a>
+</nav>
+
+<header>
+  <h1>🎯 Mode Chasse DXCC <span class="sub">{{ my_call }} · Ce qu'il te manque, en direct</span></h1>
+  <div class="controls">
+    <select id="band-filter">
+      <option value="All">Toutes bandes</option>
+      <option value="160m">160m</option>
+      <option value="80m">80m</option>
+      <option value="60m">60m</option>
+      <option value="40m">40m</option>
+      <option value="30m">30m</option>
+      <option value="20m">20m</option>
+      <option value="17m">17m</option>
+      <option value="15m">15m</option>
+      <option value="12m">12m</option>
+      <option value="10m">10m</option>
+      <option value="6m">6m</option>
+      <option value="4m">4m</option>
+      <option value="2m">2m</option>
+      <option value="70cm">70cm</option>
+    </select>
+    <span class="refresh-badge" id="refresh-badge">actualisation...</span>
+  </div>
+</header>
+
+<div id="status-banner" class="status-banner">Chargement...</div>
+<div id="hero-container"></div>
+<div id="secondary-container"></div>
+
+<script>
+const USER_LAT = {{ user_lat | tojson | safe }};
+const USER_LON = {{ user_lon | tojson | safe }};
+const STORAGE_KEY = 'hunt_seen_keys';
+
+const STATUS_LABELS = {
+  new: 'Jamais travaillé',
+  worked_unconfirmed: 'Travaillé — non confirmé',
+  band_missing: 'Manque sur cette bande',
+};
+
+function fmtAge(s) {
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}min`;
+  const h = Math.floor(m / 60);
+  return `${h}h${String(m % 60).padStart(2,'0')}`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+// Marque les entrées comme "vues" — évite que le bouton HUNT clignote
+// ailleurs dans l'app pour des opportunités déjà affichées ici.
+function markAsSeen(entries) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const seen = raw ? new Set(JSON.parse(raw)) : new Set();
+    entries.forEach(e => seen.add(`${e.country}|${e.band}`));
+    let arr = Array.from(seen);
+    if (arr.length > 500) arr = arr.slice(arr.length - 500);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  } catch (e) { /* localStorage indisponible — pas bloquant */ }
+}
+
+// Instance Leaflet unique réutilisée à chaque refresh (évite les fuites
+// mémoire/handlers si on recréait un nouveau L.map() sur un div détruit
+// par innerHTML à chaque cycle de 15s).
+let _heroMap = null;
+let _heroMapLayer = null;
+let _heroMapSecMarkers = {}; // key "country|band" -> marqueur Leaflet
+
+function destroyHeroMap() {
+  if (_heroMap) {
+    try { _heroMap.remove(); } catch (e) { /* déjà détruite */ }
+    _heroMap = null;
+    _heroMapLayer = null;
+  }
+  _heroMapSecMarkers = {};
+}
+
+// Appelée au clic sur une ligne de la liste secondaire : recentre la
+// carte sur la cible cliquée et ouvre son tooltip ("lien" vers ce pays
+// depuis la liste, sans changer la cible n°1 affichée en hero).
+function focusMapOnTarget(key) {
+  const marker = _heroMapSecMarkers[key];
+  if (!marker || !_heroMap) return;
+  _heroMap.setView(marker.getLatLng(), 5, { animate: true });
+  marker.openTooltip();
+  setTimeout(() => marker.closeTooltip(), 3000);
+}
+
+function renderHeroMapPlaceholder(hasCoords) {
+  if (hasCoords) {
+    return `<div class="hero-map-wrap"><div class="hero-map" id="hero-map-canvas"></div></div>`;
+  }
+  return `<div class="hero-map-wrap">
+    <div class="hero-map-empty">📍 Position DX<br>inconnue</div>
+  </div>`;
+}
+
+// Seuils de couleur des marqueurs secondaires — SPD_WANTED aligné sur
+// SPD_THRESHOLD (backend, webapp.py) : au-delà, un spot est déjà jugé
+// "intéressant" partout ailleurs dans l'app (is_wanted). SPD_HOT est un
+// palier visuel supplémentaire pour les toutes meilleures cibles.
+const SPD_WANTED = 70;
+const SPD_HOT = 100;
+const MAX_SECONDARY_MARKERS = 6;
+
+function spdTier(score) {
+  if (score >= SPD_HOT) return 'spd-hot';
+  if (score >= SPD_WANTED) return 'spd-warm';
+  return 'spd-cool';
+}
+
+function initHeroMap(entry, secondaryTargets) {
+  const canvas = document.getElementById('hero-map-canvas');
+  if (!canvas || entry.lat === null || entry.lon === null) return;
+
+  destroyHeroMap();
+
+  // Ne garder que les meilleures cibles secondaires (déjà triées par
+  // spd_score décroissant côté backend) pour éviter de saturer la carte.
+  const secTargets = (secondaryTargets || []).slice(0, MAX_SECONDARY_MARKERS);
+
+  // Init différée : le conteneur vient d'être injecté via innerHTML.
+  setTimeout(() => {
+    if (!document.getElementById('hero-map-canvas')) return; // page rafraîchie entre temps
+
+    // ─────────────────────────────────────────────────────────────────
+    // Configuration reprise À L'IDENTIQUE de la carte cockpit 6m du
+    // dashboard (initCockpit6mMap dans index.html), qui affiche le monde
+    // proprement sans bord gris ni répétition problématique :
+    //   center: QTH, zoom: 2, worldCopyJump: true, PAS de noWrap,
+    //   PAS de fitBounds, invalidateSize étagé à [120, 350, 900] ms.
+    // On centre sur le QTH (comme la 6m) ; la station DX et la ligne de
+    // liaison sont ajoutées par-dessus.
+    // ─────────────────────────────────────────────────────────────────
+    _heroMap = L.map('hero-map-canvas', {
+      worldCopyJump: true,
+      center: [USER_LAT, USER_LON],
+      zoom: 2,
+      zoomControl: true,
+      attributionControl: false,
+      scrollWheelZoom: false,
+      layers: [
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Tiles &copy; Esri',
+          maxZoom: 18,
+        })
+      ],
+    });
+
+    const qthIcon = L.divIcon({
+      className: '', html: '<div class="hunt-marker-qth">📡</div>',
+      iconSize: [28, 28], iconAnchor: [14, 14],
+    });
+    const dxIcon = L.divIcon({
+      className: '', html: '<div class="hunt-marker-dx">🎯</div>',
+      iconSize: [32, 32], iconAnchor: [16, 16],
+    });
+
+    const qthPoint = [USER_LAT, USER_LON];
+    const dxPoint  = [entry.lat, entry.lon];
+
+    L.marker(qthPoint, {icon: qthIcon}).addTo(_heroMap)
+      .bindTooltip('Ta station (QTH)', {direction: 'top'});
+    L.marker(dxPoint, {icon: dxIcon}).addTo(_heroMap)
+      .bindTooltip(`<b>${entry.dx_call}</b> — ${entry.country}<br>SPD ${entry.spd_score}`, {direction: 'top'});
+    L.polyline([qthPoint, dxPoint], {
+      color: '#ff6b5e', weight: 2, opacity: 0.7, dashArray: '4,6',
+    }).addTo(_heroMap);
+
+    // Cibles secondaires — taille et couleur du marqueur pondérées par
+    // le score SPD (rareté + distance + split + mode). Les plus chaudes
+    // (SPD élevé) ressortent visuellement, les autres restent discrètes.
+    secTargets.forEach(t => {
+      const tier = spdTier(t.spd_score);
+      const size = tier === 'spd-hot' ? 22 : (tier === 'spd-warm' ? 18 : 14);
+      const secIcon = L.divIcon({
+        className: '',
+        html: `<div class="hunt-marker-sec ${tier}" style="width:${size}px;height:${size}px;font-size:${Math.max(9, size-10)}px;">${t.is_rare ? '★' : ''}</div>`,
+        iconSize: [size, size], iconAnchor: [size/2, size/2],
+      });
+      const tPoint = [t.lat, t.lon];
+      const marker = L.marker(tPoint, {icon: secIcon}).addTo(_heroMap)
+        .bindTooltip(`<b>${t.dx_call}</b> — ${t.country}<br>${t.band} · SPD ${t.spd_score}`, {direction: 'top'});
+      _heroMapSecMarkers[`${t.country}|${t.band}`] = marker;
+    });
+
+    // invalidateSize étagé à [120, 350, 900] ms — copie EXACTE du timing
+    // de la carte cockpit 6m, qui garantit un rendu correct des tuiles
+    // quand le conteneur n'a pas ses dimensions finales au premier rendu.
+    [120, 350, 900].forEach(delay => setTimeout(() => {
+      try { if (_heroMap) _heroMap.invalidateSize(); } catch (e) { /* détruite */ }
+    }, delay));
+  }, 0);
+}
+
+function fmtPopulation(pop) {
+  if (pop === null || pop === undefined) return null;
+  if (pop >= 1_000_000) return (pop / 1_000_000).toLocaleString('fr-FR', {maximumFractionDigits: 1}) + 'M';
+  if (pop >= 1_000) return (pop / 1_000).toLocaleString('fr-FR', {maximumFractionDigits: 0}) + 'k';
+  return String(pop);
+}
+
+function fmtTzDiff(diff) {
+  if (diff === null || diff === undefined) return null;
+  if (diff === 0) return 'même heure que toi';
+  const sign = diff > 0 ? '+' : '';
+  return `${sign}${diff}h vs toi`;
+}
+
+function renderHero(entry, secondaryForMap, countryMeta) {
+  const container = document.getElementById('hero-container');
+  const callClass = entry.is_rare ? 'hero-call rare' : 'hero-call';
+  const rareTag = entry.is_rare ? '<span class="hero-rare-tag">RARE</span>' : '';
+  const heroClass = entry.is_rare ? 'hero rare' : 'hero';
+  const dist = (entry.distance_km !== null && entry.distance_km !== undefined)
+    ? `${Math.round(entry.distance_km).toLocaleString('fr-FR')} km`
+    : '—';
+  const hasCoords = entry.lat !== null && entry.lat !== undefined;
+  const bearingCaption = (entry.bearing_deg !== null && entry.bearing_deg !== undefined)
+    ? `<div class="bearing-readout">${Math.round(entry.bearing_deg)}° <span class="compass-abbr">${entry.compass || ''}</span> · ${dist}</div>`
+    : '';
+
+  const flag = countryMeta && countryMeta.flag ? `<span class="flag">${countryMeta.flag}</span>` : '';
+  const metaItems = [];
+  if (countryMeta && countryMeta.capital) metaItems.push(`🏛️ <b>${escapeHtml(countryMeta.capital)}</b>`);
+  const popStr = countryMeta ? fmtPopulation(countryMeta.population) : null;
+  if (popStr) metaItems.push(`👥 <b>${popStr}</b> hab.`);
+  const tzStr = countryMeta ? fmtTzDiff(countryMeta.tz_diff_hours) : null;
+  if (tzStr) metaItems.push(`🕐 <b>${tzStr}</b>`);
+  const countryMetaRow = metaItems.length > 0
+    ? `<div class="country-meta-row">${metaItems.map(m => `<span>${m}</span>`).join('')}</div>`
+    : '';
+
+  const mapTargets = (secondaryForMap || []).filter(e => e.lat !== null && e.lat !== undefined);
+  const showLegend = mapTargets.length > 0;
+
+  container.innerHTML = `
+    <div class="${heroClass}">
+      <div class="hero-grid">
+        <div class="hero-top-row">
+          <div>
+            <div class="hero-label">🎯 Cible n°1 · <span class="hero-badge ${escapeHtml(entry.status)}">${escapeHtml(entry.status_label)}</span></div>
+            <div class="hero-country">${flag}${escapeHtml(entry.country)}</div>
+            ${countryMetaRow}
+            <div class="${callClass}">${escapeHtml(entry.dx_call)}${rareTag}</div>
+            <div class="hero-meta">
+              <span class="hero-meta-item">📻 <b>${escapeHtml(entry.freq)}</b> kHz</span>
+              <span class="hero-meta-item">📡 <b>${escapeHtml(entry.band)}</b> / ${escapeHtml(entry.mode)}</span>
+              <span class="hero-meta-item">📏 <b>${dist}</b></span>
+              <span class="hero-meta-item">🕐 vu il y a <b>${fmtAge(entry.age_s)}</b></span>
+            </div>
+          </div>
+          ${bearingCaption}
+        </div>
+        ${renderHeroMapPlaceholder(hasCoords)}
+        ${showLegend ? `
+          <div class="hero-map-legend">
+            <span><span class="dot" style="background:#ff6b5e;"></span>Cible principale</span>
+            <span><span class="dot" style="background:#ffb020;"></span>SPD ≥ ${SPD_HOT}</span>
+            <span><span class="dot" style="background:#f0d030;"></span>SPD ≥ ${SPD_WANTED}</span>
+            <span><span class="dot" style="background:#7fd6e0;"></span>SPD &lt; ${SPD_WANTED}</span>
+            <span style="margin-left:auto; opacity:.7;">💡 clique une cible dans la liste pour la localiser</span>
+          </div>` : ''}
+      </div>
+    </div>`;
+
+  if (hasCoords) {
+    initHeroMap(entry, mapTargets);
+  } else {
+    destroyHeroMap();
+  }
+}
+
+function renderSecondary(entries) {
+  const container = document.getElementById('secondary-container');
+  if (!entries || entries.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const rows = entries.map((e, i) => {
+    const callClass = e.is_rare ? 'sec-call rare' : 'sec-call';
+    const dist = (e.distance_km !== null && e.distance_km !== undefined)
+      ? `${Math.round(e.distance_km).toLocaleString('fr-FR')} km`
+      : '—';
+    const bearing = (e.bearing_deg !== null && e.bearing_deg !== undefined)
+      ? `${Math.round(e.bearing_deg)}° ${e.compass || ''}`
+      : '—';
+    const tierColor = e.spd_score >= SPD_HOT ? '#ffb020' : (e.spd_score >= SPD_WANTED ? '#f0d030' : '#7fd6e0');
+    const hasCoords = e.lat !== null && e.lat !== undefined;
+    const rowClass = hasCoords ? 'sec-row' : 'sec-row no-coords';
+    const key = `${e.country}|${e.band}`;
+    return `
+      <div class="${rowClass}" data-key="${escapeHtml(key)}" title="${hasCoords ? 'Cliquer pour localiser sur la carte' : ''}">
+        <div class="sec-rank">#${i + 2}</div>
+        <div class="sec-main">
+          <span class="${callClass}">${escapeHtml(e.dx_call)}</span>
+          <span class="sec-country">${escapeHtml(e.country)} · <span class="sec-badge ${escapeHtml(e.status)}">${escapeHtml(e.status_label)}</span> · <span style="color:${tierColor};">SPD ${e.spd_score}</span></span>
+        </div>
+        <div class="sec-band">${escapeHtml(e.band)} / ${escapeHtml(e.mode)}<br><span style="opacity:.7;">${bearing} · ${dist}</span></div>
+        <div class="sec-age">${fmtAge(e.age_s)}</div>
+        <div></div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="secondary-header">
+      <span>Prochaines cibles</span>
+      <span>${entries.length} de plus</span>
+    </div>
+    <div class="secondary-list">${rows}</div>`;
+}
+
+// Délégation d'événement unique (survit aux re-renders innerHTML)
+document.getElementById('secondary-container').addEventListener('click', (ev) => {
+  const row = ev.target.closest('.sec-row');
+  if (!row || row.classList.contains('no-coords')) return;
+  focusMapOnTarget(row.dataset.key);
+});
+
+async function refreshHunt() {
+  const band = document.getElementById('band-filter').value;
+  const banner = document.getElementById('status-banner');
+  const badge = document.getElementById('refresh-badge');
+  try {
+    const resp = await fetch(`/api/hunt/data?band=${encodeURIComponent(band)}&limit=15`);
+    const data = await resp.json();
+
+    if (!data.logged_in) {
+      destroyHeroMap();
+      banner.className = 'status-banner error';
+      banner.innerHTML = 'Connexion LoTW requise pour le Mode Chasse — sans elle, impossible de savoir ce qui te manque réellement.';
+      document.getElementById('hero-container').innerHTML = `
+        <div class="login-state">
+          <span class="icon">🔒</span>
+          Connecte-toi à LoTW depuis le dashboard principal pour activer le Mode Chasse.<br>
+          <a href="/">Retour au dashboard</a>
+        </div>`;
+      document.getElementById('secondary-container').innerHTML = '';
+      return;
+    }
+
+    if (!data.hunt || data.hunt.length === 0) {
+      destroyHeroMap();
+      banner.className = 'status-banner';
+      banner.innerHTML = 'Aucune opportunité DXCC détectée sur les spots actifs actuellement.';
+      document.getElementById('hero-container').innerHTML = `
+        <div class="empty-state">
+          <span class="icon">📡</span>
+          Le chasseur surveille en continu — reviens dans quelques minutes.
+        </div>`;
+      document.getElementById('secondary-container').innerHTML = '';
+      badge.textContent = 'à jour · ' + new Date().toLocaleTimeString('fr-FR');
+      return;
+    }
+
+    banner.className = 'status-banner';
+    banner.innerHTML = `<strong>${data.total_found}</strong> opportunité(s) DXCC détectée(s) — top ${data.hunt.length} affichée(s).`;
+
+    const [top, ...rest] = data.hunt;
+    renderHero(top, rest, data.country_meta);
+    renderSecondary(rest);
+    markAsSeen(data.hunt);
+
+    badge.textContent = 'à jour · ' + new Date().toLocaleTimeString('fr-FR');
+  } catch (err) {
+    banner.className = 'status-banner error';
+    banner.innerHTML = 'Erreur de chargement — nouvelle tentative dans 15s.';
+    badge.textContent = 'erreur';
+  }
+}
+
+document.getElementById('band-filter').addEventListener('change', refreshHunt);
+refreshHunt();
+setInterval(refreshHunt, 15000);
+</script>
+
+</body>
+</html>

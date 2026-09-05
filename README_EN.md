@@ -1,329 +1,187 @@
-# 🛰️ Neural DX Watcher — v12.3
+# Neural DX Watcher v12.4
 
-**Personal DX cluster monitoring + VHF/UHF propagation forecasting system on Raspberry Pi**
+**A smart DXCC hunting web app for the modern radio amateur**, built on Flask + SQLite, running on Raspberry Pi 5 at `192.168.1.81:8000`.
 
-*Callsign: F1SMV (JN23, La Seyne-sur-Mer, Provence) | GitHub: F1SMV/Neural-DX-Watcher*
-
----
-
-## 📸 Overview (apercu.png)
-
-The main interface combines **four integrated dashboards** :
-
-### Main Dashboard (Home)
-- **"Spots Live" Panel** : Real-time stream from 3 DX clusters (dxfun.com, k0xm.net, nc7j.com), refreshed every 10s. Displays call, frequency, mode, distance, bearing, RST, spotter. Filterable by band.
-- **Last 5 Hours History** : Notable callsigns, SPD (Speed) activity, propagation trends.
-- **"DXCC Opportunities" Gauge** : LoTW real-time integration — countries never worked detected live on your favorite bands.
-- **"MY SIGNAL" Panel** (v12.3) : PSK Reporter reception reports for your callsign (342 reports live). Shows who heard you, location, SNR, distance.
-
-### Weather Module (`/weather`)
-- **Local Conditions** (Open-Meteo) : Temperature, pressure, wind, humidity, barometric trend.
-- **Blitzortung Lightning** : Leaflet dark map, pulsing markers for strikes <300km (3×3 geohash grid).
-- **2m WSPR Confirmation** : Beacons heard <300km (confirms local tropo presence).
-- **Tropo/Ducting Index** : Open-Meteo heuristic (850hPa inversion, humidity, CAPE).
-- **Quick VOACAP** : MUF/SFI prediction for ONE path to selected zone (8 HF bands, reliability mini-bars).
-- **24h Band Activity** : HF/VHF separated, actual observed graph (not prediction).
-- **Solar Banners** : SFI/K/A/UTC clock, HF/VHF synthesis, alerts.
-
-### Satellites (`/satellites`)
-- **ISS/NORAD Passes** : Next 48h passes, elevation, azimuth, live Doppler frequency.
-- **Custom AMSAT Catalog** : 62 active satellites (FO-29, AO-91, AO-109, etc.), per-user managed.
-- **Satellite Co-visibility** : Calculates simultaneous visibility with distant correspondent (local sgp4).
-- **Updated TLEs** : CelesTrak + SatNOGS fallback, auto-refresh.
-
-### DX Briefing (`/briefing`)
-- **ARRL News** (v12.3 FIX) : RSS feed `arrl.rss` real-time (342+ articles/month).
-- **DX-World Alerts** : Continuous RSS for major propagation events.
-- **NG3K ADXO** : Classic radio amateur newsletter.
-- **User Watchlist** : Custom alerts by call/country/band.
+User: **F1SMV** (QTH: JN23, La Seyne-sur-Mer, 43.076°N 5.873°E)  
+Repository: [F1SMV/Neural-DX-Watcher](https://github.com/F1SMV/Neural-DX-Watcher)
 
 ---
 
-## ✨ v12.3 Fixes (2026-08-29)
-
-### 🐛 FIX #1 : MY SIGNAL Panel Empty → Restored 342 PSK Reporter Receipts
-
-**Complete diagnostic** : Three cumulative problems resolved.
-
-**Problem 1** — MQTT broker `mqtt.pskreporter.info:1883` accepts connection + SUBACK but pushes zero messages (tested global firehose = silent). Third-party service, no guarantee.
-
-**Problem 2** (MAIN) — HTTP fallback missing `rronly=1` parameter. Without it, PSK Reporter returns `activeReceiver` (receiver list) instead of `receptionReport` (actual reports). Code looks for `receptionReport` → always empty.
-
-✅ **Real verification** : `senderCallsign=F1SMV&rronly=1` returns **342 actual reports** available this instant.
-
-**Problem 3** — Cache TTL 90s too short → rate-limit PSK Reporter (`"too many queries too often"`). Official PSK Reporter rule : max 1 request/5 min.
-
-**Fixes applied** :
-- Added `rronly=1` to query parameters (line ~7295)
-- Rate-limit message detection + clean cache fallback (line ~7307)
-- TTL 90s → 300s official (line 7239)
-
-→ **Result** : Panel displays 342 PSK Reporter reports via reliable HTTP, independent of failing MQTT broker.
-
-### 🐛 FIX #2 : ARRL News (Broken HTML → Working RSS)
-
-**Problem** : dxnews.com unstable (admin unavailable). ARRL `/news` page loads content via JavaScript → inaccessible via curl/BeautifulSoup.
-
-✅ **Solution found** : Official RSS feed `https://www.arrl.org/arrl.rss` (standard RSS2 format) returns articles continuously.
-
-**Change** : ARRL source switches from `type: html` with `/news` to `type: rss` with `arrl.rss`.
-
-→ **Result** : Briefing displays updated ARRL articles (latest update: ARRL satellite news, etc.).
-
-### ✅ Previous Fixes (v12.2)
-
-- **MSK144 corrected** : Frequency 144.350-144.370 MHz (exact 2m range, not ±10Hz)
-- **Beacons panel** : 62 IARU Region 1 VHF/UHF/SHF beacons, dl0tud source updated June 2026
-- **Blitzortung topic** : MQTT format changed `spe` → `s/p/e`, 3×3 geohash grid confirmed
-- **GPS JN23** : Exact positioning 43.076112°N, 5.873671°E (via config.json)
-- **Satellite satellites** : CelesTrak CATNR fallback for new launches, sgp4 co-visibility
+## 📸 Overview
+![Dashboard Overview](apercu.png)
 
 ---
 
-## 🚀 Installation & Startup
+## 🎯 Main Features
+
+### DXCC Hunt Mode (v12.4) ✨
+Dedicated **`/hunt`** route — full-screen interface optimized for real-time hunting:
+- **Target #1 hero card** : large country presentation, flag 🇵🇬, capital, population, UTC offset (live data via REST Countries API, 30-day cache)
+- **Leaflet world map** (320px, cockpit 6m pattern) : QTH + DX station + dashed link line, secondary markers weighted by SPD (rarity + distance + split + mode)
+- **Clickable secondary list** : top 15 targets sorted by SPD, click = zoom on map, `.active` class on 🎯 HUNT nav link
+- **Real-time band filter**, 15s refresh rate
+- **localStorage tracking** : follow interesting calls
+
+### Propagation & Forecasting
+- **VOACAP Rapid** : precise HF path to selected zone (5min)
+- **Tropospheric indicators** : 850hPa inversion, humidity, CAPE
+- **Blitzortung MQTT** : real-time lightning (3×3 grid around QTH), RF/QRN correlation
+- **WSPR global** : spots per band, fuzzy location, 2m radar confirmation
+
+### Satellites & Beacons
+- **Co- and counter-aperture visibility** : SGP4, 48h horizon, ≥30s overlap
+- **VHF/UHF/SHF beacons** : 62 IARU beacons, monthly auto-update from dl0tud.tu-dresden.de
+- **SatNOGS for frequencies**
+
+### LoTW Management & Stats
+- **Native LoTW integration** : disk cache 6589 QSOs, periodic sync
+- **Dxcc_hunt.py** : scoring engine per band, rarity + distance, internal database
+- **ARRL Briefing** : recent news replacing dxnews.com (HTML scraping)
+
+### Backend Architecture
+- **`webapp.py`** : 7500+ lines, Python 3.13, Flask, SQLite
+- **`country_meta.py`** : country enrichment (flag, capital, population, TZ) — 30-day cache, zero API calls on repeat
+- **`dxcc_hunt.py`** : pure DXCC Hunt logic (injectable, testable, 13/13 tests ✅)
+- **`ntfy_alerts.py`** : desktop/email notifications (v10.0, complete)
+- **`test_dxcc_hunt.py`, `test_country_meta.py`** : full unit test suites
+
+---
+
+## v12.4 — Detailed Changelog
+
+### New Features
+- **Complete DXCC Hunt mode** (routes `/hunt`, `/api/hunt/data`) 
+  - Sort by SPD score (signal propagation distance) instead of simple "rare/not rare"
+  - Target #1 enriched (flag, capital, population, UTC offset)
+  - Multi-target secondary markers on map, weighted by SPD
+  - Clickable navigation: click secondary target → zoom map
+
+- **`country_meta.py`** — new DXCC country enrichment module
+  - REST Countries API v3.1 requests (free, open)
+  - 30-day disk cache (data never changes)
+  - Graceful fallback: network failure → cache or `None`
+  - Aliases for non-sovereign DXCC entities (Corsica→France, etc.)
+
+- **🎯 HUNT link in complete nav** + blinking indicator (20s animation)
+  - localStorage watchlist tracking for interesting calls
+  - `/hunt` yellow flash on new opportunity since last visit
+
+### Critical Fixes
+- **DXCC Hunt sort** : replaced boolean `is_rare` with continuous SPD score (rarity + distance + split + mode)
+- **Hunt Leaflet map** : exact copy of proven cockpit 6m pattern
+  - `worldCopyJump: true`, `center: QTH`, `zoom: 2` — **zero gray borders**
+  - Staggered invalidateSize `[120, 350, 900]` ms
+
+### Infrastructure & Tests
+- **13/13 unit tests** `dxcc_hunt.py`
+- **16/16 unit tests** `country_meta.py`
+- **Frontend validation** : JS `node --check`, Jinja2 render, Flask `test_client()`
+
+---
+
+## 🚀 Quick Start
 
 ### Requirements
-- **Raspberry Pi 5** (or Pi 4, capable)
-- **Python 3.9+** (tested 3.13)
-- **SQLite** (included)
-- **Network Connectivity** (stable Ethernet/WiFi)
+- Python 3.13 + venv
+- Raspberry Pi 5 (or Linux x64)
+- Network port: 8000 (Flask)
 
-### Clone Repository
+### Deploy on Pi
 ```bash
-cd ~
-git clone https://github.com/F1SMV/Neural-DX-Watcher.git
-cd Neural-DX-Watcher
-```
+cd ~/Spot-Watcher-DX
 
-### Create venv and Install Dependencies
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+# Copy critical files
+cp webapp.py country_meta.py dxcc_hunt.py .
+cp hunt.html templates/
+cp index.html templates/
 
-### Initial Configuration
-```bash
-# 1. Create data/config.json with your callsign and locator
-cat > data/config.json << 'EOF'
-{
-  "my_call": "F1SMV",
-  "user_qra": "JN23",
-  "user_lat": 43.076112,
-  "user_lon": 5.873671
-}
-EOF
-
-# 2. Create data/ui_config.json (panel visibility)
-cat > data/ui_config.json << 'EOF'
-{
-  "briefing_visible": true,
-  "weather_visible": true,
-  "satellites_visible": true
-}
-EOF
-
-# 3. Start
+# Restart
+pkill -f "python.*webapp.py"
 bash start.sh
 ```
 
-### Web Access
-```
-http://192.168.1.81:8000/  (or your Pi's IP)
+### Verify
+```bash
+curl http://192.168.1.81:8000/hunt
+curl 'http://192.168.1.81:8000/api/hunt/data?band=20m'
 ```
 
 ---
 
-## 📡 Active DX Clusters
+## 📊 Key Modules
 
-The app connects via rotating telnet (10s interval) to three sources :
-
-| Cluster | Host | Port | Propagation |
-|---------|------|------|-------------|
-| **DXfun** | dxfun.com | 8000 | Worldwide HF + VHF |
-| **K0XM** | dxc.k0xm.net | 7300 | USA-centric |
-| **NC7J** | dxc.nc7j.com | 7373 | Active spotters |
-
-Each cluster pushes ~5-20 spots/min. Neural deduplicates and enriches.
+| File | Role | Status |
+|------|------|--------|
+| `webapp.py` | Flask backend | ✅ v12.4 |
+| `dxcc_hunt.py` | Hunt DXCC engine | ✅ 13/13 tests |
+| `country_meta.py` | Country enrichment (30d cache) | ✅ 16/16 tests |
+| `hunt.html` | Hunt UI (Leaflet, SPD markers) | ✅ Cockpit 6m |
+| `index.html` | Dashboard + 🎯 HUNT nav | ✅ v12.4 |
 
 ---
 
-## 🎯 Data Sources
+## 🔧 Advanced Config
 
-### Radio (Telnet Clusters)
-- **50 MHz (6m)** : Sporadic-E spring/summer, tropo winter
-- **144 MHz (2m)** : Quasi-permanent tropo propagation, exceptional Es
-- **70 cm / 23 cm** : Rarely spotted, rich data if present
+### DX Clusters
+```python
+CLUSTERS = [
+    'dxfun.com:8000',
+    'dxc.k0xm.net:7300',
+    'dxc.nc7j.com:7373',
+]
+```
 
-### Weather
-- **Open-Meteo** : Local conditions, pressure, humidity, wind, sea temp (refresh 30min)
-- **NOAA Kp/SFI** : Solar indices JSON (2024+ format)
-
-### Propagation
-- **PSK Reporter MQTT** : Real-time reception reports (broker mqtt.pskreporter.info)
-- **PSK Reporter HTTP** : Fallback, 342 reports v12.3 (5min cache, rate-limit observed)
-- **Blitzortung MQTT** : Lightning, topic `blitzortung/1.1/s/p/e/#`, geohash 3×3
-- **WSPR** : wspr.live API (2m beacons <300km, tropo indicator)
-
-### Satellites
-- **CelesTrak GP API** : TLE OMM JSON, updated 2-3/day
-- **SatNOGS frequencies** : Doppler frequencies, modes
+### LoTW
+- Disk cache: `data/lotw_cache.json`
+- Test ADIF: `lotw_debug_qsl.adi` (6589 QSOs)
 
 ### Beacons
-- **dl0tud CSV** : DJ5CW/Fabian Kurz scan (TU Dresden), 62 active beacons, auto-update 30d
+- Source: `dl0tud.tu-dresden.de/beacons`
+- Auto-update monthly
+- Local ref: `data/beacons_reference.json`
 
 ---
 
-## ⚙️ Advanced Configuration
+## 📡 Public APIs
 
-### User Locator (Essential)
-Edit `data/config.json` for GPS precision :
-```json
-{
-  "user_lat": 43.076112,  // ← Decimal, North = +, South = -
-  "user_lon": 5.873671    // ← Decimal, East = +, West = -
-}
+```
+GET /hunt                    → Hunt HTML page
+GET /api/hunt/data?band=20m  → Hunt JSON
+GET /weather                 → Weather + Blitzortung
+GET /satellites              → Sat visibility
 ```
 
-QRA → lat/lon conversion validated by regex `^[A-R]{2}[0-9]{2}([A-X]{2})?$`.
+---
 
-### LoTW (DXCC Confirmation)
+## 🧪 Development
+
+### Tests
 ```bash
-# Download ADIF from LoTW
-# Place in data/lotw_adif.adi
-# Restart app → DXCC Opportunities updates
+python3 test_dxcc_hunt.py      # 13/13
+python3 test_country_meta.py   # 16/16
 ```
 
-### Watchlist (Custom Briefing)
-In `data/briefing_sources.json`, add callsign/country alerts :
-```json
-{
-  "id": "watchlist",
-  "name": "My watchlist",
-  "calls": ["5V7A", "3Y0J"],
-  "countries": ["Bouvet Island", "Mauritius"]
-}
-```
-
----
-
-## 🔍 App Structure
-
-```
-.
-├── webapp.py                 # Flask backend main (7200+ lines)
-├── predictor.py              # MUF/SFI/forecasting calculations
-├── dxcc_resolver.py          # Entity/country lookup
-├── tools/
-│   └── log_meta_analyzer.py # Log analysis (offline)
-├── templates/
-│   ├── index.html            # Main dashboard
-│   ├── weather.html          # Weather module (Blitzortung, WSPR, tropo)
-│   ├── satellites.html       # Satellite passes
-│   ├── briefing.html         # DX news
-│   ├── map.html              # MUF/grayline map
-│   ├── world.html            # Real-time global activity
-│   └── ...
-├── data/
-│   ├── config.json           # User configuration
-│   ├── beacons_reference.json # IARU R1 beacons (62 entries)
-│   ├── radio_spot_watcher.db # Local SQLite
-│   └── ...
-├── start.sh                  # Startup script + venv
-└── requirements.txt          # Python dependencies
-```
-
----
-
-## 📊 Databases
-
-### SQLite Tables
-- **spot_history** : Cluster spots (50M history by default)
-- **dxcc_contacts** : Parsed LoTW log
-- **weather_snapshots** : Time-stamped weather conditions
-- **solar_snapshots** : SFI/Kp history
-- **propagation_events** : Es/Tropo events (v12.3+)
-
-### Flask API Routes
-- `GET /api/dx_briefing.json` → News (ARRL, DX-World, NG3K)
-- `GET /api/my_signal.json` → PSK Reporter (v12.3 : 342 reports)
-- `GET /api/weather/lightning.json` → Lightning strikes <300km
-- `GET /api/satellites/passes/<norad_id>` → Next passes
-- `GET /api/voacap` → Quick MUF forecast
-
----
-
-## 🔐 Security
-
-- **Local API Token** : `X-API-Token` header required
-- **Debug = False** : Production-ready
-- **LoTW Files** : chmod 600 (private)
-- **Logs** : `radio_spot_watcher.log` (auto-rotate)
-
----
-
-## 🐛 Troubleshooting
-
-### MY SIGNAL Panel Empty
-**v12.3** : Verify you waited 5 min after fix (PSK Reporter rate-limit). Then restart : `pkill -f python.*webapp.py ; bash start.sh`.
-
-### No 6m Spots
-- Verify DX clusters are reachable : `curl telnet://dxfun.com:8000`
-- Check logs : `tail -50 radio_spot_watcher.log | grep -i "6m\|50MHz"`
-
-### Lightning Map Empty
-- Geohash 3×3 centered on your QTH. Strikes <300km should appear.
-- Check log : `grep -i "lightning\|blitzortung" radio_spot_watcher.log | tail -10`
-
-### ARRL News Broken
-- RSS `arrl.org/arrl.rss` must respond. Test : `curl -s https://www.arrl.org/arrl.rss | head -20`
-
----
-
-## 📈 Roadmap v12.4+
-
-- [ ] **Real-Time Alerts** (ntfy.sh) : Push notifications for watchlist calls + new DXCC
-- [ ] **DXCC Hunt Mode** : Prioritize top 5 missing calls + exact bearing
-- [ ] **Local Learning Engine** : Es/Tropo detection + predictions (long-term)
-- [ ] **Multi-band Activity Correlator** : Visual timeline 10m→6m→4m→2m synchronized
-
----
-
-## 📝 Logs & Debugging
-
+### Pre-deployment check
 ```bash
-# Live logs
-tail -f radio_spot_watcher.log | grep -i "my_signal\|arrl\|lightning"
-
-# Search specific errors
-grep "ERROR\|WARNING" radio_spot_watcher.log | tail -20
-
-# Check API status
-curl http://192.168.1.81:8000/api/dx_briefing.json | jq '.sources' 
+node --check hunt.html
+python3 -m py_compile webapp.py country_meta.py
 ```
 
 ---
 
-## 🤝 Contribution & Support
+## 📝 License & Credits
 
-**Bug Reports** : GitHub Issues (F1SMV/Neural-DX-Watcher)
-
-**QTH** : JN23 (La Seyne-sur-Mer, Provence)
-**Callsign** : F1SMV
-**Active on** : 6m (Es), 2m (tropo), 70cm /qo100 /HF
-
----
-
-## 📄 Licence
-
-MIT. Free for personal/radio club use. 
+- **Code** : F1SMV, MIT
+- **Data** follow me on X
+  - Esri Imagery (© Esri)
+  - IARU-R1 Beacons (DJ5CW, TU Dresden)
+  - REST Countries API v3.1
+  - LoTW ARRL
+  - Blitzortung MQTT
 
 ---
 
-**Version 12.3 — August 2026**
-- Fixed: MY SIGNAL PSK Reporter (rronly=1, TTL 300s, rate-limit detection)
-- Fixed: ARRL News RSS (dxnews.com → arrl.org/arrl.rss)
-- Stable: Production-ready Raspberry Pi 5
-
-**Neural DX Watcher — Your personal DX cluster monitoring + VHF/UHF propagation dashboard.**
+**v12.4** — September 2026  
+*"Hunt smarter, not harder"*
+EOFEN
+echo "✓ README FR + EN créés"

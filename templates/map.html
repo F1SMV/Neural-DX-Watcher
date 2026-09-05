@@ -243,10 +243,46 @@ html[data-theme='sunset'], body[data-theme='sunset']{
       display:none;pointer-events:none;
     }
     .grey-legend.visible { display:block; }
-  </style>
+  
+        /* ═══════════ Navigation — added v12.4 ═══════════ */
+        nav.top-nav {
+            display: flex; gap: 8px; flex-wrap: wrap;
+            margin-bottom: 16px; padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        nav.top-nav a {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px; border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+            color: #999; text-decoration: none;
+            font-size: 0.78rem; font-weight: 600;
+            letter-spacing: 0.02em; transition: border-color .15s, color .15s, background .15s;
+            white-space: nowrap;
+        }
+        nav.top-nav a:hover {
+            border-color: rgba(0,243,255,0.35); color: #00f3ff; background: rgba(0,243,255,0.06);
+        }
+        nav.top-nav a.active {
+            border-color: rgba(255,107,94,0.5); color: #ff6b5e; background: rgba(255,107,94,0.08);
+        }
+
+</style>
 </head>
 
 <body>
+
+<nav class="top-nav">
+  <a href="/">🏠 ACCUEIL</a>
+  <a href="/briefing">📰 BRIEFING</a>
+  <a href="/map" class="active">🗺 MAP</a>
+  <a href="/world">🌍 WORLD</a>
+  <a href="/hunt" class="">🎯 HUNT</a>
+  <a href="/satellites">🛰️ SATELLITES</a>
+  <a href="/weather">⛈️ MÉTÉO</a>
+  <a href="/ai-insight">📊 AI INSIGHT</a>
+</nav>
+
+
   <div class="wrap">
     <div class="topbar">
       <div class="brand">

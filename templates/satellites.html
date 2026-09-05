@@ -115,9 +115,45 @@
         .sat-freq-ul { color: #fb923c; font-weight: bold; white-space: nowrap; }
         .sat-freq-mode { color: #555; font-size: .82em; white-space: nowrap; }
         .sat-freq-none { color: #333; font-style: italic; font-size: .78em; padding: 3px 0; }
-    </style>
+    
+        /* ═══════════ Navigation — added v12.4 ═══════════ */
+        nav.top-nav {
+            display: flex; gap: 8px; flex-wrap: wrap;
+            margin-bottom: 16px; padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        nav.top-nav a {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px; border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+            color: #999; text-decoration: none;
+            font-size: 0.78rem; font-weight: 600;
+            letter-spacing: 0.02em; transition: border-color .15s, color .15s, background .15s;
+            white-space: nowrap;
+        }
+        nav.top-nav a:hover {
+            border-color: rgba(0,243,255,0.35); color: #00f3ff; background: rgba(0,243,255,0.06);
+        }
+        nav.top-nav a.active {
+            border-color: rgba(255,107,94,0.5); color: #ff6b5e; background: rgba(255,107,94,0.08);
+        }
+
+</style>
 </head>
 <body>
+
+<nav class="top-nav">
+  <a href="/">🏠 ACCUEIL</a>
+  <a href="/briefing">📰 BRIEFING</a>
+  <a href="/map">🗺 MAP</a>
+  <a href="/world">🌍 WORLD</a>
+  <a href="/hunt" class="">🎯 HUNT</a>
+  <a href="/satellites" class="active">🛰️ SATELLITES</a>
+  <a href="/weather">⛈️ MÉTÉO</a>
+  <a href="/ai-insight">📊 AI INSIGHT</a>
+</nav>
+
+
 <div id="header">
     <div id="title">🛰️ SATELLITE TRACKER</div>
     <div class="nav">
