@@ -1,4 +1,4 @@
-# Neural DX Watcher v12.4
+# Neural DX Watcher v12.5
 
 **Une application web de chasse DXCC intelligente pour le radioamateur moderne**, basée sur Flask + SQLite, tournant sur Raspberry Pi 5 à `192.168.1.81:8000`.
 
@@ -13,6 +13,16 @@ Dépôt : [F1SMV/Neural-DX-Watcher](https://github.com/F1SMV/Neural-DX-Watcher)
 ---
 
 ## 🎯 Fonctionnalités Principales
+
+### Analyse IA / AI Insight (v12.5) ✨
+Route **`/ai_insight`** — tableau de bord d'analyse comportementale, entièrement bilingue FR/EN :
+- **Activité récente** : sparkline heure par heure (24h), pic et heure courante mis en évidence
+- **Prochaines heures** : fréquence d'activité observée par le passé sur les créneaux à venir (même heure, ou même jour+heure dès 14j d'historique) — **explications bilingues intégrées** précisant qu'il s'agit d'une fréquence constatée (« au moins un spot »), pas d'une prévision de propagation ni d'une mesure de force d'ouverture
+- **Fiabilité affichée** : créneaux avec moins de 5 observations signalés en **orange** avec info-bulle, pour éviter de lire un 100% comme un signal fort en tout début de collecte
+- **Quand ça ouvre** : heatmap jour de semaine × heure UTC, moyenne par occurrence (pas de cumul)
+- **Tendances par bande** : comparaison période récente vs précédente, triée 160 m → 23 cm
+- **Rafraîchissement automatique** : nouvel appel `/api/analytics` toutes les 5 min (fetch, sans recharger la page), barre de maturité recalculée chaque minute
+- **Module `analytics.py`** entièrement autonome : base dédiée `data/analytics.sqlite`, chaîne de repli multi-source (`predictor.sqlite` → spots en mémoire) si `predictor.py` n'est pas actif
 
 ### Mode Chasse DXCC (v12.4) ✨
 Route dédiée **`/hunt`** — interface full-screen optimisée pour le hunt en direct :
@@ -44,6 +54,30 @@ Route dédiée **`/hunt`** — interface full-screen optimisée pour le hunt en 
 - **`dxcc_hunt.py`** : logique pure DXCC Hunt (injectable, testable, 13/13 tests ✅)
 - **`ntfy_alerts.py`** : notifications desktop/mail (v10.0, complet)
 - **`test_dxcc_hunt.py`, `test_country_meta.py`** : suites unitaires complètes
+
+---
+
+## v12.5 — Changelog Détaillé
+
+### Nouvelles Fonctionnalités
+- **Page Analyse IA refondue** (`ai_insight.html`, route `/ai_insight`)
+  - Nouveau module `analytics.py` totalement autonome : base dédiée `data/analytics.sqlite`, ne dépend jamais d'un `predictor.py` qui tournerait ou non (repli silencieux sinon)
+  - 4 panneaux dynamiques : Activité récente, Prochaines heures, Quand ça ouvre, Tendances par bande
+  - Rafraîchissement AJAX toutes les 5 min, barre de maturité (niveau de collecte) qui avance chaque minute sans appel API
+
+### Améliorations UX
+- **Clarté du panneau « Prochaines heures »** : sous-titres et info-bulles bilingues FR/EN ajoutés sur les 4 panneaux, y compris les états « pas encore assez de données »
+  - Le % affiché est désormais explicitement présenté comme une fréquence d'activité passée (« au moins un spot reçu »), et non une prévision de propagation — évite la confusion quand tous les créneaux affichent 100% en tout début de collecte
+  - Créneaux à faible échantillon (< 5 observations) signalés en **orange** avec info-bulle explicative, plutôt qu'un pourcentage nu non qualifié
+  - Encadrés de synthèse (« meilleur créneau ») repassés en accent orange pour plus de lisibilité, et affichent désormais le nombre d'observations (n=X)
+
+### Correctifs
+- **`dxcc_hunt.py`** : validation des distances — les distances physiquement impossibles sont désormais filtrées (FT8 plafonné à ~1 000 km ; toute distance approchant le demi-tour de la Terre, 20 037 km, est rejetée), ce qui fiabilise le scoring de la liste Hunt
+- **`weather.html`** : migration du fond de carte CARTO → Esri Dark Gray Canvas (CARTO exige désormais une clé API) ; correction de l'ordre des tuiles `{z}/{y}/{x}`
+- **`hunt.html`** : stabilisation supplémentaire de la carte Leaflet (alignement fin sur le pattern cockpit 6m éprouvé — `invalidateSize` étagé, zéro bord gris)
+
+### Infrastructure & Tests
+- **Validation front-end** : rendu simulé en Node (`node --check` + exécution des fonctions de rendu avec données réalistes et cas limites — échantillon faible, probabilité à 0, panneaux verrouillés) avant déploiement
 
 ---
 
@@ -112,8 +146,10 @@ curl 'http://192.168.1.81:8000/api/hunt/data?band=20m'
 
 | Fichier | Rôle | État |
 |---------|------|------|
-| `webapp.py` | Backend Flask principal | ✅ v12.4 |
-| `dxcc_hunt.py` | Moteur scoring Hunt DXCC | ✅ 13/13 tests |
+| `webapp.py` | Backend Flask principal | ✅ v12.5 |
+| `analytics.py` | Moteur Analyse IA (autonome, cache dédié) | ✅ v12.5 |
+| `ai_insight.html` | UI Analyse IA (bilingue FR/EN) | ✅ v12.5 |
+| `dxcc_hunt.py` | Moteur scoring Hunt DXCC | ✅ 13/13 tests + validation distances |
 | `country_meta.py` | Enrichissement pays (cache 30j) | ✅ 16/16 tests |
 | `hunt.html` | UI Mode Hunt (Leaflet, markers SPD) | ✅ Cockpit 6m |
 | `index.html` | Dashboard + nav 🎯 HUNT | ✅ v12.4 |
@@ -181,5 +217,5 @@ python3 -m py_compile webapp.py country_meta.py
 
 ---
 
-**v12.4** — Septembre 2026  
+**v12.5** — Septembre 2026  
 *"Hunt smarter, not harder"*

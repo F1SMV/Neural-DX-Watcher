@@ -608,7 +608,30 @@ async function loadConditions() {
 let lightningMap = null, lightningLayerGroup = null;
 function initLightningMap() {
     lightningMap = L.map('lightning-map', { zoomControl: false, attributionControl: false }).setView([QTH_LAT, QTH_LON], 6);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 10 }).addTo(lightningMap);
+    // Fond de carte : Esri Dark Gray Canvas — sombre, gratuit et sans clé.
+    // Remplace CARTO basemaps (dark_nolabels), qui exige désormais une clé
+    // API et rendait la carte inutilisable ("API KEY REQUIRED" en filigrane).
+    // Esri est déjà le fournisseur utilisé par les autres cartes de l'app.
+    // ATTENTION : Esri ordonne les tuiles {z}/{y}/{x} (et non {z}/{x}/{y}),
+    // et n'accepte ni sous-domaine {s} ni suffixe retina {r}.
+    const baseLayer = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        { maxZoom: 16 }
+    ).addTo(lightningMap);
+
+    // Repli automatique : si le fournisseur principal venait à son tour à
+    // refuser le service, on bascule sur OpenStreetMap plutôt que d'afficher
+    // une carte vide. Le repli n'est tenté qu'une fois.
+    let baseLayerFallbackDone = false;
+    baseLayer.on('tileerror', () => {
+        if (baseLayerFallbackDone) return;
+        baseLayerFallbackDone = true;
+        console.warn('Tuiles Esri indisponibles — repli sur OpenStreetMap.');
+        lightningMap.removeLayer(baseLayer);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 16,
+        }).addTo(lightningMap);
+    });
     L.circle([QTH_LAT, QTH_LON], { radius: LIGHTNING_RADIUS_KM * 1000, color: '#ff9500', weight: 1, fillColor: '#ff9500', fillOpacity: 0.04, dashArray: '4,6' }).addTo(lightningMap);
     L.marker([QTH_LAT, QTH_LON], { icon: L.divIcon({ className: '', html: '<div class="qth-marker"></div>', iconSize: [14, 14] }) }).addTo(lightningMap);
     lightningLayerGroup = L.layerGroup().addTo(lightningMap);

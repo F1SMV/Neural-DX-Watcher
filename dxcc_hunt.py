@@ -141,6 +141,36 @@ def compute_hunt_list(
         dx_call = s.get("dx_call", "")
         lat = s.get("lat") or 0.0
         lon = s.get("lon") or 0.0
+        mode = s.get("mode", "").upper()
+        distance_raw = s.get("distance_km")
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 🔴 VALIDATION DISTANCE — v12.4
+        # Rejeter aberrations (e.g. 114174 km en FT8 vers USA = cluster corruption)
+        # Limite physique : demi-circonférence Terre = 20037 km
+        # Limite pratique pour chaque mode :
+        #   FT8 (numérique QRP)      : max ~1000 km (local)
+        #   SSB/CW (HF)              : max ~20000 km (ionosphérique)
+        #   VHF/UHF (sporadic-E)     : max ~2000 km
+        # ═══════════════════════════════════════════════════════════════════════
+        is_distance_valid = True
+        if distance_raw is not None:
+            try:
+                dist_float = float(distance_raw)
+                # FT8 : mode numérique QRP, portée très limitée
+                if "FT8" in mode and dist_float > 1000:
+                    is_distance_valid = False
+                # Limite absolue : > demi-Terre = impossible
+                elif dist_float > 20037:
+                    is_distance_valid = False
+                # VHF/UHF sur sporadic-E : rarissime >2000 km
+                elif band in ["2m", "70cm", "23cm"] and dist_float > 2000:
+                    is_distance_valid = False
+            except (ValueError, TypeError):
+                pass  # Si parse échoue, garder la valeur (pour compat)
+
+        if not is_distance_valid:
+            continue  # Rejeter cette aberration
 
         bearing_deg = None
         compass = None
@@ -165,12 +195,12 @@ def compute_hunt_list(
             "dx_call":        dx_call,
             "country":        country,
             "band":           band,
-            "mode":           s.get("mode", ""),
+            "mode":           mode,
             "freq":           s.get("freq", ""),
             "status":         status,
             "status_label":   STATUS_LABELS.get(status, status),
             "priority":       STATUS_PRIORITY.get(status, 99),
-            "distance_km":    s.get("distance_km"),
+            "distance_km":    distance_raw,
             "bearing_deg":    round(bearing_deg, 0) if bearing_deg is not None else None,
             "compass":        compass,
             "lat":            lat if (lat and (lat != 0.0 or lon != 0.0)) else None,

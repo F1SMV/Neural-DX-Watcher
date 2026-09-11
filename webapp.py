@@ -78,6 +78,31 @@ except ImportError:
     def get_country_meta(*a, **kw):
         return None
 
+try:
+    import analytics as _analytics_mod
+    from analytics import compute_all as compute_analytics
+    _ANALYTICS_OK = True
+except ImportError:
+    _ANALYTICS_OK = False
+    _analytics_mod = None
+    def compute_analytics(*a, **kw):
+        # Forme identique au module réel : la page AI Insight itère sur
+        # ces collections sans garde et affiche "données indisponibles".
+        return {
+            "heatmap":  {"available": False, "reason": "module absent",
+                         "grid": [[None] * 24 for _ in range(7)],
+                         "weekday_labels": ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"],
+                         "peak_value": 0.0, "best_slot": None,
+                         "total_spots": 0, "days": 30, "band": None},
+            "patterns": {"available": False, "reason": "module absent",
+                         "bands": [], "window_days": 7,
+                         "total_recent": 0, "total_previous": 0},
+            "forecast": {"available": False, "reason": "module absent",
+                         "slots": [], "best_slot": None,
+                         "days_analyzed": 30, "band": None},
+            "generated_at": time.time(),
+        }
+
 META_DIR = Path("data/meta")
 META_SUMMARY = META_DIR / "summary.json"
 LOTW_CACHE_FILE = Path("data/lotw_cache.json")
@@ -103,7 +128,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '12.4'
+APP_VERSION = '12.5'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -1721,6 +1746,20 @@ surge_lock = threading.Lock()
 # --- CONFIGURATION DU LOGGER ---
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# ── v12.5 : base d'analytique (indépendante du predictor) ──────────────
+# Créée au démarrage pour que la toute première réception de spot puisse
+# déjà être enregistrée. Un échec n'est pas bloquant : l'analytique se
+# rabattra sur les spots en mémoire et le signalera via /api/analytics.
+if _ANALYTICS_OK:
+    try:
+        if _analytics_mod.init_store():
+            logger.info("Analytics : base data/analytics.sqlite prête")
+        else:
+            logger.warning("Analytics : base non initialisée — repli mémoire")
+    except Exception as _ie:
+        logger.warning(f"Analytics init_store: {_ie}")
+
 LOG_FORMAT = '%(asctime)s [%(levelname)s] %(threadName)s: %(message)s'
 formatter = logging.Formatter(LOG_FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
 file_handler = TimedRotatingFileHandler(
@@ -2573,6 +2612,9 @@ def history_maintenance_worker():
         logger.debug(f"Prochaine rotation dans {seconds_until_next_slot} secondes.")
         time.sleep(seconds_until_next_slot + 5)
         save_wl_activity()   # persister l'activité watchlist toutes les 30 min
+        if _ANALYTICS_OK:
+            try: _analytics_mod.cleanup_store(90)
+            except Exception as _ce: logger.debug(f"analytics.cleanup_store: {_ce}")
         try: predictor.cleanup_old_data(90)
         except Exception: pass
         # v11 : vérifier les prédictions échues contre les spots réels reçus
@@ -2764,6 +2806,17 @@ def telnet_worker():
                             predictor.record_spot(spot_obj, is_watchlist=_is_wl)
                         except Exception as _pe:
                             logger.debug(f"predictor.record_spot: {_pe}")
+
+                        # ── v12.5 : collecte analytique autonome ────────────
+                        # predictor est optionnel : quand son import échoue,
+                        # webapp lui substitue un stub dont record_spot ne
+                        # fait rien, silencieusement. L'analytique tient donc
+                        # sa propre base pour ne pas dépendre de sa présence.
+                        if _ANALYTICS_OK:
+                            try:
+                                _analytics_mod.record_spot(spot_obj)
+                            except Exception as _ae:
+                                logger.debug(f"analytics.record_spot: {_ae}")
 
                         # ── v10.0 : Alertes ntfy ───────────────────────────
                         try:
@@ -7357,6 +7410,58 @@ def api_predictions():
 
     preds = predictor.get_predictions(sfi=sfi, kp=kp)
     return jsonify({"predictions": preds, "ts": time.time()})
+
+
+@app.route("/api/analytics")
+def api_analytics():
+    """
+    Analytique pour la page AI Insight : activité récente, heatmap
+    (quand ça ouvre), tendances par bande et fréquence historique des
+    prochains créneaux.
+
+    Sources essayées dans l'ordre par le module : sa propre base
+    `data/analytics.sqlite`, puis `data/predictor.sqlite` si le module
+    predictor tourne, puis les spots encore en mémoire. Ce dernier repli
+    garantit un affichage utile dès le premier démarrage, avant qu'aucun
+    historique n'ait eu le temps de se constituer.
+
+    Le paramètre `band` restreint heatmap et forecast à une bande : les
+    dynamiques de propagation n'ont rien de comparable entre 6m et 40m,
+    les agréger masquerait l'information. `patterns` reste global,
+    puisque son objet même est de comparer les bandes entre elles.
+    """
+    band = (request.args.get("band") or "").strip() or None
+
+    # Repli mémoire : copie sous verrou, la collecte écrivant en
+    # permanence dans le deque depuis les threads cluster.
+    memory_spots = None
+    try:
+        with spot_history_lock:
+            memory_spots = list(spot_history)
+    except Exception:
+        memory_spots = None
+
+    try:
+        data = compute_analytics(band=band, memory_spots=memory_spots)
+    except Exception as exc:
+        logger.warning(f"api_analytics: {exc}")
+        return jsonify({"ok": False, "error": "analytics indisponible"}), 200
+
+    data["ok"] = True
+    data["module_loaded"] = _ANALYTICS_OK
+
+    # Diagnostic : permet de distinguer « pas encore de données » d'une
+    # collecte en panne, sans avoir à se connecter au Pi.
+    diag = {"memory_spots": len(memory_spots) if memory_spots else 0,
+            "predictor_loaded": _PREDICTOR_OK}
+    if _ANALYTICS_OK:
+        try:
+            diag["store"] = _analytics_mod.store_status()
+        except Exception as exc:
+            diag["store_error"] = str(exc)
+    data["diagnostic"] = diag
+
+    return jsonify(data)
 
 
 @app.route("/api/predictor/stats")

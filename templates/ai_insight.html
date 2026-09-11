@@ -1,162 +1,196 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    
     <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/base.css">
-    <title>⚡ Neural DX Watcher — AI Insight</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <title>📊 Neural DX Watcher — DX Analytics</title>
 <style>
-        
+    :root {
+        --bg-color:#050505; --panel-bg:#0e0e0e; --text-main:#a0a0a0;
+        --accent:#00f3ff; --alert:#ff003c; --success:#22c55e; --warn:#ffc800;
+        --border:1px solid #333; --dim:#666; --line:#1e1e1e;
+    }
+    body[data-theme='light']{--bg-color:#fff;--panel-bg:#fff;--text-main:#111;
+        --accent:#0066ff;--alert:#d50000;--success:#0a0;--warn:#b58900;
+        --border:1px solid #d0d0d0;--dim:#777;--line:#e4e4e4;}
+    body[data-theme='dark']{--bg-color:#1a1a1a;--panel-bg:#2a2a2a;--text-main:#f0f0f0;
+        --accent:#00ff80;--alert:#ff6347;--success:#3d3;--warn:#ffd700;
+        --border:1px solid #555;--dim:#999;--line:#3a3a3a;}
+    body[data-theme='matrix']{--bg-color:#000;--panel-bg:#031503;--text-main:#00ff41;
+        --accent:#00ff41;--alert:#ff004c;--success:#0f0;--warn:#af0;
+        --border:1px solid #050;--dim:#0a5;--line:#052905;}
 
-        /* --- THEMES IMPORTES DE index.html --- */
-        :root {
-            --bg-color: #050505;
-            --panel-bg: #0e0e0e;
-            --text-main: #a0a0a0;
-            --accent: #00f3ff;
-            --alert: #ff003c; /* Rouge vif pour Surge */
-            --border: 1px solid #333;
-            --wl-bg: #ffeb3b;
-            --wl-text: #000000;
-            --open-color: #d35400;
-        }
-        
-        
-        body[data-theme='light'] {
-            --bg-color: #ffffff;
-            --panel-bg: #ffffff;
-            --text-main: #111111;
-            --accent: #0066ff;
-            --alert: #d50000;
-            --border: 1px solid #d0d0d0;
-            --wl-bg: #ffeb3b;
-            --wl-text: #000000;
-            --open-color: #d35400;
-        }
+    body{background:var(--bg-color);color:var(--text-main);
+        font-family:var(--font-sans);margin:0;padding:20px;}
 
-        body[data-theme='dark'] {
-            --bg-color: #1a1a1a;
-            --panel-bg: #2a2a2a;
-            --text-main: #f0f0f0;
-            --accent: #00ff80;
-            --alert: #ff6347;
-            --border: 1px solid #555;
-            --wl-bg: #ffff00;
-            --wl-text: #000000;
-            --open-color: #ffd700;
-        }
-        
-        body[data-theme='matrix'] {
-            --bg-color: #000000;
-            --panel-bg: #031503;
-            --text-main: #00ff41; /* Vert Matrix */
-            --accent: #00ff41;
-            --alert: #ff004c;
-            --border: 1px solid #005500;
-            --wl-bg: #4cff7e;
-            --wl-text: #000000;
-            --open-color: #00aa00;
-        }
-        
-        body { background-color: var(--bg-color); color: var(--text-main); font-family: var(--font-sans); margin: 0; padding: 20px; transition: all 0.3s; }
-        
-        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
-        h1 { font-family: var(--font-display); font-size: 1.2rem; color: var(--accent); margin: 0; text-transform: uppercase; letter-spacing: 1px; }
+    nav.top-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;
+        padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.06);}
+    nav.top-nav a{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;
+        border-radius:6px;border:1px solid rgba(255,255,255,.08);color:#999;
+        text-decoration:none;font-size:.78rem;font-weight:600;white-space:nowrap;
+        transition:border-color .15s,color .15s,background .15s;}
+    nav.top-nav a:hover{border-color:rgba(0,243,255,.35);color:#00f3ff;
+        background:rgba(0,243,255,.06);}
+    nav.top-nav a.active{border-color:rgba(255,107,94,.5);color:#ff6b5e;
+        background:rgba(255,107,94,.08);}
 
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-        
-        /* --- PANEL & DRAG HANDLE --- */
-        .panel { background: var(--panel-bg); border: var(--border); border-radius: 14px; padding: 15px; box-shadow: 0 10px 28px rgba(0,0,0,0.45); position: relative; display: flex; flex-direction: column; transition: box-shadow 0.3s; }
-        .drag-handle { 
-            position: absolute; top: 8px; left: 8px; cursor: grab; 
-            width: 12px; height: 18px; 
-            display: grid; grid-template-columns: 1fr 1fr; gap: 2px; opacity: 0.3;
-        }
-        .drag-handle div { width: 3px; height: 3px; background-color: var(--text-main); border-radius: 50%; }
-        .panel:hover .drag-handle { opacity: 0.8; }
-        .panel:active { cursor: grabbing; }
+    header{display:flex;justify-content:space-between;align-items:center;
+        flex-wrap:wrap;gap:10px;border-bottom:2px solid var(--accent);
+        padding-bottom:10px;margin-bottom:16px;}
+    h1{font-family:var(--font-display);font-size:1.15rem;color:var(--accent);
+        margin:0;text-transform:uppercase;letter-spacing:1px;}
+    .head-right{display:flex;align-items:center;gap:10px;font-size:.75rem;
+        color:var(--dim);}
+    select.band-select{background:var(--panel-bg);color:var(--text-main);
+        border:var(--border);border-radius:6px;padding:5px 8px;
+        font-size:.75rem;font-family:inherit;}
 
-        .panel-header { font-family: var(--font-display); font-size: 0.8rem; color: var(--accent); margin-bottom: 5px; margin-left: 20px; border-bottom: 1px solid #222; padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
-        
-        .explanation { font-size: 0.7rem; color: #777; font-style: italic; margin-bottom: 10px; line-height: 1.2; padding-left: 20px;}
-        .explanation b { color: var(--accent); }
+    /* ── Bouton thème ────────────────────────────────────────── */
+    #theme-btn{background:none;border:var(--border);border-radius:6px;
+        color:var(--text-main);cursor:pointer;font-size:1rem;
+        padding:4px 10px;line-height:1;transition:border-color .15s,background .15s;
+        flex-shrink:0;}
+    #theme-btn:hover{border-color:var(--accent);background:rgba(255,255,255,.05);}
 
-        .ai-briefing { background: rgba(0, 243, 255, 0.03); border-left: 3px solid var(--accent); padding: 12px; font-size: 0.95rem; color: #eee; margin-top: 10px; line-height: 1.4; }
-        
-        .stat-row { display: flex; justify-content: space-around; text-align: center; margin: 10px 0; }
-        .stat-value { font-size: 1.6rem; font-weight: bold; color: var(--success); }
-        .stat-label { font-size: 0.65rem; text-transform: uppercase; opacity: 0.7; }
+    /* ── Bandeau de maturité ─────────────────────────────── */
+    .maturity{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+        padding:11px 14px;margin-bottom:18px;border:var(--border);
+        border-radius:10px;background:var(--panel-bg);font-size:.78rem;}
+    .maturity-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+    .maturity-label{font-weight:600;color:var(--text-main);}
+    .maturity-track{flex:1;min-width:120px;height:8px;border-radius:4px;
+        background:rgba(255,255,255,.07);overflow:hidden;}
+    .maturity-fill{height:100%;border-radius:4px;transition:width .8s ease;}
+    .maturity-note{color:var(--dim);font-size:.72rem;}
 
-        .list-container { max-height: 150px; overflow-y: auto; font-size: 0.8rem; border: 1px solid #111; padding: 5px; background: rgba(0,0,0,0.2); }
-        .list-item { display: flex; justify-content: space-between; padding: 4px 5px; border-bottom: 1px solid #222; }
-        
-        .status-badge { font-size: 0.6rem; padding: 2px 6px; border-radius: 10px; border: 1px solid var(--success); color: var(--success); font-weight: bold; }
-        .badge-alert { border-color: var(--alert); color: var(--alert); }
+    .dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));
+        gap:18px;}
+    .panel{background:var(--panel-bg);border:var(--border);border-radius:14px;
+        padding:15px;box-shadow:0 10px 28px rgba(0,0,0,.45);
+        display:flex;flex-direction:column;}
+    .panel.grid-full{grid-column:1/-1;}
+    .panel.locked{opacity:.55;}
+    .panel-header{font-family:var(--font-display);font-size:.8rem;color:var(--accent);
+        margin-bottom:6px;padding-bottom:8px;border-bottom:1px solid var(--line);
+        display:flex;justify-content:space-between;align-items:center;gap:8px;
+        text-transform:uppercase;letter-spacing:.05em;}
+    .panel-header .tag{font-size:.62rem;color:var(--dim);text-transform:none;
+        letter-spacing:0;font-family:'IBM Plex Mono',monospace;}
+    .panel-sub{font-size:.7rem;color:var(--dim);font-style:italic;
+        margin-bottom:12px;line-height:1.4;}
+    .sub-en{display:block;margin-top:4px;opacity:.7;font-style:italic;}
 
-        .btn { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 5px 12px; cursor: pointer; font-family: var(--font-display); font-size: 0.7rem; text-transform: uppercase; }
-        .btn:hover { background: var(--accent); color: #000; }
-        
-        .grid-full { grid-column: 1 / -1; }
-        canvas { width: 100% !important; max-height: 180px; }
-    
-        /* === V4.0 LOOK (FORCÉ) : pavés très lisibles === */
-        .panel{
-            background: var(--panel-bg) !important;
-            border: 1px solid rgba(255,255,255,0.22) !important;
-            border-radius: 16px !important;
-            box-shadow: 0 14px 34px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06) inset !important;
-            overflow: hidden !important;
-        }
-        body[data-theme='light'] .panel{
-            border: 1px solid rgba(0,0,0,0.16) !important;
-            box-shadow: 0 14px 30px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.80) inset !important;
-        }
-        body[data-theme='matrix'] .panel{
-            border: 1px solid rgba(0,255,65,0.55) !important;
-            box-shadow: 0 14px 36px rgba(0,0,0,0.70), 0 0 0 1px rgba(0,255,65,0.12) inset !important;
-        }
-        .panel-header{
-            padding: 12px 16px !important;
-            border-bottom: 1px solid rgba(255,255,255,0.14) !important;
-            letter-spacing: .08em !important;
-            text-transform: uppercase !important;
-            font-weight: 900 !important;
-        }
-        body[data-theme='light'] .panel-header{
-            border-bottom: 1px solid rgba(0,0,0,0.10) !important;
-        }
-        /* espace entre colonnes/pavés */
-        .dashboard-grid, .grid, .container{
-            gap: 14px !important;
-        }
+    .no-data{padding:16px;text-align:center;color:var(--dim);font-size:.78rem;
+        line-height:1.5;border:1px dashed var(--line);border-radius:8px;}
+    .no-data b{display:block;margin-bottom:4px;color:var(--text-main);}
 
+    /* ── Activité récente ────────────────────────────────── */
+    /* Ligne de labels au-dessus des barres */
+    .spark-label-row{display:flex;gap:2px;height:18px;align-items:flex-end;
+        margin-bottom:2px;}
+    .spark-label-row span{flex:1;min-width:3px;text-align:center;
+        font-size:.58rem;font-family:'IBM Plex Mono',monospace;
+        overflow:hidden;white-space:nowrap;line-height:1;}
 
-        /* ═══════════ Navigation — added v12.4 ═══════════ */
-        nav.top-nav {
-            display: flex; gap: 8px; flex-wrap: wrap;
-            margin-bottom: 16px; padding-bottom: 14px;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        nav.top-nav a {
-            display: inline-flex; align-items: center; gap: 5px;
-            padding: 6px 12px; border-radius: 6px;
-            border: 1px solid rgba(255,255,255,0.08);
-            color: #999; text-decoration: none;
-            font-size: 0.78rem; font-weight: 600;
-            letter-spacing: 0.02em; transition: border-color .15s, color .15s, background .15s;
-            white-space: nowrap;
-        }
-        nav.top-nav a:hover {
-            border-color: rgba(0,243,255,0.35); color: #00f3ff; background: rgba(0,243,255,0.06);
-        }
-        nav.top-nav a.active {
-            border-color: rgba(255,107,94,0.5); color: #ff6b5e; background: rgba(255,107,94,0.08);
-        }
+    /* Barres */
+    .spark{display:flex;align-items:flex-end;gap:2px;height:120px;
+        border-bottom:2px solid var(--line);}
+    .spark-bar{flex:1;min-width:3px;border-radius:2px 2px 0 0;
+        transition:height .3s,opacity .2s;cursor:default;}
+    .spark-bar.now{box-shadow:0 0 8px var(--success);}
+    .spark-bar:hover{opacity:.85;filter:brightness(1.3);}
 
+    /* Axe X */
+    .spark-axis{display:flex;gap:2px;margin-top:4px;}
+    .spark-axis span{flex:1;min-width:3px;text-align:center;font-size:.6rem;
+        color:var(--dim);font-family:'IBM Plex Mono',monospace;overflow:hidden;
+        white-space:nowrap;}
+    .spark-axis span.is-now{color:var(--success);font-weight:700;}
+
+    /* Légende sous le graphe */
+    .spark-meta{display:flex;align-items:center;gap:8px;margin-top:6px;
+        font-size:.68rem;color:var(--dim);flex-wrap:wrap;}
+    .spark-meta b{font-family:'IBM Plex Mono',monospace;}
+
+    /* KPI */
+    .kpi-row{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;}
+    .kpi{flex:1;min-width:90px;}
+    .kpi-value{font-size:2.1rem;font-weight:700;color:var(--accent);
+        font-family:'IBM Plex Mono',monospace;line-height:1.1;}
+    .kpi-label{font-size:.65rem;color:var(--dim);text-transform:uppercase;
+        letter-spacing:.04em;margin-top:3px;}
+
+    /* Chips bandes */
+    .band-section-title{font-size:.68rem;color:var(--dim);
+        text-transform:uppercase;letter-spacing:.05em;
+        margin:10px 0 5px;font-family:'IBM Plex Mono',monospace;}
+    .band-chips{display:flex;gap:6px;flex-wrap:wrap;}
+    .band-chip{font-family:'IBM Plex Mono',monospace;font-size:.7rem;
+        padding:4px 9px;border-radius:12px;border:1px solid var(--line);
+        background:rgba(255,255,255,.02);display:flex;align-items:center;gap:4px;}
+    .band-chip b{font-weight:700;}
+    .band-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+    /* ── Heatmap ─────────────────────────────────────────── */
+    .heatmap-scroll{overflow-x:auto;padding-bottom:6px;}
+    table.heatmap{border-collapse:collapse;font-size:.6rem;min-width:520px;}
+    table.heatmap th{font-weight:500;color:var(--dim);padding:2px 3px;
+        font-family:'IBM Plex Mono',monospace;}
+    table.heatmap td{width:19px;height:17px;padding:0;
+        border:1px solid rgba(0,0,0,.35);border-radius:2px;}
+    table.heatmap td.void{background:repeating-linear-gradient(45deg,
+        transparent,transparent 2px,rgba(255,255,255,.05) 2px,rgba(255,255,255,.05) 4px);}
+    .legend{display:flex;align-items:center;gap:8px;margin-top:10px;
+        font-size:.65rem;color:var(--dim);flex-wrap:wrap;}
+    .legend-scale{display:flex;gap:2px;}
+    .legend-scale span{width:15px;height:9px;border-radius:2px;}
+    .callout{margin-top:10px;padding:8px 10px;background:rgba(255,200,0,.07);
+        border-left:3px solid var(--warn);border-radius:4px;font-size:.79rem;}
+
+    /* ── Patterns ────────────────────────────────────────── */
+    .pattern-row{display:flex;align-items:center;gap:8px;padding:6px 4px;
+        border-bottom:1px solid var(--line);}
+    .pattern-row:last-of-type{border-bottom:none;}
+    .pattern-row.insufficient{opacity:.45;}
+    .pattern-band{font-family:'IBM Plex Mono',monospace;font-weight:700;
+        width:54px;flex-shrink:0;font-size:.82rem;
+        display:flex;align-items:center;gap:5px;}
+    .pattern-bar-wrap{flex:1;height:14px;background:rgba(255,255,255,.05);
+        border-radius:5px;overflow:hidden;position:relative;}
+    .pattern-bar{height:100%;border-radius:5px;transition:width .5s ease;
+        position:relative;}
+    .pattern-bar::after{content:'';position:absolute;inset:0;
+        background:linear-gradient(90deg,rgba(255,255,255,.18) 0%,transparent 100%);
+        border-radius:5px;}
+    .pattern-trend{width:72px;text-align:right;flex-shrink:0;
+        font-size:.72rem;font-family:'IBM Plex Mono',monospace;font-weight:700;}
+    .pattern-avg{width:56px;text-align:right;flex-shrink:0;
+        font-size:.66rem;color:var(--dim);font-family:'IBM Plex Mono',monospace;}
+    .trend-up{color:var(--success);} .trend-down{color:var(--alert);}
+    .trend-stable{color:var(--dim);} .trend-insufficient{color:#555;font-style:italic;}
+
+    /* ── Forecast ────────────────────────────────────────── */
+    .forecast-strip{display:flex;gap:7px;flex-wrap:wrap;}
+    .forecast-slot{flex:1;min-width:74px;padding:9px 5px;border:1px solid var(--line);
+        border-radius:8px;text-align:center;background:rgba(255,255,255,.02);}
+    .forecast-slot.best{border-color:var(--success);background:rgba(34,197,94,.08);}
+    .forecast-hour{font-size:.68rem;color:var(--dim);
+        font-family:'IBM Plex Mono',monospace;}
+    .forecast-prob{font-size:1.3rem;font-weight:700;margin:3px 0;
+        font-family:'IBM Plex Mono',monospace;}
+    .forecast-prob.unknown{font-size:.9rem;color:#4a4a4a;}
+    .forecast-conf{font-size:.57rem;color:var(--dim);}
+    .forecast-conf.low-sample{color:var(--warn);font-weight:700;}
+
+    .footnote{font-size:.68rem;color:var(--dim);margin-top:12px;padding-top:8px;
+        border-top:1px solid var(--line);line-height:1.45;}
+    .btn-hunt{display:block;text-align:center;text-decoration:none;
+        background:rgba(255,107,94,.1);border:1px solid #ff6b5e;color:#ff6b5e;
+        padding:8px 12px;font-size:.75rem;border-radius:6px;margin-top:12px;
+        text-transform:uppercase;letter-spacing:.04em;}
+    .btn-hunt:hover{background:rgba(255,107,94,.2);}
 </style>
 </head>
 <body>
@@ -166,580 +200,571 @@
   <a href="/briefing">📰 BRIEFING</a>
   <a href="/map">🗺 MAP</a>
   <a href="/world">🌍 WORLD</a>
-  <a href="/hunt" class="">🎯 HUNT</a>
+  <a href="/hunt">🎯 HUNT</a>
   <a href="/satellites">🛰️ SATELLITES</a>
   <a href="/weather">⛈️ MÉTÉO</a>
   <a href="/ai-insight" class="active">📊 AI INSIGHT</a>
 </nav>
 
-
-
-<!-- Dialog confirmation META analyse (remplace confirm() natif) -->
-<div id="meta-confirm-dialog" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);align-items:center;justify-content:center;">
-    <div style="background:#0e0e0e;border:1px solid var(--accent, #00f3ff);border-radius:12px;padding:24px 28px;max-width:340px;text-align:center;">
-        <p style="color:#a0a0a0;margin:0 0 16px;font-size:.9em;"><b>Relancer la méta-analyse ?</b><br><small style="color:#666">Disponible 1x par jour</small></p>
-        <div style="display:flex;gap:10px;justify-content:center;">
-            <button class="btn" id="meta-confirm-yes" style="border-color:#22c55e;color:#22c55e;">✓ Confirmer</button>
-            <button class="btn" id="meta-confirm-no">✕ Annuler</button>
-        </div>
-    </div>
-</div>
 <header>
-    <div>
-        <h1>Neural AI Analysis Center</h1>
-        <small id="sync-info">Sync Mode: Active</small>
-    </div>
-    <div style="display:flex; gap:8px;">
-        <button class="btn" onclick="location.href='/map'">DX Map</button>
-        <button class="btn" onclick="location.href='/'">Dashboard</button>
-        <button class="btn" onclick="location.href='/world'">World</button>
-        <button class="btn" onclick="location.href='/briefing'">Briefing</button>
-        <button class="btn" onclick="location.href='/satellites'">&#128752; Satellites</button>
-        <button class="btn" onclick="location.href='/weather'">&#9928; Météo</button>
+    <h1>📊 DX Analytics</h1>
+    <div class="head-right">
+        <label for="band-filter">Bande :</label>
+        <select id="band-filter" class="band-select">
+            <option value="">Toutes</option>
+            <option value="6m">6m</option><option value="10m">10m</option>
+            <option value="12m">12m</option><option value="15m">15m</option>
+            <option value="17m">17m</option><option value="20m">20m</option>
+            <option value="30m">30m</option><option value="40m">40m</option>
+            <option value="80m">80m</option><option value="160m">160m</option>
+            <option value="2m">2m</option><option value="70cm">70cm</option>
+        </select>
+        <span>MàJ <span id="last-update">--:--</span></span>
+        <button id="theme-btn" onclick="cycleTheme()" title="Changer le thème">🌙</button>
     </div>
 </header>
 
-      <div class="dashboard-grid" id="sortable-dashboard">
+<div id="maturity-bar"></div>
 
-        <div class="panel grid-full" data-id="ai-report">
-            <div class="drag-handle"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            <div class="panel-header">
-                <span>🤖 AI OPERATOR REPORT / RAPPORT IA</span>
-                <span id="ai-status" class="status-badge">ACTIVE</span>
-            </div>
-            <div class="explanation">Tactical synthesis of ionospheric conditions. / <i>Synthèse tactique des conditions ionosphériques.</i></div>
-            <div id="ai-text-report" class="ai-briefing">Initializing neural correlation...</div>
-        </div>
-
-
-        <div class="panel grid-full" data-id="dx-briefing">
-            <div class="drag-handle"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            <div class="panel-header">
-                <span>🛰️ DX BRIEFING / BRIEFING DX</span>
-                <span style="display:flex; gap:6px; align-items:center;">
-                    <button id="dx-lang-fr" class="btn" style="padding:4px 8px;">FR</button>
-                    <button id="dx-lang-en" class="btn" style="padding:4px 8px;">EN</button>
-                    <button id="dx-refresh" class="btn" style="padding:4px 8px;">Refresh</button>
-                </span>
-            </div>
-            <div class="explanation">
-                Generated tactical summary from live stats + solar indices. /
-                <i>Synthèse tactique générée à partir des stats et des indices solaires.</i>
-            </div>
-            <div id="dx-briefing-text" class="ai-briefing">Loading DX Briefing...</div>
-            <div id="dx-briefing-meta" style="margin-top:8px; font-size:0.75rem; color:#8ef; opacity:0.9; padding-left:20px;"></div>
-        </div>
-
-        <div class="panel" data-id="stats-24h">
-            <div class="drag-handle"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            <div class="panel-header">24H PERFORMANCE / PERFORMANCE 24H</div>
-            <div class="explanation">Activity volume and prefix diversity. / <i>Volume d'activité et diversité des préfixes.</i></div>
-            <div class="stat-row">
-                <div><div id="stat-dxcc" class="stat-value">--</div><div class="stat-label">DXCC</div></div>
-                <div><div id="stat-rarity" class="stat-value">--</div><div class="stat-label">RARITY %</div></div>
-                <div><div id="stat-spots" class="stat-value">--</div><div class="stat-label">SPOTS</div></div>
-            </div>
-        </div>
-
-        <div class="panel" data-id="band-analysis">
-            <div class="drag-handle"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            <div class="panel-header">BAND ANALYZER / ANALYSEUR DE BANDES</div>
-            <div class="explanation">Distribution of spots by frequency. / <i>Répartition des spots par fréquence.</i></div>
-            <canvas id="bandChart"></canvas>
-        </div>
-
-        <div class="panel" data-id="anomaly-detector">
-            <div class="drag-handle"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            <div class="panel-header">ANOMALY DETECTOR / DÉTECTEUR D'ANOMALIES</div>
-            <div class="explanation">Detection of unusual propagation events. / <i>Détection d'évènements de propagation rares.</i></div>
-            <div id="anomaly-list" class="list-container">
-                <div class="list-item">Scanning spectrum...</div>
-            </div>
-        </div>
-
-        <div class="panel" data-id="rare-entities">
-            <div class="drag-handle"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            <div class="panel-header">RARE ENTITIES / ENTITÉS RARES</div>
-            <div class="explanation">Entities with high SPD scores (>70). / <i>Entités à haut score de rareté SPD.</i></div>
-            <div id="rare-list" class="list-container"></div>
-        </div>
-
-        <div class="panel" data-id="ld-calls">
-            <div class="drag-handle"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            <div class="panel-header">LONG DISTANCE / TRAJETS DX (>10k km)</div>
-            <div class="explanation">Stations spotted at extreme ranges. / <i>Stations reçues à très longue distance.</i></div>
-            <div id="ld-list" class="list-container"></div>
-        </div>
-
-    
-        <div class="panel" data-id="meta-analyse" id="meta-panel">
-            <div class="drag-handle"><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>📊 META ANALYSE / META ANALYSIS</span>
-                <span style="display:flex; gap:8px; align-items:center;">
-                    <span class="status-badge" id="metaFreshBadge" title="Fraîcheur / Freshness">—</span>
-                    <button class="btn" id="metaRunBtn" style="padding:4px 8px;" onclick="showMetaConfirm()" title="Relancer la méta-analyse (1x/jour)">↻ RUN</button>
-                </span>
-            </div>
-            <div class="explanation">
-                FR: Synthèse auto du log (volume, période, top DX SPD). / 
-                <i>EN: Auto summary from log (volume, time range, top DX SPD).</i>
-            </div>
-
-            <div class="list-container" style="max-height:none;">
-                <div class="list-item"><b>Spots</b><span id="metaSpots">—</span></div>
-                <div class="list-item"><b>Période</b><span id="metaRange">—</span></div>
-                <div class="list-item"><b>Généré</b><span id="metaGeneratedAt">—</span></div>
-                <div class="list-item"><b>Relance possible</b><span id="metaCountdown">—</span></div>
-            </div>
-
-            <div style="margin-top:10px; font-size:0.8rem; color:var(--accent); padding-left:20px; opacity:0.95;">
-                Top DX (SPD)
-            </div>
-            <div id="metaTopList" class="list-container"></div>
-        </div>
-
+<div class="dashboard-grid">
+    <div class="panel grid-full" data-panel="recent"></div>
+    <div class="panel grid-full" data-panel="forecast"></div>
+    <div class="panel grid-full" data-panel="heatmap"></div>
+    <div class="panel grid-full" data-panel="patterns"></div>
 </div>
 
-    <script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// Neural DX Watcher — DX Analytics v12.5
+// Panneau analytique : activité récente, prévisions, heatmap, tendances.
+// ═══════════════════════════════════════════════════════════════════════
 
-        /* ── SÉCURITÉ v11 — Jeton API automatique (voir index.html) ──── */
-        window._apiToken = null;
-        window._apiTokenPromise = fetch('/api/token')
-            .then(r => r.json())
-            .then(d => { window._apiToken = d.token || null; return window._apiToken; })
-            .catch(() => null);
-        (function() {
-            const originalFetch = window.fetch;
-            window.fetch = async function(input, init) {
-                init = init || {};
-                const method = (init.method || 'GET').toUpperCase();
-                if (method === 'POST' || method === 'DELETE') {
-                    if (window._apiToken === null) { await window._apiTokenPromise; }
-                    if (window._apiToken) {
-                        init.headers = new Headers(init.headers || {});
-                        if (!init.headers.has('X-API-Token')) {
-                            init.headers.set('X-API-Token', window._apiToken);
-                        }
-                    }
-                }
-                return originalFetch.call(this, input, init);
-            };
-        })();
+// ── Couleurs et ordre des bandes ───────────────────────────────────────
+const BAND_COLORS = {
+    '160m':'#ef4444','80m':'#f97316','60m':'#f59e0b',
+    '40m':'#eab308','30m':'#84cc16','20m':'#22c55e',
+    '17m':'#10b981','15m':'#06b6d4','12m':'#3b82f6',
+    '10m':'#6366f1','6m':'#a855f7','4m':'#d946ef',
+    '2m':'#ec4899','70cm':'#f43f5e','23cm':'#fb923c'
+};
+// Ordre radio logique OHF → UHF
+const BAND_ORDER = ['160m','80m','60m','40m','30m','20m','17m','15m',
+                    '12m','10m','6m','4m','2m','70cm','23cm'];
+function bandColor(b) { return BAND_COLORS[b] || '#888'; }
+function bandSortKey(b) {
+    const i = BAND_ORDER.indexOf(b);
+    return i === -1 ? 999 : i;
+}
 
-        // --- COULEURS SYNCHRONISÉES AVEC INDEX.HTML ---
-        const BAND_COLORS = {
-            '160m': '#4b0082', '80m': '#0000ff', '60m': '#00ced1', '40m': '#00ff00',
-            '30m': '#adff2f', '20m': '#ffff00', '17m': '#ffa500', '15m': '#ff4500',
-            '12m': '#ff0000', '10m': '#ff1493', '6m': '#8b0000', '2m': '#4b0082',
-            '70cm': '#2f4f4f', 'QO-100': '#ffffff'
-        };
+// ── Thème jour/nuit ────────────────────────────────────────────────────
+const THEMES = ['', 'dark', 'light', 'matrix'];
+const THEME_ICONS = { '':'🌙', dark:'☀️', light:'🌙', matrix:'💚' };
 
-        let bandChart;
+function cycleTheme() {
+    const cur = document.body.getAttribute('data-theme') || '';
+    const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+    if (next) {
+        document.body.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+    } else {
+        document.body.removeAttribute('data-theme');
+        localStorage.removeItem('theme');
+    }
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = THEME_ICONS[next] || '🌙';
+}
 
-        // --- MOTEUR IA (LOGIQUE TACTIQUE) ---
-        
-        // --- DX BRIEFING (API) ---
-        let dxBriefingLang = (localStorage.getItem('dxBriefingLang') || 'fr');
+// Applique le thème sauvegardé au chargement
+(function () {
+    const t = localStorage.getItem('theme');
+    if (t) {
+        document.body.setAttribute('data-theme', t);
+        const btn = document.getElementById('theme-btn');
+        if (btn) btn.textContent = THEME_ICONS[t] || '🌙';
+    }
+})();
 
-        function setDXBriefingButtons() {
-            const fr = document.getElementById('dx-lang-fr');
-            const en = document.getElementById('dx-lang-en');
-            if (!fr || !en) return;
-            fr.style.opacity = (dxBriefingLang === 'fr') ? '1' : '0.5';
-            en.style.opacity = (dxBriefingLang === 'en') ? '1' : '0.5';
+// ── Cache ──────────────────────────────────────────────────────────────
+class DXCache {
+    static TTL_MS = 5 * 60 * 1000; // 5 min — cohérent avec le refresh
+
+    static set(key, data) {
+        try {
+            localStorage.setItem('dxa_' + key,
+                JSON.stringify({ data, exp: Date.now() + this.TTL_MS }));
+        } catch (e) {}
+    }
+    static get(key) {
+        try {
+            const raw = localStorage.getItem('dxa_' + key);
+            if (!raw) return null;
+            const { data, exp } = JSON.parse(raw);
+            if (Date.now() > exp) { localStorage.removeItem('dxa_' + key); return null; }
+            return data;
+        } catch (e) { return null; }
+    }
+}
+
+// ── Panneau ────────────────────────────────────────────────────────────
+class DXPanel {
+    constructor(key, renderer) { this.key = key; this.renderer = renderer; }
+    render(data) {
+        const el = document.querySelector(`[data-panel="${this.key}"]`);
+        if (!el) return;
+        try {
+            const out = this.renderer(data) || '';
+            el.innerHTML = out.html !== undefined ? out.html : out;
+            el.classList.toggle('locked', Boolean(out.locked));
+        } catch (err) {
+            console.error(`panel ${this.key}:`, err);
+            el.innerHTML = `<div class="panel-header">${this.key}</div>
+                <div class="no-data"><b>Erreur d'affichage</b>Voir la console.</div>`;
+        }
+    }
+}
+
+// ── Utilitaires ────────────────────────────────────────────────────────
+function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g,
+        c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fmtDuration(hours) {
+    if (hours == null) return '';
+    if (hours < 1) return Math.round(hours * 60) + ' min';
+    if (hours < 48) return Math.round(hours) + ' h';
+    return Math.round(hours / 24) + ' j';
+}
+
+// Échelle continue teal → ambre
+function heatColor(ratio) {
+    if (ratio <= 0) return 'rgba(255,255,255,.04)';
+    const stops = [[0,[0,60,75]],[.35,[0,160,180]],[.65,[255,200,0]],[1,[255,90,40]]];
+    let lo = stops[0], hi = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+        if (ratio >= stops[i][0] && ratio <= stops[i+1][0]) { lo = stops[i]; hi = stops[i+1]; break; }
+    }
+    const span = hi[0] - lo[0];
+    const t = span === 0 ? 0 : (ratio - lo[0]) / span;
+    const c = lo[1].map((v,i) => Math.round(v + (hi[1][i] - v) * t));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+// Assemble une explication FR + traduction EN discrète, pour tous les panneaux.
+function bisub(fr, en) {
+    return `${fr}<span class="sub-en">🇬🇧 ${en}</span>`;
+}
+
+function lockedPanel(title, sub, maturity, needLabel) {
+    // needLabel accepte soit une chaîne (rétro-compat), soit {fr, en}.
+    const need = typeof needLabel === 'string' ? { fr: needLabel, en: needLabel } : needLabel;
+    const remaining = maturity && maturity.hours_remaining != null
+        ? { fr: `Disponible dans environ ${fmtDuration(maturity.hours_remaining)} de collecte.`,
+            en: `Available in about ${fmtDuration(maturity.hours_remaining)} of collection.` }
+        : { fr: '', en: '' };
+    return {
+        locked: true,
+        html: `<div class="panel-header">${title}
+                <span class="tag">en attente</span></div>
+            <div class="panel-sub">${sub}</div>
+            <div class="no-data"><b>${esc(need.fr)}</b>${esc(remaining.fr)}
+                <div class="sub-en">🇬🇧 ${esc(need.en)} ${esc(remaining.en)}</div></div>`,
+    };
+}
+
+// ── Bandeau de maturité (avec décalage temporel lissé) ─────────────────
+// _lastData / _lastFetchMs permettent un tick chaque minute sans appel API.
+let _lastData = null, _lastFetchMs = 0;
+
+function renderMaturity(data, extraH = 0) {
+    const el = document.getElementById('maturity-bar');
+    if (!el || !data) return;
+    const m = data.maturity;
+    if (!m) { el.innerHTML = ''; return; }
+
+    const colors = { collecting:'var(--warn)', basic:'var(--accent)',
+                     daily:'var(--accent)', weekly:'var(--success)' };
+    const color = colors[m.level] || 'var(--dim)';
+
+    const spanH   = (m.span_hours || 0) + extraH;
+    const hoursLeft = Math.max(0, (m.hours_remaining || 0) - extraH);
+
+    let pct = 100, note = 'Historique complet — toutes les analyses sont actives.';
+    if (m.next_at_hours) {
+        const levelStarts = { collecting:0, basic:6, daily:48, weekly:336 };
+        const from = levelStarts[m.level] || 0;
+        const span = m.next_at_hours - from;
+        pct = span > 0 ? Math.max(2, Math.min(99, (spanH - from) / span * 100)) : 0;
+        note = `${fmtDuration(spanH)} d'historique · `
+             + `${esc(m.next_level)} dans ~${fmtDuration(hoursLeft)}`;
+    }
+
+    el.innerHTML = `<div class="maturity">
+        <span class="maturity-dot" style="background:${color}"></span>
+        <span class="maturity-label">${esc(m.label)}</span>
+        <span class="maturity-track">
+            <span class="maturity-fill" style="width:${pct.toFixed(1)}%;background:${color}"></span>
+        </span>
+        <span class="maturity-note">${note}</span>
+    </div>`;
+}
+
+// ── Renderers ──────────────────────────────────────────────────────────
+
+// ── Activité récente ───────────────────────────────────────────────────
+const recentRenderer = (data) => {
+    const r = data.recent || {};
+    const head = `<div class="panel-header">⚡ Activité récente
+        <span class="tag">${r.hours || 24} dernières heures</span></div>
+        <div class="panel-sub">${bisub(
+            "Spots reçus heure par heure — toutes bandes confondues. Barres colorées du froid (peu actif) au chaud (très actif). Le pic est libellé en orange, l'heure courante en vert.",
+            "Spots received hour by hour — all bands combined. Bars run from cool (quiet) to hot (very active). The peak is labeled in orange, the current hour in green."
+        )}</div>`;
+
+    if (!r.available || !r.series || !r.series.length) {
+        return head + `<div class="no-data"><b>Aucun spot reçu</b>
+            Vérifie la connexion aux clusters DX.</div>`;
+    }
+
+    const peak = Math.max(r.peak || 0, 1);
+    const avg  = Math.round(r.total / r.series.length);
+
+    // Ligne de labels au-dessus des barres (pic + heure courante)
+    const labelRow = r.series.map((p) => {
+        const isNow  = p.hours_ago === 0;
+        const isPeak = p.count === r.peak && p.count > 0;
+        if (!isNow && !isPeak) return `<span></span>`;
+        const color = isNow ? 'var(--success)' : 'var(--warn)';
+        return `<span style="color:${color};font-weight:700">${p.count}</span>`;
+    }).join('');
+
+    // Barres colorées par intensité
+    const bars = r.series.map((p) => {
+        const ratio = p.count / peak;
+        const h     = Math.max(3, Math.round(ratio * 100));
+        const isNow = p.hours_ago === 0;
+        const color = isNow ? 'var(--success)' : heatColor(ratio);
+        const glow  = isNow ? 'box-shadow:0 0 8px var(--success);' : '';
+        const hour  = String(p.hour_utc).padStart(2, '0');
+        return `<span class="spark-bar${isNow ? ' now' : ''}"
+            style="height:${h}%;background:${color};${glow}"
+            title="${hour}z — ${p.count} spots/h"></span>`;
+    }).join('');
+
+    // Axe X : heure toutes les 4 tranches + marqueur "maintenant"
+    const axis = r.series.map((p, idx) => {
+        const isNow    = p.hours_ago === 0;
+        const showHour = idx % 4 === 0 && !isNow;
+        const label    = isNow ? '▲' : showHour ? String(p.hour_utc).padStart(2,'0') : '';
+        return `<span${isNow ? ' class="is-now"' : ''}>${label}</span>`;
+    }).join('');
+
+    // Chips de bandes avec couleur
+    const chips = (r.bands || []).slice(0, 8).map(b => {
+        const c = bandColor(b.band);
+        return `<span class="band-chip" style="border-color:${c}55;background:${c}18">
+            <span class="band-dot" style="background:${c}"></span>
+            ${esc(b.band)} <b style="color:${c}">${b.count}</b></span>`;
+    }).join('');
+
+    // Section modes (si l'API renvoie r.modes)
+    const modeChips = (r.modes || []).slice(0, 5).map(m =>
+        `<span class="band-chip"><b>${esc(m.mode)}</b> ${m.count}</span>`).join('');
+    const modeSection = modeChips
+        ? `<div class="band-section-title">Mode</div>
+           <div class="band-chips">${modeChips}</div>` : '';
+
+    return head
+        + `<div class="spark-label-row">${labelRow}</div>`
+        + `<div class="spark">${bars}</div>`
+        + `<div class="spark-axis">${axis}</div>`
+        + `<div class="spark-meta">
+            <span>UTC →</span>
+            <span style="margin-left:auto">
+                Pic : <b style="color:var(--warn)">${r.peak} spots/h</b>
+                &nbsp;·&nbsp; Moyenne : <b>${avg}/h</b>
+            </span>
+           </div>`
+        + `<div class="kpi-row">
+            <div class="kpi">
+                <div class="kpi-value">${r.total.toLocaleString('fr-FR')}</div>
+                <div class="kpi-label">spots ${r.hours}h</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-value">${avg}</div>
+                <div class="kpi-label">moy. / heure</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-value">${r.peak}</div>
+                <div class="kpi-label">pic horaire</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-value">${(r.bands||[]).length}</div>
+                <div class="kpi-label">bandes actives</div>
+            </div>
+           </div>`
+        + `<div class="band-section-title">Répartition par bande</div>`
+        + `<div class="band-chips">${chips}</div>`
+        + modeSection;
+};
+
+// ── Prochaines heures ──────────────────────────────────────────────────
+const forecastRenderer = (data) => {
+    const f = data.forecast || {};
+    const basisLabel = f.basis === 'weekday'
+        ? 'même jour de semaine et même heure / same weekday & hour'
+        : 'même heure, tous jours confondus / same hour, any day';
+    const head = `<div class="panel-header">🔮 Prochaines heures
+        <span class="tag">${f.available ? esc(basisLabel) : ''}</span></div>
+        <div class="panel-sub">${bisub(
+            "Le % indique la fréquence à laquelle <b>au moins un spot</b> a été reçu sur ce créneau dans le passé — ce n'est pas la force d'une ouverture ni une prévision de propagation. Avec peu de jours d'historique (regarde le nombre d'« obs »), les spots arrivant presque en continu, il est normal que la plupart des créneaux affichent 100 %.",
+            "The % shows how often <b>at least one spot</b> was received in this slot in the past — not opening strength, and not a propagation forecast. With only a few days of history (check the \u201cobs\u201d count), spots arrive almost continuously, so most slots naturally read 100%."
+        )}</div>`;
+
+    if (!f.available || !f.slots.length) {
+        return lockedPanel('🔮 Prochaines heures',
+            bisub("Fréquence d'activité observée sur les créneaux à venir.",
+                  "How often activity has been observed on upcoming slots."),
+            data.maturity,
+            { fr: "Pas encore assez de créneaux observés",
+              en: "Not enough time slots observed yet" });
+    }
+
+    const bestOffset = f.best_slot ? f.best_slot.offset_h : -1;
+    const slots = f.slots.map(s => {
+        const isBest = s.offset_h === bestOffset && s.probability !== null;
+        const label = s.offset_h === 0 ? 'maintenant / now' : `+${s.offset_h}h`;
+        const prob = s.probability === null
+            ? `<div class="forecast-prob unknown">—</div>`
+            : `<div class="forecast-prob" style="color:${heatColor(s.probability/100)}">${s.probability}%</div>`;
+        // Échantillon faible (< 5 observations) : peu fiable, on le signale en orange
+        // plutôt que de laisser un 100 % nu et non qualifié.
+        const lowSample = s.probability !== null && s.observations < 5;
+        const conf = s.probability === null
+            ? `${s.observations} obs.`
+            : `${s.observations} obs · ${s.avg_spots}/h`;
+        return `<div class="forecast-slot ${isBest ? 'best' : ''}">
+            <div class="forecast-hour">${esc(label)}</div>
+            <div class="forecast-hour">${String(s.hour_utc).padStart(2,'0')}z</div>
+            ${prob}<div class="forecast-conf${lowSample ? ' low-sample' : ''}"
+                title="${lowSample ? 'Échantillon faible — estimation à prendre avec prudence / Small sample — take this estimate with caution' : ''}">${esc(conf)}</div></div>`;
+    }).join('');
+
+    let verdict = '';
+    if (f.best_slot && f.best_slot.probability !== null) {
+        const b = f.best_slot;
+        const when = b.offset_h === 0 ? 'maintenant' : `dans ${b.offset_h}h`;
+        const whenEn = b.offset_h === 0 ? 'now' : `in ${b.offset_h}h`;
+        verdict = `<div class="callout">
+            <div>Meilleur créneau : <b>${when}</b>
+            (${String(b.hour_utc).padStart(2,'0')}z) — activité observée
+            ${b.probability}% du temps${f.band ? ' sur ' + esc(f.band) : ''}
+            (n=${b.observations} obs.).</div>
+            <div class="sub-en">🇬🇧 Best slot: <b>${whenEn}</b>
+            (${String(b.hour_utc).padStart(2,'0')}z) — activity observed
+            ${b.probability}% of the time${f.band ? ' on ' + esc(f.band) : ''}
+            (n=${b.observations} obs.).</div></div>`;
+    }
+
+    return head + `<div class="forecast-strip">${slots}</div>` + verdict +
+        `<a href="/hunt" class="btn-hunt">🎯 Ouvrir le mode chasse / Open hunt mode</a>`;
+};
+
+// ── Heatmap ────────────────────────────────────────────────────────────
+const heatmapRenderer = (data) => {
+    const h = data.heatmap || {};
+    if (!h.available || !h.grid || !(h.peak_value > 0)) {
+        return lockedPanel('🗓 Quand ça ouvre',
+            bisub("Activité moyenne par jour de semaine et heure UTC.",
+                  "Average activity by weekday and UTC hour."),
+            data.maturity,
+            { fr: "Il faut au moins 2 jours d'historique",
+              en: "At least 2 days of history needed" });
+    }
+
+    const head = `<div class="panel-header">🗓 Quand ça ouvre
+        <span class="tag">${h.total_spots.toLocaleString('fr-FR')} spots · ${h.days} j</span></div>
+        <div class="panel-sub">${bisub(
+            "Moyenne par occurrence du créneau, et non cumul : sinon les jours les mieux représentés dans la fenêtre ressortiraient artificiellement.",
+            "Average per occurrence of the slot, not a running total — otherwise days better represented in the window would stand out artificially."
+        )}</div>`;
+
+    const peak = h.peak_value;
+    const hours = Array.from({length:24}, (_,i) => i);
+    const headerRow = `<tr><th></th>${hours.map(i =>
+        `<th>${i % 3 === 0 ? String(i).padStart(2,'0') : ''}</th>`).join('')}</tr>`;
+
+    const rows = h.grid.map((row, wd) => {
+        const cells = row.map((v, hr) => {
+            const when = `${h.weekday_labels[wd]} ${String(hr).padStart(2,'0')}z`;
+            if (v === null) return `<td class="void" title="${when} — pas d'observation"></td>`;
+            return `<td style="background:${heatColor(v/peak)}" title="${when} — ${v} spots/h"></td>`;
+        }).join('');
+        return `<tr><th>${esc(h.weekday_labels[wd])}</th>${cells}</tr>`;
+    }).join('');
+
+    const legend = `<div class="legend"><span>calme</span>
+        <span class="legend-scale">${[0,.2,.4,.6,.8,1].map(r =>
+            `<span style="background:${heatColor(r)}"></span>`).join('')}</span>
+        <span>actif</span><span style="margin-left:12px;">hachuré = aucune observation</span></div>`;
+
+    let best = '';
+    if (h.best_slot) {
+        const b = h.best_slot;
+        best = `<div class="callout">
+            <div>Créneau le plus actif :
+            <b>${esc(b.weekday_label)} ${String(b.hour).padStart(2,'0')}z</b>
+            — ${b.value} spots/h en moyenne${h.band ? ' sur ' + esc(h.band) : ''}.</div>
+            <div class="sub-en">🇬🇧 Busiest slot:
+            <b>${esc(b.weekday_label)} ${String(b.hour).padStart(2,'0')}z</b>
+            — ${b.value} spots/h on average${h.band ? ' on ' + esc(h.band) : ''}.</div></div>`;
+    }
+
+    return head + `<div class="heatmap-scroll"><table class="heatmap">${headerRow}${rows}</table></div>`
+        + legend + best;
+};
+
+// ── Tendances par bande ────────────────────────────────────────────────
+const patternsRenderer = (data) => {
+    const p = data.patterns || {};
+    if (!p.available || !p.bands.length) {
+        return lockedPanel('📈 Tendances par bande',
+            bisub("Comparaison d'une période récente avec la précédente.",
+                  "Comparison of a recent period with the previous one."),
+            data.maturity,
+            { fr: "Il faut deux périodes comparables (~12 h)",
+              en: "Two comparable periods needed (~12 h)" });
+    }
+
+    const win = p.window_days >= 1
+        ? `${p.window_days} j` : `${p.window_hours} h`;
+    const head = `<div class="panel-header">📈 Tendances par bande
+        <span class="tag">${win} vs ${win} précédents</span></div>
+        <div class="panel-sub">${bisub(
+            "Barres en couleur par bande, ordre 160 m → 23 cm. Une bande sous 10 spots n'est pas qualifiée (grisée).",
+            "Color bars by band, ordered 160 m → 23 cm. A band under 10 spots is not qualified (greyed out)."
+        )}</div>`;
+
+    // Tri : ordre radio logique, Unknown à la fin
+    const sorted = [...p.bands].sort((a, b) => {
+        if (a.band === 'Unknown') return 1;
+        if (b.band === 'Unknown') return -1;
+        return bandSortKey(a.band) - bandSortKey(b.band);
+    });
+
+    const maxCount = Math.max(...sorted.map(b => b.recent_count), 1);
+
+    const rows = sorted.map(b => {
+        const bc    = bandColor(b.band);
+        const width = Math.round(b.recent_count / maxCount * 100);
+        const insufficient = b.trend === 'insufficient' || b.trend == null;
+
+        let trendCls, trendLabel;
+        switch (b.trend) {
+            case 'up':
+                trendCls = 'trend-up';
+                trendLabel = b.change_pct === null ? '▲ nouveau' : `▲ +${b.change_pct}%`;
+                break;
+            case 'down':
+                trendCls = 'trend-down';
+                trendLabel = `▼ ${b.change_pct}%`;
+                break;
+            case 'stable':
+                trendCls = 'trend-stable';
+                trendLabel = '● stable';
+                break;
+            default:
+                trendCls = 'trend-insufficient';
+                trendLabel = 'trop peu';
         }
 
-        async function loadDXBriefing(force=false) {
-            const box = document.getElementById('dx-briefing-text');
-            const meta = document.getElementById('dx-briefing-meta');
-            if (!box) return;
+        // La barre utilise la couleur de bande ; le fond montre la capacité max
+        return `<div class="pattern-row${insufficient ? ' insufficient' : ''}">
+            <span class="pattern-band" style="color:${bc}">
+                <span class="band-dot" style="background:${bc}"></span>${esc(b.band)}
+            </span>
+            <span class="pattern-bar-wrap" title="${b.recent_count} spots">
+                <span class="pattern-bar"
+                    style="width:${width}%;background:${bc}"></span>
+            </span>
+            <span class="pattern-trend ${trendCls}">${trendLabel}</span>
+            <span class="pattern-avg">${b.daily_avg}/j</span>
+        </div>`;
+    }).join('');
 
-            const url = `/api/dx_briefing.json?lang=${dxBriefingLang}` + (force ? '&force=1' : '');
-            try {
-                const r = await fetch(url, { cache: 'no-store' });
-                if (!r.ok) throw new Error('dx_briefing HTTP ' + r.status);
-                const d = await r.json();
+    const delta = p.total_previous > 0
+        ? Math.round((p.total_recent - p.total_previous) / p.total_previous * 100) : null;
+    const summary = delta === null ? '' :
+        `<div class="footnote">Activité globale :
+        ${p.total_recent.toLocaleString('fr-FR')} spots sur la période récente contre
+        ${p.total_previous.toLocaleString('fr-FR')} sur la précédente
+        (${delta >= 0 ? '+' : ''}${delta}%).</div>`;
 
-                // Render text (server returns HTML-ready line breaks sometimes; keep safe-ish)
-                box.innerHTML = (d.briefing || 'No briefing available.');
+    return head + rows + summary;
+};
 
-                const ts = d.generated_utc || d.updated_utc || d.ts || '';
-                const conf = (d.confidence !== undefined && d.confidence !== null) ? ` · Confidence: ${d.confidence}%` : '';
-                meta.textContent = ts ? (`Updated: ${ts}${conf}`) : conf.replace(' ·','');
+// ── Boucle principale ──────────────────────────────────────────────────
+const panels = [
+    new DXPanel('recent',   recentRenderer),
+    new DXPanel('forecast', forecastRenderer),
+    new DXPanel('heatmap',  heatmapRenderer),
+    new DXPanel('patterns', patternsRenderer),
+];
 
-            } catch (e) {
-                box.innerHTML = "DX Briefing unavailable (API error).<br><i>Briefing DX indisponible (erreur API).</i>";
-                if (meta) meta.textContent = '';
-                console.error("DX Briefing error:", e);
-            }
-        }
+let currentBand = '';
 
-        function initDXBriefingUI() {
-            const fr = document.getElementById('dx-lang-fr');
-            const en = document.getElementById('dx-lang-en');
-            const rf = document.getElementById('dx-refresh');
+async function updateDashboard({ useCache = true } = {}) {
+    const cacheKey = 'analytics_' + (currentBand || 'all');
+    let data = useCache ? DXCache.get(cacheKey) : null;
+    let fromCache = Boolean(data);
 
-            if (fr) fr.addEventListener('click', () => {
-                dxBriefingLang = 'fr';
-                localStorage.setItem('dxBriefingLang', dxBriefingLang);
-                setDXBriefingButtons();
-                loadDXBriefing(true);
-            });
-            if (en) en.addEventListener('click', () => {
-                dxBriefingLang = 'en';
-                localStorage.setItem('dxBriefingLang', dxBriefingLang);
-                setDXBriefingButtons();
-                loadDXBriefing(true);
-            });
-            if (rf) rf.addEventListener('click', () => loadDXBriefing(true));
-
-            setDXBriefingButtons();
-        }
-
-function runAIAnalysis(stats, solar) {
-            const reportEl = document.getElementById('ai-text-report');
-            const statusEl = document.getElementById('ai-status');
-            
-            let sfi = parseInt(solar.sfi) || 0;
-            let k = parseInt(solar.k) || 0;
-            let rarity = parseFloat(stats.rarity_rate_percent) || 0;
-
-            let report = "<strong>[CORRELATION REPORT]</strong><br>";
-
-            if (sfi > 140) report += "☀️ <b>High Solar Activity:</b> Band 10m-15m optimized. / <i>Flux solaire élevé : Bandes 10m-15m optimales.</i><br>";
-            if (k >= 4) {
-                report += "⚠️ <b>Geomagnetic Warning:</b> High noise levels expected. / <i>Alerte Géomagnétique : Niveaux de bruit élevés.</i><br>";
-                statusEl.className = "status-badge badge-alert";
-                statusEl.textContent = "DISTURBED";
-            } else {
-                statusEl.className = "status-badge";
-                statusEl.textContent = "ACTIVE";
-            }
-
-            if (stats.long_distance_calls_count > 5) report += "🌎 <b>DX Window:</b> Excellent long-path openings detected. / <i>Ouvertures Long Path détectées.</i><br>";
-            
-            if (rarity > 15) report += "💎 <b>Rarity Peak:</b> Multiple rare prefixes active. / <i>Pic de rareté : Plusieurs préfixes rares actifs.</i><br>";
-
-            if (k < 3 && sfi > 115) report += "🎯 <b>Recommendation:</b> Focus on CW/Digital for long-range DX. / <i>Focus sur CW/Digital pour le DX lointain.</i>";
-            
-            reportEl.innerHTML = report;
-        }
-
-        // --- RÉCUPÉRATION DONNÉES ---
-        async function updateDashboard() {
-            try {
-                const [resStats, resSolar] = await Promise.all([
-                    fetch('/dxcc_stats_24h.json'),
-                    fetch('/solar.json')
-                ]);
-                const stats = await resStats.json();
-                const solar = await resSolar.json();
-
-                document.getElementById('stat-dxcc').textContent = stats.unique_dxcc_count;
-                document.getElementById('stat-rarity').textContent = stats.rarity_rate_percent;
-                document.getElementById('stat-spots').textContent = stats.total_spots_24h;
-
-                runAIAnalysis(stats, solar);
-                renderBandChart(stats.dxcc_by_band);
-
-                fillRareSpots('rare-list', stats.recent_rare_spots);
-                fillList('ld-list', stats.long_distance_calls, 'DX');
-                
-                // Anomalies
-                const anomalyContainer = document.getElementById('anomaly-list');
-                anomalyContainer.innerHTML = "";
-
-                // 6m: affichage uniquement si le dernier spot 6m date de moins de 2h
-                const last6 = stats.last_6m || {};
-                const last6Age = (last6.age_sec !== undefined && last6.age_sec !== null) ? parseInt(last6.age_sec) : null;
-                const last6Time = last6.time || null;
-                const last6Call = last6.call || null;
-                const last6Freq = last6.freq || null;
-
-                if (last6Age !== null && last6Age < 7200) {
-                    const when = last6Time ? (' • ' + last6Time) : '';
-                    const who = last6Call ? (' • ' + last6Call) : '';
-                    const frq = last6Freq ? (' • ' + last6Freq) : '';
-                    anomalyContainer.innerHTML += `<div class="list-item" style="color:var(--success)">[+] Sudden 6m activity${when}${who}${frq}</div>`;
-                }
-
-                // Solaire: garde-fou simple
-                if (solar && parseFloat(solar.k) >= 4) {
-                    anomalyContainer.innerHTML += '<div class="list-item" style="color:var(--alert)">[!] Geomagnetic activity (K≥4)</div>';
-                }
-
-if (anomalyContainer.innerHTML === "") anomalyContainer.innerHTML = '<div class="list-item">Ionosphere stable.</div>';
-
-            } catch (err) { console.error("Update Error:", err); }
-        }
-
-        
-        function fillRareSpots(id, items) {
-            const container = document.getElementById(id);
-            container.innerHTML = '';
-            if (!items || items.length === 0) {
-                container.innerHTML = '<div class="list-item"><i>Aucune activité rare récente.</i></div>';
+    if (!data) {
+        try {
+            const url = '/api/analytics' + (currentBand ? '?band=' + encodeURIComponent(currentBand) : '');
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            data = await res.json();
+            DXCache.set(cacheKey, data);
+        } catch (err) {
+            console.error('analytics:', err);
+            data = DXCache.get(cacheKey);
+            if (!data) {
+                for (const p of panels) p.render({});
+                document.getElementById('last-update').textContent = 'hors ligne';
                 return;
             }
-            for (const it of items) {
-                const call = it.call || 'N/A';
-                const time = it.time || '--:--';
-                const freq = it.freq ? String(it.freq) : '';
-                const band = it.band || '';
-                const mode = it.mode || '';
-                const suffix = [band, mode].filter(Boolean).join(' ');
-                const ftxt = freq ? (' • ' + freq) : '';
-                container.innerHTML += `<div class="list-item"><b>${call}</b> • ${time}${ftxt}${suffix ? ' • ' + suffix : ''}</div>`;
-            }
+            fromCache = true;
         }
+    }
 
-function fillList(id, items, tag) {
-            const container = document.getElementById(id);
-            container.innerHTML = items && items.length > 0 
-                ? items.map(i => `<div class="list-item"><span>${i}</span><span style="color:var(--accent); font-weight:bold;">${tag}</span></div>`).join('')
-                : '<div class="list-item" style="opacity:0.5;">No data available.</div>';
-        }
+    // Mémoriser pour le tick de maturité
+    _lastData = data;
+    _lastFetchMs = Date.now();
 
-        function renderBandChart(bandData) {
-            const ctx = document.getElementById('bandChart').getContext('2d');
-            const labels = Object.keys(bandData);
-            const values = Object.values(bandData);
-            
-            // Appliquer les couleurs de index.html
-            const backgroundColors = labels.map(label => BAND_COLORS[label] || '#555555');
+    renderMaturity(data);
+    for (const p of panels) p.render(data);
 
-            if (bandChart) {
-                bandChart.data.labels = labels;
-                bandChart.data.datasets[0].data = values;
-                bandChart.data.datasets[0].backgroundColor = backgroundColors;
-                bandChart.update();
-            } else {
-                bandChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: values,
-                            backgroundColor: backgroundColors,
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        indexAxis: 'y',
-                        responsive: true,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { color: '#222' }, ticks: { color: '#666', font: { size: 10 } } },
-                            y: { grid: { display: false }, ticks: { color: '#aaa', font: { size: 11 } } }
-                        }
-                    }
-                });
-            }
-        }
+    document.getElementById('last-update').textContent =
+        new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})
+        + (fromCache ? ' (cache)' : '');
+}
 
-        // --- INIT & THEME SYNC ---
-        function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'softtech';
-            document.body.setAttribute('data-theme', savedTheme);
-        }
+document.getElementById('band-filter').addEventListener('change', (e) => {
+    currentBand = e.target.value;
+    updateDashboard({ useCache: false });
+});
 
-        function initSortable() {
-            const grid = document.getElementById('sortable-dashboard');
-            Sortable.create(grid, {
-                animation: 150,
-                handle: '.drag-handle',
-                onEnd: () => {
-                    const order = Array.from(grid.children).map(p => p.getAttribute('data-id'));
-                    localStorage.setItem('dx-analysis-pos', JSON.stringify(order));
-                }
-            });
-            const savedOrder = JSON.parse(localStorage.getItem('dx-analysis-pos'));
-            if (savedOrder) {
-                savedOrder.forEach(id => {
-                    const el = grid.querySelector(`[data-id="${id}"]`);
-                    if (el) grid.appendChild(el);
-                });
-            }
-        }
+// Tick chaque minute pour faire avancer la barre de maturité sans appel API
+setInterval(() => {
+    if (_lastData && _lastFetchMs) {
+        renderMaturity(_lastData, (Date.now() - _lastFetchMs) / 3600000);
+    }
+}, 60000);
 
-        
-        // === META ANALYSE (manuel 1x/jour) ===
-        const META_INTERVAL_SEC = 86400; // 24h
-        let __metaGeneratedMs = null;
+// Refresh des données toutes les 5 minutes
+updateDashboard();
+setInterval(() => updateDashboard({ useCache: false }), 300000);
+</script>
 
-        function updateMetaCountdown(){
-            const el = document.getElementById("metaCountdown");
-            if(!el) return;
-            const now = Date.now();
-
-            const lastManual = Number(localStorage.getItem("meta_last_run_click_ms") || "0");
-            const baseMs = lastManual || __metaGeneratedMs || 0;
-
-            if(!baseMs){
-                el.textContent = "Disponible / Available";
-                el.style.color = "var(--accent)";
-                return;
-            }
-
-            const nextMs = baseMs + (META_INTERVAL_SEC * 1000);
-            if(now >= nextMs){
-                el.textContent = "Disponible / Available";
-                el.style.color = "var(--accent)";
-            } else {
-                const diff = Math.floor((nextMs - now) / 1000);
-                const h = String(Math.floor(diff / 3600)).padStart(2,'0');
-                const m = String(Math.floor((diff % 3600) / 60)).padStart(2,'0');
-                const s = String(diff % 60).padStart(2,'0');
-                el.textContent = `${h}:${m}:${s}`;
-                el.style.color = "";
-            }
-        }
-
-        function _metaSetRunButtonState(){
-            const btn = document.getElementById("metaRunBtn");
-            if(!btn) return;
-            const last = Number(localStorage.getItem("meta_last_run_click_ms") || "0");
-            const now  = Date.now();
-            const DAY  = 24 * 60 * 60 * 1000;
-
-            if(last && (now - last) < DAY){
-                const remainSec = Math.ceil((DAY - (now - last)) / 1000);
-                const hh = String(Math.floor(remainSec / 3600)).padStart(2,'0');
-                const mm = String(Math.floor((remainSec % 3600) / 60)).padStart(2,'0');
-                btn.disabled = true;
-                btn.textContent = `↻ ${hh}:${mm}`;
-            } else {
-                btn.disabled = false;
-                btn.textContent = "↻ RUN";
-            }
-        }
-
-        function showMetaConfirm() {
-            const d = document.getElementById('meta-confirm-dialog');
-            if (d) d.style.display = 'flex';
-        }
-        function hideMetaConfirm() {
-            const d = document.getElementById('meta-confirm-dialog');
-            if (d) d.style.display = 'none';
-        }
-        function showMetaError(msg) {
-            let errEl = document.getElementById('meta-error-msg');
-            if (!errEl) {
-                errEl = document.createElement('div');
-                errEl.id = 'meta-error-msg';
-                errEl.style.cssText = 'margin-top:8px;padding:8px 12px;background:rgba(255,0,60,.10);border-left:3px solid #ff003c;color:#ff6b8a;font-size:.78em;border-radius:4px;white-space:pre-wrap;font-family:monospace;max-height:200px;overflow-y:auto;';
-                document.getElementById('metaRunBtn')?.closest('div')?.appendChild(errEl);
-            }
-            errEl.textContent = '⚠ ' + msg;
-            errEl.style.display = 'block';
-            setTimeout(() => { if (errEl) errEl.style.display = 'none'; }, 15000);
-        }
-
-        async function runMetaOncePerDay(){
-            _metaSetRunButtonState();
-            const btn = document.getElementById("metaRunBtn");
-            if(btn && btn.disabled) return;
-
-            // confirm() natif remplacé par dialog inline (voir showMetaConfirm)
-
-            try{
-                if(btn){ btn.disabled = true; btn.textContent = "↻ ..."; }
-                const r = await fetch("/api/meta/run", { method:"POST" });
-                if(!r.ok){
-                    let detail = '';
-                    try {
-                        const j = await r.json();
-                        detail = j.stderr || j.msg || (j.code != null ? `code ${j.code}` : '');
-                    } catch(_) {}
-                    const msg = r.status === 500
-                        ? `Erreur ${r.status}${detail ? ' — ' + detail : ' — méta-analyse déjà en cours ou limitée à 1x/jour, laissez votre machine travailler.'}`
-                        : `Erreur ${r.status}${detail ? ' — ' + detail : ''}`;
-                    showMetaError(msg);
-                    if(btn){ btn.disabled = false; btn.textContent = "↻ RUN"; }
-                    return;
-                }
-                localStorage.setItem("meta_last_run_click_ms", String(Date.now()));
-                setTimeout(loadMeta, 1800);
-            }catch(e){
-                console.error("META run error:", e);
-                showMetaError('Erreur réseau — vérifiez que le serveur est actif : ' + e);
-                if(btn){ btn.disabled = false; btn.textContent = "↻ RUN"; }
-                return;
-            }
-            _metaSetRunButtonState();
-        }
-
-        async function loadMeta(){
-            try{
-                const r = await fetch("/api/meta/summary", { cache:"no-store" });
-                if(!r.ok) return;
-                const data = await r.json();
-
-                const spotsEl = document.getElementById("metaSpots");
-                const rangeEl = document.getElementById("metaRange");
-                const genEl   = document.getElementById("metaGeneratedAt");
-                const badgeEl = document.getElementById("metaFreshBadge");
-                const listEl  = document.getElementById("metaTopList");
-
-                if(spotsEl) spotsEl.textContent = (data.spots ?? "—");
-                if(rangeEl){
-                    if(data.range?.start && data.range?.end) rangeEl.textContent = `${data.range.start} → ${data.range.end}`;
-                    else rangeEl.textContent = "—";
-                }
-
-                const genRaw = data.generated_at || null;
-                __metaGeneratedMs = genRaw ? new Date(genRaw).getTime() : null;
-                if(genEl) genEl.textContent = genRaw ? String(genRaw).replace('T',' ').slice(0,19) : "—";
-
-                if(badgeEl){
-                    badgeEl.classList.remove("badge-alert");
-                    if(!genRaw){
-                        badgeEl.textContent = "INCONNU / UNKNOWN";
-                    }else{
-                        const ageMin = Math.floor(Math.max(0, (Date.now() - __metaGeneratedMs) / 60000));
-                        badgeEl.textContent = (ageMin < 10) ? `FRAIS ${ageMin}m` : `ANALYSE ${ageMin}m`;
-                        if(ageMin >= 60) badgeEl.classList.add("badge-alert");
-                    }
-                }
-
-                if(listEl){
-                    const top = (data.top_spots || []).slice(0,8);
-                    if(top.length === 0){
-                        listEl.innerHTML = '<div class="list-item"><i>Aucun top spot.</i></div>';
-                    }else{
-                        listEl.innerHTML = top.map(s => `<div class="list-item"><b>${s.dx}</b><span>SPD ${s.spd} · ${s.band} ${s.mode}</span></div>`).join("");
-                    }
-                }
-
-                updateMetaCountdown();
-                _metaSetRunButtonState();
-            }catch(e){
-                console.error("Meta load error:", e);
-            }
-        }
-
-function _metaDialogInit() {
-            initTheme();
-            initSortable();
-            initDXBriefingUI();
-            loadDXBriefing(false);
-            updateDashboard();
-            setInterval(updateDashboard, 30000);
-            setInterval(updateMetaCountdown, 1000);
-            setInterval(_metaSetRunButtonState, 60000);
-            setInterval(() => loadDXBriefing(false), 600000);
-            document.getElementById('meta-confirm-yes')?.addEventListener('click', () => {
-                hideMetaConfirm();
-                runMetaOncePerDay();
-            });
-            document.getElementById('meta-confirm-no')?.addEventListener('click', hideMetaConfirm);
-        }
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', _metaDialogInit);
-        } else {
-            _metaDialogInit();
-        }
-    </script>
 </body>
 </html>
