@@ -1,11 +1,23 @@
-# Radio Spot Watcher DX — v8.0
-# Installation : pip install -r requirements.txt --break-system-packages
+# Neural DX Watcher v12.6 — dépendances Python
+# Installer avec : pip install -r requirements.txt
+# (Sur Raspberry Pi OS Bookworm, ajouter --break-system-packages si hors venv)
+#
+# Dépendances système préalables (une seule fois) :
+#   sudo apt install -y gfortran libgfortran5   # requis pour sgp4
+#
+# VOACAP (optionnel — panneau Prédictions HF) :
+#   bash ~/.claude/skills/voacap/scripts/setup.sh
 
-flask>=2.3
-flask-socketio>=5.3
+# ── Framework web ─────────────────────────────────────────────────────
+flask>=3.0,<4.0
+
+# ── Parsing & scraping ────────────────────────────────────────────────
 requests>=2.31
 beautifulsoup4>=4.12
 feedparser>=6.0
-telnetlib3>=1.0
+
+# ── MQTT (foudre Blitzortung + PSK Reporter) ──────────────────────────
+paho-mqtt>=1.6,<2.0
+
+# ── Calculs orbitaux / satellites ─────────────────────────────────────
 sgp4>=2.22
-pandas==3.0.2

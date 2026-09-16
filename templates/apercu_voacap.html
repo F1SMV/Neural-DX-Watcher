@@ -1,0 +1,427 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --bg-color:#050505; --panel-bg:#0e0e0e; --text-main:#a0a0a0;
+        --accent:#00f3ff; --alert:#ff003c; --success:#22c55e; --warn:#ffc800;
+        --border:1px solid #333; --dim:#666; --line:#1e1e1e;
+    }
+    body[data-theme='light']{--bg-color:#fff;--panel-bg:#fff;--text-main:#111;
+        --accent:#0066ff;--alert:#d50000;--success:#0a0;--warn:#b58900;
+        --border:1px solid #d0d0d0;--dim:#777;--line:#e4e4e4;}
+    body[data-theme='dark']{--bg-color:#1a1a1a;--panel-bg:#2a2a2a;--text-main:#f0f0f0;
+        --accent:#00ff80;--alert:#ff6347;--success:#3d3;--warn:#ffd700;
+        --border:1px solid #555;--dim:#999;--line:#3a3a3a;}
+    body[data-theme='matrix']{--bg-color:#000;--panel-bg:#031503;--text-main:#00ff41;
+        --accent:#00ff41;--alert:#ff004c;--success:#0f0;--warn:#af0;
+        --border:1px solid #050;--dim:#0a5;--line:#052905;}
+
+    body{background:var(--bg-color);color:var(--text-main);
+        font-family:var(--font-sans);margin:0;padding:20px;}
+
+    nav.top-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;
+        padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.06);}
+    nav.top-nav a{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;
+        border-radius:6px;border:1px solid rgba(255,255,255,.08);color:#999;
+        text-decoration:none;font-size:.78rem;font-weight:600;white-space:nowrap;
+        transition:border-color .15s,color .15s,background .15s;}
+    nav.top-nav a:hover{border-color:rgba(0,243,255,.35);color:#00f3ff;
+        background:rgba(0,243,255,.06);}
+    nav.top-nav a.active{border-color:rgba(255,107,94,.5);color:#ff6b5e;
+        background:rgba(255,107,94,.08);}
+
+    header{display:flex;justify-content:space-between;align-items:center;
+        flex-wrap:wrap;gap:10px;border-bottom:2px solid var(--accent);
+        padding-bottom:10px;margin-bottom:16px;}
+    h1{font-family:var(--font-display);font-size:1.15rem;color:var(--accent);
+        margin:0;text-transform:uppercase;letter-spacing:1px;}
+    .head-right{display:flex;align-items:center;gap:10px;font-size:.75rem;
+        color:var(--dim);}
+    select.band-select{background:var(--panel-bg);color:var(--text-main);
+        border:var(--border);border-radius:6px;padding:5px 8px;
+        font-size:.75rem;font-family:inherit;}
+
+    /* ── Bouton thème ────────────────────────────────────────── */
+    #theme-btn{background:none;border:var(--border);border-radius:6px;
+        color:var(--text-main);cursor:pointer;font-size:1rem;
+        padding:4px 10px;line-height:1;transition:border-color .15s,background .15s;
+        flex-shrink:0;}
+    #theme-btn:hover{border-color:var(--accent);background:rgba(255,255,255,.05);}
+
+    /* ── Bandeau de maturité ─────────────────────────────── */
+    .maturity{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+        padding:11px 14px;margin-bottom:18px;border:var(--border);
+        border-radius:10px;background:var(--panel-bg);font-size:.78rem;}
+    .maturity-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+    .maturity-label{font-weight:600;color:var(--text-main);}
+    .maturity-track{flex:1;min-width:120px;height:8px;border-radius:4px;
+        background:rgba(255,255,255,.07);overflow:hidden;}
+    .maturity-fill{height:100%;border-radius:4px;transition:width .8s ease;}
+    .maturity-note{color:var(--dim);font-size:.72rem;}
+
+    .dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));
+        gap:18px;}
+    .panel{background:var(--panel-bg);border:var(--border);border-radius:14px;
+        padding:15px;box-shadow:0 10px 28px rgba(0,0,0,.45);
+        display:flex;flex-direction:column;}
+    .panel.grid-full{grid-column:1/-1;}
+    .panel.locked{opacity:.55;}
+    .panel-header{font-family:var(--font-display);font-size:.8rem;color:var(--accent);
+        margin-bottom:6px;padding-bottom:8px;border-bottom:1px solid var(--line);
+        display:flex;justify-content:space-between;align-items:center;gap:8px;
+        text-transform:uppercase;letter-spacing:.05em;}
+    .panel-header .tag{font-size:.62rem;color:var(--dim);text-transform:none;
+        letter-spacing:0;font-family:'IBM Plex Mono',monospace;}
+    .panel-sub{font-size:.7rem;color:var(--dim);font-style:italic;
+        margin-bottom:12px;line-height:1.4;}
+    .sub-en{display:block;margin-top:4px;opacity:.7;font-style:italic;}
+
+    .no-data{padding:16px;text-align:center;color:var(--dim);font-size:.78rem;
+        line-height:1.5;border:1px dashed var(--line);border-radius:8px;}
+    .no-data b{display:block;margin-bottom:4px;color:var(--text-main);}
+
+    /* ── Activité récente ────────────────────────────────── */
+    /* Ligne de labels au-dessus des barres */
+    .spark-label-row{display:flex;gap:2px;height:18px;align-items:flex-end;
+        margin-bottom:2px;}
+    .spark-label-row span{flex:1;min-width:3px;text-align:center;
+        font-size:.58rem;font-family:'IBM Plex Mono',monospace;
+        overflow:hidden;white-space:nowrap;line-height:1;}
+
+    /* Barres */
+    .spark{display:flex;align-items:flex-end;gap:2px;height:120px;
+        border-bottom:2px solid var(--line);}
+    .spark-bar{flex:1;min-width:3px;border-radius:2px 2px 0 0;
+        transition:height .3s,opacity .2s;cursor:default;}
+    .spark-bar.now{box-shadow:0 0 8px var(--success);}
+    .spark-bar:hover{opacity:.85;filter:brightness(1.3);}
+
+    /* Axe X */
+    .spark-axis{display:flex;gap:2px;margin-top:4px;}
+    .spark-axis span{flex:1;min-width:3px;text-align:center;font-size:.6rem;
+        color:var(--dim);font-family:'IBM Plex Mono',monospace;overflow:hidden;
+        white-space:nowrap;}
+    .spark-axis span.is-now{color:var(--success);font-weight:700;}
+
+    /* Légende sous le graphe */
+    .spark-meta{display:flex;align-items:center;gap:8px;margin-top:6px;
+        font-size:.68rem;color:var(--dim);flex-wrap:wrap;}
+    .spark-meta b{font-family:'IBM Plex Mono',monospace;}
+
+    /* KPI */
+    .kpi-row{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;}
+    .kpi{flex:1;min-width:90px;}
+    .kpi-value{font-size:2.1rem;font-weight:700;color:var(--accent);
+        font-family:'IBM Plex Mono',monospace;line-height:1.1;}
+    .kpi-label{font-size:.65rem;color:var(--dim);text-transform:uppercase;
+        letter-spacing:.04em;margin-top:3px;}
+
+    /* Chips bandes */
+    .band-section-title{font-size:.68rem;color:var(--dim);
+        text-transform:uppercase;letter-spacing:.05em;
+        margin:10px 0 5px;font-family:'IBM Plex Mono',monospace;}
+    .band-chips{display:flex;gap:6px;flex-wrap:wrap;}
+    .band-chip{font-family:'IBM Plex Mono',monospace;font-size:.7rem;
+        padding:4px 9px;border-radius:12px;border:1px solid var(--line);
+        background:rgba(255,255,255,.02);display:flex;align-items:center;gap:4px;}
+    .band-chip b{font-weight:700;}
+    .band-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+    /* ── Heatmap ─────────────────────────────────────────── */
+    .heatmap-scroll{overflow-x:auto;padding-bottom:6px;}
+    table.heatmap{border-collapse:collapse;font-size:.6rem;min-width:520px;}
+    table.heatmap th{font-weight:500;color:var(--dim);padding:2px 3px;
+        font-family:'IBM Plex Mono',monospace;}
+    table.heatmap td{width:19px;height:17px;padding:0;
+        border:1px solid rgba(0,0,0,.35);border-radius:2px;}
+    table.heatmap td.void{background:repeating-linear-gradient(45deg,
+        transparent,transparent 2px,rgba(255,255,255,.05) 2px,rgba(255,255,255,.05) 4px);}
+    .legend{display:flex;align-items:center;gap:8px;margin-top:10px;
+        font-size:.65rem;color:var(--dim);flex-wrap:wrap;}
+    .legend-scale{display:flex;gap:2px;}
+    .legend-scale span{width:15px;height:9px;border-radius:2px;}
+    .callout{margin-top:10px;padding:8px 10px;background:rgba(255,200,0,.07);
+        border-left:3px solid var(--warn);border-radius:4px;font-size:.79rem;}
+
+    /* ── Patterns ────────────────────────────────────────── */
+    .pattern-row{display:flex;align-items:center;gap:8px;padding:6px 4px;
+        border-bottom:1px solid var(--line);}
+    .pattern-row:last-of-type{border-bottom:none;}
+    .pattern-row.insufficient{opacity:.45;}
+    .pattern-band{font-family:'IBM Plex Mono',monospace;font-weight:700;
+        width:54px;flex-shrink:0;font-size:.82rem;
+        display:flex;align-items:center;gap:5px;}
+    .pattern-bar-wrap{flex:1;height:14px;background:rgba(255,255,255,.05);
+        border-radius:5px;overflow:hidden;position:relative;}
+    .pattern-bar{height:100%;border-radius:5px;transition:width .5s ease;
+        position:relative;}
+    .pattern-bar::after{content:'';position:absolute;inset:0;
+        background:linear-gradient(90deg,rgba(255,255,255,.18) 0%,transparent 100%);
+        border-radius:5px;}
+    .pattern-trend{width:72px;text-align:right;flex-shrink:0;
+        font-size:.72rem;font-family:'IBM Plex Mono',monospace;font-weight:700;}
+    .pattern-avg{width:56px;text-align:right;flex-shrink:0;
+        font-size:.66rem;color:var(--dim);font-family:'IBM Plex Mono',monospace;}
+    .trend-up{color:var(--success);} .trend-down{color:var(--alert);}
+    .trend-stable{color:var(--dim);} .trend-insufficient{color:#555;font-style:italic;}
+
+    /* ── Forecast ────────────────────────────────────────── */
+    .forecast-strip{display:flex;gap:7px;flex-wrap:wrap;}
+    .forecast-slot{flex:1;min-width:74px;padding:9px 5px;border:1px solid var(--line);
+        border-radius:8px;text-align:center;background:rgba(255,255,255,.02);}
+    .forecast-slot.best{border-color:var(--success);background:rgba(34,197,94,.08);}
+    .forecast-hour{font-size:.68rem;color:var(--dim);
+        font-family:'IBM Plex Mono',monospace;}
+    .forecast-prob{font-size:1.3rem;font-weight:700;margin:3px 0;
+        font-family:'IBM Plex Mono',monospace;}
+    .forecast-prob.unknown{font-size:.9rem;color:#4a4a4a;}
+    .forecast-conf{font-size:.57rem;color:var(--dim);}
+    .forecast-conf.low-sample{color:var(--warn);font-weight:700;}
+
+    /* ── Panneau VOACAP : grille bandes × heures ────────────────────── */
+    .vc-controls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;
+        margin-bottom:14px;}
+    .vc-field{display:flex;flex-direction:column;gap:3px;}
+    .vc-field label{font-size:.58rem;color:var(--dim);letter-spacing:.04em;}
+    .vc-field input{background:#000;color:var(--text-main);
+        border:1px solid var(--line);border-bottom:1px solid #2a2a2a;
+        border-radius:3px;padding:5px 7px;font-family:'IBM Plex Mono',monospace;
+        font-size:.72rem;font-variant-numeric:tabular-nums;}
+    .vc-field input:focus{outline:none;border-color:var(--accent);
+        box-shadow:0 0 0 1px rgba(0,243,255,.25);}
+    .vc-field input.vc-name{width:120px;}
+    .vc-field input.vc-coord{width:72px;}
+    .vc-run{background:transparent;color:var(--accent);
+        border:1px solid var(--accent);border-radius:3px;padding:6px 14px;
+        font-family:'IBM Plex Mono',monospace;font-size:.72rem;font-weight:600;
+        cursor:pointer;transition:background .15s,color .15s;}
+    .vc-run:hover{background:var(--accent);color:#000;}
+    .vc-run:disabled{opacity:.4;cursor:wait;}
+
+    .vc-presets{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px;}
+    .vc-chip{background:transparent;border:1px solid var(--line);
+        color:var(--dim);border-radius:11px;padding:3px 10px;font-size:.63rem;
+        cursor:pointer;font-family:'IBM Plex Mono',monospace;
+        transition:border-color .15s,color .15s;}
+    .vc-chip:hover{border-color:var(--accent);color:var(--accent);}
+
+    /* Hero : la réponse opérationnelle immédiate */
+    .vc-now{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+        padding:12px 14px;margin-bottom:14px;background:#000;
+        border:1px solid var(--line);border-left:2px solid var(--accent);
+        border-radius:3px;}
+    .vc-now-band{font-family:'IBM Plex Mono',monospace;font-size:2.4rem;
+        font-weight:700;line-height:1;letter-spacing:-.02em;
+        font-variant-numeric:tabular-nums;}
+    .vc-now-meta{display:flex;flex-direction:column;gap:2px;}
+    .vc-now-hour{font-size:.62rem;color:var(--dim);letter-spacing:.08em;}
+    .vc-now-stats{font-family:'IBM Plex Mono',monospace;font-size:.74rem;
+        color:var(--text-main);font-variant-numeric:tabular-nums;}
+    .vc-now-dead{font-size:.76rem;color:var(--dim);font-style:italic;}
+
+    .vc-scroll{overflow-x:auto;padding-bottom:6px;}
+    table.vc-grid{border-collapse:collapse;font-size:.6rem;min-width:540px;
+        font-family:'IBM Plex Mono',monospace;}
+    table.vc-grid th{font-weight:500;color:var(--dim);padding:2px 3px;
+        font-variant-numeric:tabular-nums;}
+    table.vc-grid th.vc-band-label{text-align:right;padding-right:8px;
+        color:var(--text-main);}
+    table.vc-grid th.vc-hnow{color:var(--accent);font-weight:700;}
+    table.vc-grid td{width:19px;height:16px;padding:0;
+        border:1px solid #0a0a0a;}
+    table.vc-grid td.vc-cnow{box-shadow:inset 0 0 0 1px rgba(0,243,255,.55);}
+    .vc-scale{display:flex;align-items:center;gap:7px;margin-top:10px;
+        font-size:.6rem;color:var(--dim);}
+    .vc-scale-ramp{height:7px;width:120px;border-radius:2px;
+        background:linear-gradient(90deg,rgb(0,60,75),rgb(0,160,180),
+            rgb(255,200,0),rgb(255,90,40));}
+
+    .footnote{font-size:.68rem;color:var(--dim);margin-top:12px;padding-top:8px;
+        border-top:1px solid var(--line);line-height:1.45;}
+    .btn-hunt{display:block;text-align:center;text-decoration:none;
+        background:rgba(255,107,94,.1);border:1px solid #ff6b5e;color:#ff6b5e;
+        padding:8px 12px;font-size:.75rem;border-radius:6px;margin-top:12px;
+        text-transform:uppercase;letter-spacing:.04em;}
+    .btn-hunt:hover{background:rgba(255,107,94,.2);}
+
+body{background:var(--bg-color);font-family:'Space Grotesk',sans-serif;padding:24px;}
+.panel{background:var(--panel-bg);border:var(--border);border-radius:6px;padding:16px;max-width:860px;}
+</style></head><body>
+<div class="panel" data-panel="voacap"></div>
+<script>
+function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g,
+        c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fmtDuration(hours) {
+    if (hours == null) return '';
+    if (hours < 1) return Math.round(hours * 60) + ' min';
+    if (hours < 48) return Math.round(hours) + ' h';
+    return Math.round(hours / 24) + ' j';
+}
+
+// Échelle continue teal → ambre
+function heatColor(ratio) {
+    if (ratio <= 0) return 'rgba(255,255,255,.04)';
+    const stops = [[0,[0,60,75]],[.35,[0,160,180]],[.65,[255,200,0]],[1,[255,90,40]]];
+    let lo = stops[0], hi = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+        if (ratio >= stops[i][0] && ratio <= stops[i+1][0]) { lo = stops[i]; hi = stops[i+1]; break; }
+    }
+    const span = hi[0] - lo[0];
+    const t = span === 0 ? 0 : (ratio - lo[0]) / span;
+    const c = lo[1].map((v,i) => Math.round(v + (hi[1][i] - v) * t));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+// Assemble une explication FR + traduction EN discrète, pour tous les panneaux.
+function bisub(fr, en) {
+    return `${fr}<span class="sub-en">🇬🇧 ${en}</span>`;
+}
+
+class DXPanel {
+  constructor(key, renderer){ this.key=key; this.renderer=renderer; }
+  render(data){ const el=document.querySelector(`[data-panel="${this.key}"]`); if(!el) return;
+    const out=this.renderer(data)||''; el.innerHTML = out.html!==undefined?out.html:out; }
+}
+let voacapResult = null;   // dernier résultat, conservé entre refresh du panneau
+let voacapBusy = false;
+
+// Fréquences interrogées -> étiquette de bande. Ordre décroissant :
+// les hautes bandes en haut, comme sur une carte VOACAP classique.
+const VC_BANDS = [
+    { mhz: 28.4, label: '10m' },
+    { mhz: 21.2, label: '15m' },
+    { mhz: 14.2, label: '20m' },
+    { mhz: 7.1,  label: '40m' },
+    { mhz: 3.5,  label: '80m' },
+];
+
+// Cinq directions de référence depuis JN23 — les repères que tout
+// chasseur DX utilise pour jauger une ouverture.
+const VC_PRESETS = [
+    { name: 'USA est',    lat: 40.7,  lon: -74.0 },
+    { name: 'Japon',      lat: 35.7,  lon: 139.7 },
+    { name: 'Australie',  lat: -33.9, lon: 151.2 },
+    { name: 'Brésil',     lat: -23.5, lon: -46.6 },
+    { name: 'Afr. du Sud',lat: -26.2, lon: 28.0  },
+];
+
+function vcBandLabel(mhz) {
+    const b = VC_BANDS.find(x => Math.abs(x.mhz - mhz) < 0.35);
+    return b ? b.label : `${mhz} MHz`;
+}
+
+const voacapRenderer = (data) => {
+    const head = `<div class="panel-header">🌐 Prédictions HF
+        <span class="tag">VOACAP</span></div>
+        <div class="panel-sub">${bisub(
+            "Fiabilité prévue du circuit vers une cible, bande par bande et heure par heure. Modèle statistique mensuel : c'est le comportement typique du mois, pas la météo du jour.",
+            "Predicted circuit reliability to a target, band by band and hour by hour. Monthly statistical model: this is the month's typical behaviour, not today's conditions."
+        )}</div>`;
+
+    const r = voacapResult;
+    const chips = VC_PRESETS.map(p =>
+        `<button class="vc-chip" onclick="vcUsePreset('${esc(p.name)}',${p.lat},${p.lon})">${esc(p.name)}</button>`
+    ).join('');
+
+    const controls = `<div class="vc-presets">${chips}</div>
+        <div class="vc-controls">
+            <div class="vc-field"><label for="vc-name">Cible</label>
+                <input type="text" id="vc-name" class="vc-name" placeholder="Nom"></div>
+            <div class="vc-field"><label for="vc-lat">Latitude</label>
+                <input type="number" id="vc-lat" class="vc-coord" step="0.1" placeholder="40.7"></div>
+            <div class="vc-field"><label for="vc-lon">Longitude</label>
+                <input type="number" id="vc-lon" class="vc-coord" step="0.1" placeholder="-74.0"></div>
+            <button class="vc-run" id="vc-run" onclick="runVoacapPrediction()"
+                ${voacapBusy ? 'disabled' : ''}>${voacapBusy ? 'Calcul…' : 'Calculer'}</button>
+        </div>`;
+
+    if (!r) {
+        return head + controls + `<div class="no-data">
+            <b>Choisis une direction, ou saisis les coordonnées d'une cible.</b>
+            <div class="sub-en">🇬🇧 Pick a direction, or enter a target's coordinates.</div>
+        </div>`;
+    }
+
+    if (r.status === 'unavailable') {
+        return head + controls + `<div class="no-data">
+            <b>Moteur VOACAP injoignable — ${esc(r.reason || 'raison inconnue')}</b>
+            <div class="sub-en">🇬🇧 VOACAP engine unreachable — ${esc(r.reason || 'unknown reason')}</div>
+        </div>`;
+    }
+    if (r.status === 'error') {
+        return head + controls + `<div class="no-data"><b>${esc(r.reason || 'Requête invalide')}</b></div>`;
+    }
+
+    const hours = r.hours || [];
+    const byHour = new Map(hours.map(h => [h.hour_utc, h]));
+    const nowH = new Date().getUTCHours();
+    const now = byHour.get(nowH);
+
+    // Hero : ce que l'opérateur veut savoir tout de suite.
+    let hero;
+    if (now && now.rel > 0) {
+        hero = `<div class="vc-now">
+            <div class="vc-now-band" style="color:${heatColor(now.rel)}">${esc(vcBandLabel(now.best_freq_mhz))}</div>
+            <div class="vc-now-meta">
+                <div class="vc-now-hour">maintenant · ${String(nowH).padStart(2,'0')}z · ${esc(r.circuit || '')}</div>
+                <div class="vc-now-stats">fiabilité ${Math.round(now.rel*100)}% · ${now.snr} dB · ${now.best_freq_mhz} MHz</div>
+            </div></div>`;
+    } else {
+        hero = `<div class="vc-now"><div class="vc-now-meta">
+            <div class="vc-now-hour">maintenant · ${String(nowH).padStart(2,'0')}z · ${esc(r.circuit || '')}</div>
+            <div class="vc-now-dead">Aucune bande exploitable vers cette cible à cette heure.
+                Regarde la grille pour la prochaine fenêtre.</div>
+            </div></div>`;
+    }
+
+    // Grille bandes × heures — la forme dans laquelle les cartes VOACAP
+    // se lisent depuis toujours.
+    const headerCells = Array.from({length:24}, (_,h) =>
+        `<th class="${h===nowH?'vc-hnow':''}">${h%2===0?String(h).padStart(2,'0'):''}</th>`
+    ).join('');
+    const headerRow = `<tr><th></th>${headerCells}</tr>`;
+
+    const rows = VC_BANDS.map(band => {
+        const cells = Array.from({length:24}, (_,h) => {
+            const entry = byHour.get(h);
+            const f = entry && entry.frequencies ? entry.frequencies[band.mhz] : null;
+            const rel = f ? f.rel : 0;
+            const tip = f
+                ? `${band.label} à ${String(h).padStart(2,'0')}z — fiabilité ${Math.round(rel*100)}%, ${f.snr} dB`
+                : `${band.label} à ${String(h).padStart(2,'0')}z — pas de donnée`;
+            return `<td class="${h===nowH?'vc-cnow':''}" style="background:${heatColor(rel)}" title="${esc(tip)}"></td>`;
+        }).join('');
+        return `<tr><th class="vc-band-label">${band.label}</th>${cells}</tr>`;
+    }).join('');
+
+    const origin = r.from_cache
+        ? bisub('en cache (moins de 24 h)', 'cached (under 24 h)')
+        : bisub('calcul à l’instant', 'computed just now');
+
+    return head + controls + hero +
+        `<div class="vc-scroll"><table class="vc-grid">${headerRow}${rows}</table></div>
+        <div class="vc-scale">
+            <span>peu fiable</span><div class="vc-scale-ramp"></div><span>très fiable</span>
+            <span style="margin-left:auto">mois ${r.month} · SSN ${r.ssn} · ${origin}</span>
+        </div>`;
+};
+
+const panels=[new DXPanel('voacap', voacapRenderer)];
+const nowH=new Date().getUTCHours();
+const mk=(hr)=>{
+  const prof={0:[.63,.87,.51,0,0],1:[.63,.88,.47,0,0],2:[.63,.93,.01,0,0],3:[.74,.95,0,0,0],
+  4:[.69,.95,0,0,0],5:[.51,.94,0,0,0],6:[.14,.88,0,0,0],7:[0,.67,0,0,0],8:[0,.47,.10,0,0],
+  9:[0,.04,.06,0,0],10:[0,0,.72,.18,0],11:[0,0,.67,.56,0],12:[0,0,.54,.67,0],13:[0,0,.50,.71,0],
+  14:[0,0,.52,.70,0],15:[0,0,.66,.60,0],16:[0,0,.68,.65,0],17:[0,0,.75,.76,0],18:[0,.04,.81,.78,0],
+  19:[0,.64,.84,.69,0],20:[.01,.80,.80,.20,0],21:[.23,.86,.83,0,0],22:[.56,.86,.72,0,0],23:[.62,.87,.59,0,0]}[hr];
+  const f={"3.5":{rel:prof[0],snr:20},"7.1":{rel:prof[1],snr:40},"14.2":{rel:prof[2],snr:30},"21.2":{rel:prof[3],snr:33},"28.4":{rel:prof[4],snr:-100}};
+  let best="7.1",bv=-1; for(const k in f) if(f[k].rel>bv){bv=f[k].rel;best=k;}
+  return {hour_utc:hr,best_freq_mhz:parseFloat(best),rel:bv,snr:f[best].snr,frequencies:f};
+};
+voacapResult={status:'ok',circuit:'F1SMV → USA',month:9,ssn:60,from_cache:false,
+  hours:Array.from({length:24},(_,i)=>mk(i))};
+panels[0].render({});
+</script></body></html>

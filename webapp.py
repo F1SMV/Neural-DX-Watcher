@@ -103,6 +103,13 @@ except ImportError:
             "generated_at": time.time(),
         }
 
+try:
+    import voacap_adapter
+    _voacap_adapter_ok = voacap_adapter.is_available()
+except ImportError:
+    _voacap_adapter_ok = False
+    voacap_adapter = None
+
 META_DIR = Path("data/meta")
 META_SUMMARY = META_DIR / "summary.json"
 LOTW_CACHE_FILE = Path("data/lotw_cache.json")
@@ -128,7 +135,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '12.5'
+APP_VERSION = '12.6'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -2357,7 +2364,14 @@ def load_cty_dat(force_download: bool = False):
                 p = rec.split(":")
                 country = p[0].strip()
                 try:
-                    lat, lon = float(p[4]), float(p[5]) * -1
+                    lat = float(p[4])
+                    # cty.dat convention : longitude stockée en degrés OUEST positifs.
+                    # Conversion en degrés EST (standard géographique) : lon_E = -lon_cty
+                    # MAIS certaines entrées modernes (dont Big Omaha et country-files.com)
+                    # stockent déjà en EST (valeurs négatives pour les longitudes Ouest).
+                    # Test : si p[5] est négatif → déjà en Est → pas de conversion.
+                    raw_lon = float(p[5])
+                    lon = -raw_lon if raw_lon >= 0 else raw_lon
                 except Exception:
                     lat, lon = 0.0, 0.0
                 try:
@@ -2379,6 +2393,34 @@ def load_cty_dat(force_download: bool = False):
             logger.warning("prefix_db vide après parsing cty.dat -> re-téléchargement et retry.")
             if download_cty():
                 return load_cty_dat(force_download=False)
+
+        # ── Corrections post-parsing : entrées cty.dat avec signe de longitude erroné ──
+        # Le fichier country-files.com utilise une convention mixte : certaines entrées
+        # Pacifique Ouest sont stockées avec une longitude négative (déjà en Est) alors
+        # que d'autres sont positives (convention Ouest). Notre parseur applique -lon si
+        # lon >= 0, ce qui est correct pour la majorité mais faux pour ces 8 entités.
+        # On corrige directement dans prefix_db après le parsing plutôt que de complexifier
+        # le parseur avec des cas particuliers.
+        _CTY_LON_FIXES = {
+            # Préfixe : (lat, lon_correct_en_Est)   raison
+            '5W':    (-13.93,  171.70),  # Samoa indépendantes — cty positif → parseur donne -171.70 ❌
+            'KH0':   ( 15.18,  145.72),  # Mariannes — cty déjà négatif (-145.72) → reste ❌
+            'KH1':   (  0.00,  176.00),  # Baker & Howland — cty positif → -176.00 ❌
+            'KH2':   ( 13.37,  144.70),  # Guam — cty déjà négatif (-144.70) → reste ❌
+            'KH4':   ( 28.20,  177.37),  # Midway — cty positif → -177.37 ❌
+            'KH5':   (  5.87,  162.07),  # Palmyra & Jarvis — cty positif → -162.07 ❌
+            'KH7K':  ( 29.00,  178.00),  # Kure Island — cty positif → -178.00 ❌
+            'KH8/s': (-11.05,  171.25),  # Swains Island — cty positif → -171.25 ❌
+        }
+        for pfx, (fix_lat, fix_lon) in _CTY_LON_FIXES.items():
+            if pfx in prefix_db:
+                prefix_db[pfx]['lat'] = fix_lat
+                prefix_db[pfx]['lon'] = fix_lon
+            else:
+                # Entrée absente du cty.dat courant — on l'ajoute explicitement
+                prefix_db[pfx] = {'c': prefix_db.get(pfx, {}).get('c', pfx),
+                                   'lat': fix_lat, 'lon': fix_lon, 'dxcc_num': 0}
+        logger.debug(f"Corrections lon cty.dat appliquées : {list(_CTY_LON_FIXES.keys())}")
 
         logger.info(f"Base de données DXCC chargée: {len(prefix_db)} préfixes.")
     except Exception as e:
@@ -2425,14 +2467,14 @@ CALLSIGN_ZONES = {
     'N8': (41.5, -82.5, 'Ohio Valley'),
     'N9': (41.8, -87.6, 'Midwest'),
     'N0': (38.5, -98.0, 'Plains'),
-    'AA': (37.6, -91.9, 'USA'),   # préfixes AA-AK génériques
+    'AA': (37.6, -91.9, 'USA'),   # préfixes AA-AK génériques (USA continental seulement)
     'AB': (37.6, -91.9, 'USA'),
     'AC': (37.6, -91.9, 'USA'),
     'AD': (37.6, -91.9, 'USA'),
     'AE': (37.6, -91.9, 'USA'),
     'AF': (37.6, -91.9, 'USA'),
     'AG': (37.6, -91.9, 'USA'),
-    'AH': (37.6, -91.9, 'USA'),
+    # AH retiré : AH0=Mariannes, AH2=Guam, AH6=Hawaii, AH8=Samoa — tous hors USA continental
     'AI': (37.6, -91.9, 'USA'),
     'AJ': (37.6, -91.9, 'USA'),
     'AK': (37.6, -91.9, 'USA'),
@@ -2557,8 +2599,13 @@ def get_precise_latlon(call):
             lat, lon = _callsign_jitter(call, lat, lon)
             return lat, lon, True
 
-    # 3. Indicatifs USA : extraire le chiffre de zone (ex: KF6I → 6 → W6/K6)
-    if base and base[0] in ('K', 'W', 'N', 'A'):
+    # 3. Indicatifs USA continentaux uniquement : extraire le chiffre de zone (ex: KF6I → 6 → W6/K6)
+    # EXCLUSION EXPLICITE : KH*/AH*/NH*/WH* (Pacific outlying), KP*/NP*/WP* (Caribbean),
+    # KG4 (Guantanamo) et tout indicatif dont le préfixe cty.dat pointe hors USA-48.
+    # Sans ce garde-fou, KH8WW → K + "8" → K8 (Ohio Valley) et AH8 → AH (Missouri).
+    _CONUS_EXCLUSIONS = ('KH', 'AH', 'NH', 'WH', 'KP', 'NP', 'WP', 'KG4')
+    _is_conus_excluded = any(base.startswith(exc) for exc in _CONUS_EXCLUSIONS)
+    if base and base[0] in ('K', 'W', 'N', 'A') and not _is_conus_excluded:
         m = _re.search(r'(\d)', base)
         if m:
             digit = m.group(1)
@@ -2943,10 +2990,6 @@ def index():
     return render_template('index.html', version=APP_VERSION, my_call=MY_CALL,
                            hf_bands=HF_BANDS, vhf_bands=VHF_BANDS, band_colors=BAND_COLORS,
                            spd_threshold=SPD_THRESHOLD, user_qra=user_qra)
-
-@app.route("/ai.html")
-def ai_page():
-    return render_template("ai.html")
 
 @app.route("/map")
 def map_page():
@@ -5783,6 +5826,60 @@ def api_voacap():
     _voacap_cache[cache_key] = result
     return jsonify(result)
 
+
+@app.route('/api/voacap/predict', methods=['POST'])
+def api_voacap_predict():
+    """
+    Prédiction VOACAP point-à-point réelle (v12.6), via le skill Reid
+    (voacapl). Distincte de /api/voacap (heuristique interne par zone
+    ci-dessus) : celle-ci appelle le vrai moteur VOACAP en subprocess,
+    avec cache 24h car coûteux en CPU.
+
+    Corps JSON attendu (tous les champs optionnels sauf rx_lat/rx_lon) :
+      {"rx_lat": 40.7, "rx_lon": -74.0, "rx_name": "New York",
+       "freqs": [3.5, 7.1, 14.2, 21.2, 28.4], "ssn": 75, "month": 9}
+    """
+    if not _voacap_adapter_ok:
+        return jsonify({"status": "unavailable",
+                         "reason": "module voacap_adapter non chargé"}), 200
+
+    payload = request.get_json(force=True, silent=True) or {}
+
+    rx_lat = payload.get('rx_lat')
+    rx_lon = payload.get('rx_lon')
+    if rx_lat is None or rx_lon is None:
+        return jsonify({"status": "error", "reason": "rx_lat et rx_lon requis"}), 400
+    rx_name = str(payload.get('rx_name', 'Cible'))[:40]
+
+    import datetime as _dt
+    month = payload.get('month') or _dt.datetime.now(_dt.timezone.utc).month
+
+    ssn = payload.get('ssn')
+    if ssn is None:
+        # Pas de SSN mesuré en direct : approximation grossière depuis le SFI
+        # courant (relation SSN ≈ (SFI-60)*1.2, valable en ordre de grandeur
+        # pour SFI 70-200 ; à affiner si besoin). Neutre à 75 si SFI absent.
+        with solar_lock:
+            sol_sfi = solar_cache.get('sfi')
+        try:
+            sfi_val = float(sol_sfi)
+            ssn = max(0, round((sfi_val - 60) * 1.2))
+        except (TypeError, ValueError):
+            ssn = 75
+
+    freqs = payload.get('freqs') or [3.5, 7.1, 14.2, 21.2, 28.4]
+    try:
+        freqs = [float(f) for f in freqs][:11]  # limite raisonnable par appel
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "reason": "freqs invalides"}), 400
+
+    result = voacap_adapter.run_prediction(
+        tx_name=MY_CALL, tx_lat=user_lat, tx_lon=user_lon,
+        rx_name=rx_name, rx_lat=float(rx_lat), rx_lon=float(rx_lon),
+        month=int(month), ssn=int(ssn), freqs=freqs,
+    )
+    return jsonify(result)
+
 # ============================================================
 # INTÉGRATION LoTW (Logbook of the World)
 # Identifiants jamais stockés sur disque — session mémoire uniquement
@@ -7460,6 +7557,9 @@ def api_analytics():
         except Exception as exc:
             diag["store_error"] = str(exc)
     data["diagnostic"] = diag
+
+    # Stub VOACAP v12.6 — panneau verrouillé jusqu'à install du skill
+    data["voacap"] = {"available": False}
 
     return jsonify(data)
 

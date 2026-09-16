@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/base.css">
     <title>📊 Neural DX Watcher — DX Analytics</title>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <style>
     :root {
         --bg-color:#050505; --panel-bg:#0e0e0e; --text-main:#a0a0a0;
@@ -81,6 +82,11 @@
     .panel-sub{font-size:.7rem;color:var(--dim);font-style:italic;
         margin-bottom:12px;line-height:1.4;}
     .sub-en{display:block;margin-top:4px;opacity:.7;font-style:italic;}
+
+    .dd-handle{font-size:1.1em;cursor:grab;margin-right:6px;color:var(--dim);
+        opacity:.5;user-select:none;vertical-align:middle;}
+    .dd-handle:hover{opacity:1;color:var(--warn);}
+    .sortable-ghost{opacity:.25;}
 
     .no-data{padding:16px;text-align:center;color:var(--dim);font-size:.78rem;
         line-height:1.5;border:1px dashed var(--line);border-radius:8px;}
@@ -184,6 +190,65 @@
     .forecast-conf{font-size:.57rem;color:var(--dim);}
     .forecast-conf.low-sample{color:var(--warn);font-weight:700;}
 
+    /* ── Panneau VOACAP : grille bandes × heures ────────────────────── */
+    .vc-controls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;
+        margin-bottom:14px;}
+    .vc-field{display:flex;flex-direction:column;gap:3px;}
+    .vc-field label{font-size:.58rem;color:var(--dim);letter-spacing:.04em;}
+    .vc-field input{background:#000;color:var(--text-main);
+        border:1px solid var(--line);border-bottom:1px solid #2a2a2a;
+        border-radius:3px;padding:5px 7px;font-family:'IBM Plex Mono',monospace;
+        font-size:.72rem;font-variant-numeric:tabular-nums;}
+    .vc-field input:focus{outline:none;border-color:var(--accent);
+        box-shadow:0 0 0 1px rgba(0,243,255,.25);}
+    .vc-field input.vc-name{width:200px;}
+    .vc-field input.vc-coord{width:72px;}
+    .vc-resolve{font-size:.6rem;color:var(--dim);margin-top:2px;min-height:14px;}
+    .vc-run{background:transparent;color:var(--accent);
+        border:1px solid var(--accent);border-radius:3px;padding:6px 14px;
+        font-family:'IBM Plex Mono',monospace;font-size:.72rem;font-weight:600;
+        cursor:pointer;transition:background .15s,color .15s;}
+    .vc-run:hover{background:var(--accent);color:#000;}
+    .vc-run:disabled{opacity:.4;cursor:wait;}
+
+    .vc-presets{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px;}
+    .vc-chip{background:transparent;border:1px solid var(--line);
+        color:var(--dim);border-radius:11px;padding:3px 10px;font-size:.63rem;
+        cursor:pointer;font-family:'IBM Plex Mono',monospace;
+        transition:border-color .15s,color .15s;}
+    .vc-chip:hover{border-color:var(--accent);color:var(--accent);}
+
+    /* Hero : la réponse opérationnelle immédiate */
+    .vc-now{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+        padding:12px 14px;margin-bottom:14px;background:#000;
+        border:1px solid var(--line);border-left:2px solid var(--accent);
+        border-radius:3px;}
+    .vc-now-band{font-family:'IBM Plex Mono',monospace;font-size:2.4rem;
+        font-weight:700;line-height:1;letter-spacing:-.02em;
+        font-variant-numeric:tabular-nums;}
+    .vc-now-meta{display:flex;flex-direction:column;gap:2px;}
+    .vc-now-hour{font-size:.62rem;color:var(--dim);letter-spacing:.08em;}
+    .vc-now-stats{font-family:'IBM Plex Mono',monospace;font-size:.74rem;
+        color:var(--text-main);font-variant-numeric:tabular-nums;}
+    .vc-now-dead{font-size:.76rem;color:var(--dim);font-style:italic;}
+
+    .vc-scroll{overflow-x:auto;padding-bottom:6px;}
+    table.vc-grid{border-collapse:collapse;font-size:.6rem;min-width:540px;
+        font-family:'IBM Plex Mono',monospace;}
+    table.vc-grid th{font-weight:500;color:var(--dim);padding:2px 3px;
+        font-variant-numeric:tabular-nums;}
+    table.vc-grid th.vc-band-label{text-align:right;padding-right:8px;
+        color:var(--text-main);}
+    table.vc-grid th.vc-hnow{color:var(--accent);font-weight:700;}
+    table.vc-grid td{width:19px;height:16px;padding:0;
+        border:1px solid #0a0a0a;}
+    table.vc-grid td.vc-cnow{box-shadow:inset 0 0 0 1px rgba(0,243,255,.55);}
+    .vc-scale{display:flex;align-items:center;gap:7px;margin-top:10px;
+        font-size:.6rem;color:var(--dim);}
+    .vc-scale-ramp{height:7px;width:120px;border-radius:2px;
+        background:linear-gradient(90deg,rgb(0,60,75),rgb(0,160,180),
+            rgb(255,200,0),rgb(255,90,40));}
+
     .footnote{font-size:.68rem;color:var(--dim);margin-top:12px;padding-top:8px;
         border-top:1px solid var(--line);line-height:1.45;}
     .btn-hunt{display:block;text-align:center;text-decoration:none;
@@ -226,11 +291,12 @@
 
 <div id="maturity-bar"></div>
 
-<div class="dashboard-grid">
-    <div class="panel grid-full" data-panel="recent"></div>
-    <div class="panel grid-full" data-panel="forecast"></div>
-    <div class="panel grid-full" data-panel="heatmap"></div>
-    <div class="panel grid-full" data-panel="patterns"></div>
+<div class="dashboard-grid" id="panels-grid">
+    <div class="panel grid-full" data-panel="recent"   id="pi-recent"></div>
+    <div class="panel grid-full" data-panel="forecast" id="pi-forecast"></div>
+    <div class="panel grid-full" data-panel="heatmap"  id="pi-heatmap"></div>
+    <div class="panel grid-full" data-panel="patterns" id="pi-patterns"></div>
+    <div class="panel grid-full" data-panel="voacap"   id="pi-voacap"></div>
 </div>
 
 <script>
@@ -355,6 +421,8 @@ function bisub(fr, en) {
     return `${fr}<span class="sub-en">🇬🇧 ${en}</span>`;
 }
 
+const ddHandle = () => `<span class="dd-handle" title="Déplacer / Drag">⋮⋮</span>`;
+
 function lockedPanel(title, sub, maturity, needLabel) {
     // needLabel accepte soit une chaîne (rétro-compat), soit {fr, en}.
     const need = typeof needLabel === 'string' ? { fr: needLabel, en: needLabel } : needLabel;
@@ -414,7 +482,7 @@ function renderMaturity(data, extraH = 0) {
 // ── Activité récente ───────────────────────────────────────────────────
 const recentRenderer = (data) => {
     const r = data.recent || {};
-    const head = `<div class="panel-header">⚡ Activité récente
+    const head = `<div class="panel-header">${ddHandle()}⚡ Activité récente
         <span class="tag">${r.hours || 24} dernières heures</span></div>
         <div class="panel-sub">${bisub(
             "Spots reçus heure par heure — toutes bandes confondues. Barres colorées du froid (peu actif) au chaud (très actif). Le pic est libellé en orange, l'heure courante en vert.",
@@ -514,7 +582,7 @@ const forecastRenderer = (data) => {
     const basisLabel = f.basis === 'weekday'
         ? 'même jour de semaine et même heure / same weekday & hour'
         : 'même heure, tous jours confondus / same hour, any day';
-    const head = `<div class="panel-header">🔮 Prochaines heures
+    const head = `<div class="panel-header">${ddHandle()}🔮 Prochaines heures
         <span class="tag">${f.available ? esc(basisLabel) : ''}</span></div>
         <div class="panel-sub">${bisub(
             "Le % indique la fréquence à laquelle <b>au moins un spot</b> a été reçu sur ce créneau dans le passé — ce n'est pas la force d'une ouverture ni une prévision de propagation. Avec peu de jours d'historique (regarde le nombre d'« obs »), les spots arrivant presque en continu, il est normal que la plupart des créneaux affichent 100 %.",
@@ -582,7 +650,7 @@ const heatmapRenderer = (data) => {
               en: "At least 2 days of history needed" });
     }
 
-    const head = `<div class="panel-header">🗓 Quand ça ouvre
+    const head = `<div class="panel-header">${ddHandle()}🗓 Quand ça ouvre
         <span class="tag">${h.total_spots.toLocaleString('fr-FR')} spots · ${h.days} j</span></div>
         <div class="panel-sub">${bisub(
             "Moyenne par occurrence du créneau, et non cumul : sinon les jours les mieux représentés dans la fenêtre ressortiraient artificiellement.",
@@ -638,7 +706,7 @@ const patternsRenderer = (data) => {
 
     const win = p.window_days >= 1
         ? `${p.window_days} j` : `${p.window_hours} h`;
-    const head = `<div class="panel-header">📈 Tendances par bande
+    const head = `<div class="panel-header">${ddHandle()}📈 Tendances par bande
         <span class="tag">${win} vs ${win} précédents</span></div>
         <div class="panel-sub">${bisub(
             "Barres en couleur par bande, ordre 160 m → 23 cm. Une bande sous 10 spots n'est pas qualifiée (grisée).",
@@ -703,12 +771,275 @@ const patternsRenderer = (data) => {
     return head + rows + summary;
 };
 
+let voacapResult = null;
+let voacapBusy = false;
+
+const VC_BANDS = [
+    { mhz: 28.4, label: '10m' },
+    { mhz: 21.2, label: '15m' },
+    { mhz: 14.2, label: '20m' },
+    { mhz: 7.1,  label: '40m' },
+    { mhz: 3.5,  label: '80m' },
+];
+
+const VC_DXCC = {
+    'w':{lat:38.9,lon:-77.0,name:'USA'},'k':{lat:38.9,lon:-77.0,name:'USA'},
+    'n':{lat:38.9,lon:-77.0,name:'USA'},'aa':{lat:38.9,lon:-77.0,name:'USA'},
+    've':{lat:45.4,lon:-75.7,name:'Canada'},
+    'ce':{lat:-33.5,lon:-70.6,name:'Chili'},'xq':{lat:-33.5,lon:-70.6,name:'Chili'},
+    'py':{lat:-23.5,lon:-46.6,name:'Brésil'},'lu':{lat:-34.6,lon:-58.4,name:'Argentine'},
+    'hk':{lat:4.7,lon:-74.1,name:'Colombie'},'hp':{lat:8.9,lon:-79.5,name:'Panama'},
+    'vp9':{lat:32.3,lon:-64.8,name:'Bermudes'},
+    'vk':{lat:-35.3,lon:149.1,name:'Australie'},'vh':{lat:-35.3,lon:149.1,name:'Australie'},
+    'zl':{lat:-36.9,lon:174.8,name:'Nouvelle-Zélande'},
+    'ja':{lat:35.7,lon:139.7,name:'Japon'},'jh':{lat:35.7,lon:139.7,name:'Japon'},
+    'jf':{lat:35.7,lon:139.7,name:'Japon'},'jg':{lat:35.7,lon:139.7,name:'Japon'},
+    'hl':{lat:37.6,lon:127.0,name:'Corée'},'ds':{lat:37.6,lon:127.0,name:'Corée'},
+    'by':{lat:39.9,lon:116.4,name:'Chine'},'bg':{lat:39.9,lon:116.4,name:'Chine'},
+    'bd':{lat:39.9,lon:116.4,name:'Chine'},
+    'vu':{lat:28.6,lon:77.2,name:'Inde'},'vt':{lat:28.6,lon:77.2,name:'Inde'},
+    'ap':{lat:33.7,lon:73.1,name:'Pakistan'},
+    '4s':{lat:6.9,lon:79.8,name:'Sri Lanka'},
+    'vr':{lat:22.3,lon:114.2,name:'Hong Kong'},'vs6':{lat:22.3,lon:114.2,name:'Hong Kong'},
+    'bv':{lat:25.0,lon:121.5,name:'Taïwan'},'bu':{lat:25.0,lon:121.5,name:'Taïwan'},
+    'yb':{lat:-6.2,lon:106.8,name:'Indonésie'},'pk':{lat:-6.2,lon:106.8,name:'Indonésie'},
+    'zs':{lat:-26.2,lon:28.0,name:'Afrique du Sud'},'zr':{lat:-26.2,lon:28.0,name:'Afrique du Sud'},
+    'zt':{lat:-26.2,lon:28.0,name:'Afrique du Sud'},
+    'ea8':{lat:28.1,lon:-15.4,name:'Canaries'},
+    '5b':{lat:34.7,lon:33.0,name:'Chypre'},'5n':{lat:9.1,lon:7.5,name:'Nigeria'},
+    '5h':{lat:-6.8,lon:39.3,name:'Tanzanie'},'9j':{lat:-15.4,lon:28.3,name:'Zambie'},
+    'su':{lat:30.1,lon:31.2,name:'Égypte'},'4x':{lat:31.8,lon:35.2,name:'Israël'},
+    '4z':{lat:31.8,lon:35.2,name:'Israël'},'a4':{lat:23.6,lon:58.6,name:'Oman'},
+    'a6':{lat:24.5,lon:54.4,name:'Émirats'},'a7':{lat:25.3,lon:51.5,name:'Qatar'},
+    '9k':{lat:29.4,lon:47.9,name:'Koweït'},'ta':{lat:39.9,lon:32.8,name:'Turquie'},
+    'ep':{lat:35.7,lon:51.4,name:'Iran'},
+    'ua':{lat:55.7,lon:37.6,name:'Russie'},'r':{lat:55.7,lon:37.6,name:'Russie'},
+    'sp':{lat:52.2,lon:21.0,name:'Pologne'},'i':{lat:41.9,lon:12.5,name:'Italie'},
+    'dl':{lat:52.5,lon:13.4,name:'Allemagne'},'g':{lat:51.5,lon:-0.1,name:'Royaume-Uni'},
+    'm':{lat:51.5,lon:-0.1,name:'Royaume-Uni'},'sm':{lat:59.3,lon:18.1,name:'Suède'},
+    'oh':{lat:60.2,lon:24.9,name:'Finlande'},'la':{lat:59.9,lon:10.7,name:'Norvège'},
+    'oz':{lat:55.7,lon:12.6,name:'Danemark'},'pa':{lat:52.4,lon:4.9,name:'Pays-Bas'},
+    'on':{lat:50.8,lon:4.4,name:'Belgique'},'lx':{lat:49.6,lon:6.1,name:'Luxembourg'},
+    'hb':{lat:46.9,lon:7.4,name:'Suisse'},'oe':{lat:48.2,lon:16.4,name:'Autriche'},
+    'ok':{lat:50.1,lon:14.4,name:'Tchéquie'},'ha':{lat:47.5,lon:19.0,name:'Hongrie'},
+    'yo':{lat:44.4,lon:26.1,name:'Roumanie'},'lz':{lat:42.7,lon:23.3,name:'Bulgarie'},
+    'sv':{lat:37.9,lon:23.7,name:'Grèce'},'ct':{lat:38.7,lon:-9.1,name:'Portugal'},
+    'ea':{lat:40.4,lon:-3.7,name:'Espagne'},
+};
+
+const VC_COUNTRY_INDEX = (() => {
+    const idx = [], seen = new Set();
+    for (const [pfx,d] of Object.entries(VC_DXCC)) {
+        if (!seen.has(d.name)) { seen.add(d.name); idx.push({name:d.name.toLowerCase(),pfx,d}); }
+    }
+    return idx;
+})();
+
+const VC_PRESETS = [
+    {name:'USA', pfx:'w'},{name:'Japon', pfx:'ja'},{name:'Australie', pfx:'vk'},
+    {name:'Brésil', pfx:'py'},{name:'Afr. du Sud', pfx:'zs'},
+];
+
+function vcBandLabel(mhz) {
+    const b = VC_BANDS.find(x => Math.abs(x.mhz - mhz) < 0.35);
+    return b ? b.label : `${mhz} MHz`;
+}
+
+function vcResolveLocal(raw) {
+    const q = raw.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
+    if (!q) return null;
+    const hits = Object.entries(VC_DXCC).filter(([k]) => q.startsWith(k))
+                       .sort((a,b) => b[0].length - a[0].length);
+    if (hits.length) return hits[0][1];
+    const nameHit = VC_COUNTRY_INDEX.find(x => x.name.includes(q));
+    return nameHit ? nameHit.d : null;
+}
+
+async function vcGeocode(raw) {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(raw)}&format=json&limit=1`;
+    try {
+        const res = await fetch(url, {headers:{'Accept-Language':'fr,en'}});
+        const arr = await res.json();
+        if (!arr.length) return null;
+        return {lat:parseFloat(arr[0].lat), lon:parseFloat(arr[0].lon), name:raw.trim()};
+    } catch { return null; }
+}
+
+const voacapRenderer = (data) => {
+    const head = `<div class="panel-header">${ddHandle()}🌐 Prédictions HF
+        <span class="tag">VOACAP</span></div>
+        <div class="panel-sub">${bisub(
+            "Fiabilité prévue du circuit vers une cible, bande par bande et heure par heure. Modèle statistique mensuel : c'est le comportement typique du mois, pas la météo du jour.",
+            "Predicted circuit reliability to a target, band by band and hour by hour. Monthly statistical model: this is the month's typical behaviour, not today's conditions."
+        )}</div>`;
+
+    const r = voacapResult;
+    const chips = VC_PRESETS.map(p =>
+        `<button class="vc-chip" onclick="vcRunPreset('${esc(p.pfx)}')">${esc(p.name)}</button>`
+    ).join('');
+
+    const controls = `<div class="vc-presets">${chips}</div>
+        <div class="vc-controls">
+            <div class="vc-field">
+                <label for="vc-query">Indicatif, préfixe DXCC ou pays</label>
+                <input type="text" id="vc-query" class="vc-name"
+                    placeholder="JA1ABC · ZS · Brésil · Australie…"
+                    onkeydown="if(event.key==='Enter') runVoacapPrediction()">
+                <div class="vc-resolve" id="vc-resolve"></div>
+            </div>
+            <button class="vc-run" id="vc-run" onclick="runVoacapPrediction()"
+                ${voacapBusy ? 'disabled' : ''}>${voacapBusy ? 'Calcul…' : 'Calculer'}</button>
+        </div>`;
+
+    if (!r) {
+        return head + controls + `<div class="no-data">
+            <b>Saisis un indicatif, un préfixe ou un nom de pays — puis Entrée.</b>
+            <div class="sub-en">🇬🇧 Enter a callsign, DXCC prefix or country name — then hit Enter.</div>
+        </div>`;
+    }
+    if (r.status === 'unavailable') {
+        return head + controls + `<div class="no-data">
+            <b>Moteur VOACAP injoignable — ${esc(r.reason||'raison inconnue')}</b>
+            <div class="sub-en">🇬🇧 VOACAP engine unreachable — ${esc(r.reason||'unknown reason')}</div>
+        </div>`;
+    }
+    if (r.status === 'error') {
+        return head + controls + `<div class="no-data"><b>${esc(r.reason||'Requête invalide')}</b></div>`;
+    }
+
+    const hours = r.hours || [];
+    const byHour = new Map(hours.map(h => [h.hour_utc, h]));
+    const nowH = new Date().getUTCHours();
+    const now = byHour.get(nowH);
+
+    let hero;
+    if (now && now.rel > 0) {
+        hero = `<div class="vc-now">
+            <div class="vc-now-band" style="color:${heatColor(now.rel)}">${esc(vcBandLabel(now.best_freq_mhz))}</div>
+            <div class="vc-now-meta">
+                <div class="vc-now-hour">maintenant · ${String(nowH).padStart(2,'0')}z · ${esc(r.circuit||'')}</div>
+                <div class="vc-now-stats">fiabilité ${Math.round(now.rel*100)}% · ${now.snr} dB · ${now.best_freq_mhz} MHz</div>
+            </div></div>`;
+    } else {
+        hero = `<div class="vc-now"><div class="vc-now-meta">
+            <div class="vc-now-hour">maintenant · ${String(nowH).padStart(2,'0')}z · ${esc(r.circuit||'')}</div>
+            <div class="vc-now-dead">Aucune bande exploitable à cette heure. Regarde la grille.</div>
+            </div></div>`;
+    }
+
+    const headerCells = Array.from({length:24},(_,h) =>
+        `<th class="${h===nowH?'vc-hnow':''}">${h%2===0?String(h).padStart(2,'0'):''}</th>`
+    ).join('');
+
+    const rows = VC_BANDS.map(band => {
+        const cells = Array.from({length:24},(_,h) => {
+            const entry = byHour.get(h);
+            const f = entry && entry.frequencies ? entry.frequencies[band.mhz] : null;
+            const rel = f ? f.rel : 0;
+            const tip = f
+                ? `${band.label} ${String(h).padStart(2,'0')}z — ${Math.round(rel*100)}% / ${f.snr} dB`
+                : `${band.label} ${String(h).padStart(2,'0')}z — pas de donnée`;
+            return `<td class="${h===nowH?'vc-cnow':''}" style="background:${heatColor(rel)}" title="${esc(tip)}"></td>`;
+        }).join('');
+        return `<tr><th class="vc-band-label">${band.label}</th>${cells}</tr>`;
+    }).join('');
+
+    const origin = r.from_cache
+        ? bisub('en cache (< 24 h)','cached (< 24 h)')
+        : bisub("calcul à l'instant",'computed just now');
+
+    return head + controls + hero +
+        `<div class="vc-scroll"><table class="vc-grid">
+            <tr><th></th>${headerCells}</tr>${rows}
+        </table></div>
+        <div class="vc-scale">
+            <span>peu fiable</span><div class="vc-scale-ramp"></div><span>très fiable</span>
+            <span style="margin-left:auto">mois ${r.month} · SSN ${r.ssn} · ${origin}</span>
+        </div>`;
+};
+
+function vcRunPreset(pfx) {
+    const el = document.getElementById('vc-query');
+    if (el) el.value = pfx;
+    runVoacapPrediction();
+}
+
+function vcPaint() {
+    const p = panels.find(x => x.key === 'voacap');
+    if (p) p.render({});
+}
+
+async function runVoacapPrediction() {
+    const raw = (document.getElementById('vc-query')?.value || '').trim();
+    if (!raw) {
+        voacapResult = {status:'error', reason:'Saisis un indicatif ou un nom de pays.'};
+        vcPaint(); return;
+    }
+    voacapBusy = true; vcPaint();
+
+    let resolved = vcResolveLocal(raw);
+    const resolveEl = document.getElementById('vc-resolve');
+    if (!resolved) {
+        if (resolveEl) resolveEl.textContent = 'Géocodage…';
+        resolved = await vcGeocode(raw);
+    }
+    if (!resolved) {
+        voacapBusy = false;
+        voacapResult = {status:'error',
+            reason:`"${raw}" non reconnu. Essaie un préfixe DXCC (JA, ZS, VK…) ou un nom de pays.`};
+        vcPaint(); return;
+    }
+    if (resolveEl) resolveEl.textContent = `→ ${resolved.name} (${resolved.lat.toFixed(1)}, ${resolved.lon.toFixed(1)})`;
+
+    try {
+        const res = await fetch('/api/voacap/predict', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({rx_name:resolved.name, rx_lat:resolved.lat, rx_lon:resolved.lon})
+        });
+        voacapResult = await res.json();
+    } catch(err) {
+        voacapResult = {status:'unavailable', reason:String(err)};
+    }
+    voacapBusy = false; vcPaint();
+    const qEl = document.getElementById('vc-query');
+    if (qEl) qEl.value = raw;
+    const rEl = document.getElementById('vc-resolve');
+    if (rEl) rEl.textContent = `→ ${resolved.name} (${resolved.lat.toFixed(1)}, ${resolved.lon.toFixed(1)})`;
+}
+
+// ── Drag & Drop des pavés (SortableJS, persistance localStorage) ──
+function initPanelSorting() {
+    if (typeof Sortable === 'undefined') return;
+    const grid = document.getElementById('panels-grid');
+    if (!grid) return;
+
+    // Restaurer l'ordre sauvegardé
+    const STORAGE_KEY = 'ai_insight_panel_order';
+    const savedOrder = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (savedOrder && Array.isArray(savedOrder)) {
+        savedOrder.forEach(id => {
+            const node = document.getElementById(id);
+            if (node) grid.appendChild(node);
+        });
+    }
+
+    Sortable.create(grid, {
+        handle: '.dd-handle',
+        animation: 150,
+        onEnd: () => {
+            const order = Array.from(grid.children).map(c => c.id).filter(Boolean);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
+        }
+    });
+}
+
 // ── Boucle principale ──────────────────────────────────────────────────
 const panels = [
     new DXPanel('recent',   recentRenderer),
     new DXPanel('forecast', forecastRenderer),
     new DXPanel('heatmap',  heatmapRenderer),
     new DXPanel('patterns', patternsRenderer),
+    new DXPanel('voacap',   voacapRenderer),
 ];
 
 let currentBand = '';
@@ -760,6 +1091,9 @@ setInterval(() => {
         renderMaturity(_lastData, (Date.now() - _lastFetchMs) / 3600000);
     }
 }, 60000);
+
+// Drag & Drop — initialiser après que le DOM est prêt
+document.addEventListener('DOMContentLoaded', initPanelSorting);
 
 // Refresh des données toutes les 5 minutes
 updateDashboard();

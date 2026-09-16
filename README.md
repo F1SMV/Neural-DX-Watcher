@@ -1,4 +1,4 @@
-# Neural DX Watcher v12.5
+# Neural DX Watcher v12.6
 
 **Une application web de chasse DXCC intelligente pour le radioamateur moderne**, basée sur Flask + SQLite, tournant sur Raspberry Pi 5 à `192.168.1.81:8000`.
 
@@ -17,12 +17,27 @@ Dépôt : [F1SMV/Neural-DX-Watcher](https://github.com/F1SMV/Neural-DX-Watcher)
 ### Analyse IA / AI Insight (v12.5) ✨
 Route **`/ai_insight`** — tableau de bord d'analyse comportementale, entièrement bilingue FR/EN :
 - **Activité récente** : sparkline heure par heure (24h), pic et heure courante mis en évidence
-- **Prochaines heures** : fréquence d'activité observée par le passé sur les créneaux à venir (même heure, ou même jour+heure dès 14j d'historique) — **explications bilingues intégrées** précisant qu'il s'agit d'une fréquence constatée (« au moins un spot »), pas d'une prévision de propagation ni d'une mesure de force d'ouverture
-- **Fiabilité affichée** : créneaux avec moins de 5 observations signalés en **orange** avec info-bulle, pour éviter de lire un 100% comme un signal fort en tout début de collecte
-- **Quand ça ouvre** : heatmap jour de semaine × heure UTC, moyenne par occurrence (pas de cumul)
-- **Tendances par bande** : comparaison période récente vs précédente, triée 160 m → 23 cm
-- **Rafraîchissement automatique** : nouvel appel `/api/analytics` toutes les 5 min (fetch, sans recharger la page), barre de maturité recalculée chaque minute
-- **Module `analytics.py`** entièrement autonome : base dédiée `data/analytics.sqlite`, chaîne de repli multi-source (`predictor.sqlite` → spots en mémoire) si `predictor.py` n'est pas actif
+- **Prochaines heures** : fréquence d'activité observée par le passé sur les créneaux à venir — explications bilingues, créneaux à faible échantillon signalés en orange
+- **Quand ça ouvre** : heatmap jour de semaine × heure UTC
+- **Tendances par bande** : comparaison période récente vs précédente
+- **Prédictions HF VOACAP (v12.6)** : grille bandes × heures vers une cible quelconque, voir ci-dessous
+- Rafraîchissement AJAX toutes les 5 min, barre de maturité chaque minute
+
+### Prédictions HF VOACAP (v12.6) ✨
+Cinquième panneau de la page AI Insight — prédictions point-à-point via le moteur **VOACAP** (US gov, open source) :
+- **Saisie libre** : indicatif (`JA1ABC`), préfixe DXCC (`ZS`, `VK`, `EA8`…) ou nom de pays (`Brésil`, `Australie`) — résolution automatique
+- **Table DXCC locale** (~60 entités, réponse instantanée) + fallback géocodage Nominatim/OSM pour tout le reste
+- **Grille bandes × heures** : 5 bandes (10m→80m) × 24 heures UTC, teintées selon la fiabilité du circuit (REL) — même échelle de couleur que les autres panneaux
+- **Hero heure courante** : bande recommandée maintenant, REL% et SNR en grand
+- **Raccourcis DX** : 5 directions de référence depuis JN23 (USA, Japon, Australie, Brésil, Afrique du Sud) en un clic
+- **Cache 24h** : calcul coûteux sur Pi → résultat stocké dans `data/voacap_cache.sqlite`
+- **Fallback gracieux** : si `voacap_predict.py` n'est pas installé, le panneau reste visible avec un message clair
+
+**Setup VOACAP (une seule fois) :**
+```bash
+# Installer le skill Reid VOACAP (compile voacapl, ~2 min)
+bash ~/.claude/skills/voacap/scripts/setup.sh
+```
 
 ### Mode Chasse DXCC (v12.4) ✨
 Route dédiée **`/hunt`** — interface full-screen optimisée pour le hunt en direct :
@@ -54,6 +69,27 @@ Route dédiée **`/hunt`** — interface full-screen optimisée pour le hunt en 
 - **`dxcc_hunt.py`** : logique pure DXCC Hunt (injectable, testable, 13/13 tests ✅)
 - **`ntfy_alerts.py`** : notifications desktop/mail (v10.0, complet)
 - **`test_dxcc_hunt.py`, `test_country_meta.py`** : suites unitaires complètes
+
+---
+
+## v12.6 — Changelog Détaillé
+
+### Nouvelles Fonctionnalités
+- **Panneau Prédictions HF VOACAP** dans AI Insight (`ai_insight.html`)
+  - Grille bandes × heures (10m→80m / UTC 00-23), teintée par fiabilité REL
+  - Hero heure courante : bande recommandée + REL% + SNR en un coup d'œil
+  - Saisie unifiée : indicatif, préfixe DXCC ou nom de pays → résolution automatique (table locale ~60 entités + fallback Nominatim)
+  - 5 raccourcis DX : USA, Japon, Australie, Brésil, Afrique du Sud
+  - Cache SQLite 24h (`data/voacap_cache.sqlite`)
+  - Fallback gracieux si `voacapl` non installé
+
+- **`voacap_adapter.py`** (nouveau module) : enveloppe `voacap_predict.py` (skill Reid), parseur de sortie VOACAP, cache SQLite autonome
+- **Route `POST /api/voacap/predict`** dans `webapp.py` : SSN auto-dérivé du SFI NOAA courant si non fourni
+
+### Nettoyage
+- `APP_VERSION` mis à jour : `'12.6'`
+- Suppression de la route orpheline `@app.route("/ai.html")` (TemplateNotFound depuis le renommage en v12.5)
+- `requirements.txt` entièrement réécrit : dépendances exactes et à jour, notes setup VOACAP
 
 ---
 
@@ -146,9 +182,10 @@ curl 'http://192.168.1.81:8000/api/hunt/data?band=20m'
 
 | Fichier | Rôle | État |
 |---------|------|------|
-| `webapp.py` | Backend Flask principal | ✅ v12.5 |
+| `webapp.py` | Backend Flask principal | ✅ v12.6 |
 | `analytics.py` | Moteur Analyse IA (autonome, cache dédié) | ✅ v12.5 |
-| `ai_insight.html` | UI Analyse IA (bilingue FR/EN) | ✅ v12.5 |
+| `voacap_adapter.py` | Enveloppe VOACAP + cache 24h | ✅ v12.6 |
+| `ai_insight.html` | UI Analyse IA + Prédictions HF (bilingue FR/EN) | ✅ v12.6 |
 | `dxcc_hunt.py` | Moteur scoring Hunt DXCC | ✅ 13/13 tests + validation distances |
 | `country_meta.py` | Enrichissement pays (cache 30j) | ✅ 16/16 tests |
 | `hunt.html` | UI Mode Hunt (Leaflet, markers SPD) | ✅ Cockpit 6m |
@@ -214,8 +251,9 @@ python3 -m py_compile webapp.py country_meta.py
   - REST Countries API v3.1
   - LoTW ARRL
   - Blitzortung MQTT
+  - codé par -ClaudeAI
 
 ---
 
-**v12.5** — Septembre 2026  
+**v12.6** — Septembre 2026  
 *"Hunt smarter, not harder"*

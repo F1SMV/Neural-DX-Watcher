@@ -99,6 +99,34 @@ class DXCCResolver:
             )
             if entities_loaded == 0:
                 self._degraded = True
+            
+            # ── v12.6: Post-parse fix for misplaced US Pacific territories (KH*) ──
+            # cty.dat sometimes has inverted or incorrect coordinates for US island territories.
+            # This caused KH8 (American Samoa) to appear in Europe on the map, KH3 in Africa, etc.
+            # Reference coordinates (DXCC/ARRL official):
+            _kh_corrections = {
+                "KH0": (-14.0, 145.8),   # Mariana Islands
+                "KH1": (0.4, -176.4),    # Baker/Howland
+                "KH2": (13.4, 144.8),    # Guam
+                "KH3": (16.7, -169.5),   # Johnston Island
+                "KH4": (28.2, -177.4),   # Midway
+                "KH5": (6.0, -162.1),    # Palmyra/Jarvis
+                "KH6": (21.3, -157.9),   # Hawaii
+                "KH7": (64.0, -153.0),   # Alaska
+                "KH8": (-14.3, -170.1),  # American Samoa ← bug: was misplaced
+                "KH9": (19.3, 166.6),    # Wake Island
+            }
+            for prefix, (correct_lat, correct_lon) in _kh_corrections.items():
+                if prefix in self.by_prefix:
+                    orig_lat = self.by_prefix[prefix].get("lat")
+                    orig_lon = self.by_prefix[prefix].get("lon")
+                    # Only override if current values differ significantly (avoid false positives)
+                    if (orig_lat is None or abs(orig_lat - correct_lat) > 1.0) or \
+                       (orig_lon is None or abs(orig_lon - correct_lon) > 1.0):
+                        self.by_prefix[prefix]["lat"] = correct_lat
+                        self.by_prefix[prefix]["lon"] = correct_lon
+                        logger.info(f"dxcc_resolver: corrected {prefix} coords "
+                                   f"({orig_lat}, {orig_lon}) → ({correct_lat}, {correct_lon})")
         except Exception as e:
             logger.warning(f"dxcc_resolver: échec parsing cty.dat ({e}) — mode dégradé")
             self._degraded = True
