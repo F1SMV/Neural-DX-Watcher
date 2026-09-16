@@ -14,15 +14,6 @@ Repository: [F1SMV/Neural-DX-Watcher](https://github.com/F1SMV/Neural-DX-Watcher
 
 ## 🎯 Main Features
 
-### AI Insight (v12.5) ✨
-Dedicated **`/ai_insight`** route — behavioral analysis dashboard, fully bilingual FR/EN:
-- **Recent Activity**: hour-by-hour sparkline (24h), peak and current hour highlighted
-- **Next Hours**: past activity frequency on upcoming slots — bilingual explanations, low-sample slots flagged in orange
-- **When It Opens**: weekday × UTC hour heatmap
-- **Band Trends**: recent vs. previous period comparison
-- **HF Predictions VOACAP (v12.6)**: band × hour matrix toward any target — see below
-- AJAX refresh every 5 min, maturity bar every minute
-
 ### HF Predictions VOACAP (v12.6) ✨
 Fifth panel on the AI Insight page — point-to-point predictions via the **VOACAP** engine (US gov, open source):
 - **Free-form input**: callsign (`JA1ABC`), DXCC prefix (`ZS`, `VK`, `EA8`…) or country name (`Brazil`, `Australia`) — automatic resolution
@@ -36,7 +27,16 @@ Fifth panel on the AI Insight page — point-to-point predictions via the **VOAC
 **VOACAP setup (one time only):**
 ```bash
 bash ~/.claude/skills/voacap/scripts/setup.sh
-```
+
+
+### AI Insight (v12.5) ✨
+Dedicated **`/ai_insight`** route — behavioral analysis dashboard, fully bilingual FR/EN:
+- **Recent Activity**: hour-by-hour sparkline (24h), peak and current hour highlighted
+- **Next Hours**: past activity frequency on upcoming slots — bilingual explanations, low-sample slots flagged in orange
+- **When It Opens**: weekday × UTC hour heatmap
+- **Band Trends**: recent vs. previous period comparison
+- **HF Predictions VOACAP (v12.6)**: band × hour matrix toward any target — see below
+- AJAX refresh every 5 min, maturity bar every minute
 
 ### DXCC Hunt Mode (v12.4) ✨
 Dedicated **`/hunt`** route — full-screen interface optimized for real-time hunting:

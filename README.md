@@ -14,15 +14,6 @@ Dépôt : [F1SMV/Neural-DX-Watcher](https://github.com/F1SMV/Neural-DX-Watcher)
 
 ## 🎯 Fonctionnalités Principales
 
-### Analyse IA / AI Insight (v12.5) ✨
-Route **`/ai_insight`** — tableau de bord d'analyse comportementale, entièrement bilingue FR/EN :
-- **Activité récente** : sparkline heure par heure (24h), pic et heure courante mis en évidence
-- **Prochaines heures** : fréquence d'activité observée par le passé sur les créneaux à venir — explications bilingues, créneaux à faible échantillon signalés en orange
-- **Quand ça ouvre** : heatmap jour de semaine × heure UTC
-- **Tendances par bande** : comparaison période récente vs précédente
-- **Prédictions HF VOACAP (v12.6)** : grille bandes × heures vers une cible quelconque, voir ci-dessous
-- Rafraîchissement AJAX toutes les 5 min, barre de maturité chaque minute
-
 ### Prédictions HF VOACAP (v12.6) ✨
 Cinquième panneau de la page AI Insight — prédictions point-à-point via le moteur **VOACAP** (US gov, open source) :
 - **Saisie libre** : indicatif (`JA1ABC`), préfixe DXCC (`ZS`, `VK`, `EA8`…) ou nom de pays (`Brésil`, `Australie`) — résolution automatique
@@ -32,6 +23,15 @@ Cinquième panneau de la page AI Insight — prédictions point-à-point via le 
 - **Raccourcis DX** : 5 directions de référence depuis JN23 (USA, Japon, Australie, Brésil, Afrique du Sud) en un clic
 - **Cache 24h** : calcul coûteux sur Pi → résultat stocké dans `data/voacap_cache.sqlite`
 - **Fallback gracieux** : si `voacap_predict.py` n'est pas installé, le panneau reste visible avec un message clair
+
+### Analyse IA / AI Insight (v12.5) ✨
+Route **`/ai_insight`** — tableau de bord d'analyse comportementale, entièrement bilingue FR/EN :
+- **Activité récente** : sparkline heure par heure (24h), pic et heure courante mis en évidence
+- **Prochaines heures** : fréquence d'activité observée par le passé sur les créneaux à venir — explications bilingues, créneaux à faible échantillon signalés en orange
+- **Quand ça ouvre** : heatmap jour de semaine × heure UTC
+- **Tendances par bande** : comparaison période récente vs précédente
+- **Prédictions HF VOACAP (v12.6)** : grille bandes × heures vers une cible quelconque, voir ci-dessous
+- Rafraîchissement AJAX toutes les 5 min, barre de maturité chaque minute
 
 **Setup VOACAP (une seule fois) :**
 ```bash
