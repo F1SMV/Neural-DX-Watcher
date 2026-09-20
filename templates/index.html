@@ -745,6 +745,19 @@
             color: var(--accent);
             font-weight: bold;
         }
+        .expedition-badge {
+            display: inline-block;
+            margin-left: 6px;
+            font-size: .65em;
+            color: #ff8c00;
+            background: rgba(255,140,0,.13);
+            border: 1px solid rgba(255,140,0,.35);
+            border-radius: 3px;
+            padding: 0 4px;
+            vertical-align: middle;
+            letter-spacing: .03em;
+            font-weight: 700;
+        }
         .ranking-score {
             color: var(--alert);
         }
@@ -6149,8 +6162,9 @@
             try {
                 const wantedResponse = await fetch('/wanted.json');
                 const wantedData = await wantedResponse.json();
-                displayRanking('ranking-hf', wantedData.hf);
-                displayRanking('ranking-vhf', wantedData.vhf);
+                const expeditionCalls = wantedData.expedition_calls || {};
+                displayRanking('ranking-hf', wantedData.hf, expeditionCalls);
+                displayRanking('ranking-vhf', wantedData.vhf, expeditionCalls);
             } catch(e) { console.error("Failed to fetch ranking:", e); }
 
             try {
@@ -7750,9 +7764,10 @@
             }
         }
 
-        function displayRanking(ulId, ranks) {
+        function displayRanking(ulId, ranks, expeditionCalls) {
             const ul = document.getElementById(ulId);
             ul.innerHTML = '';
+            expeditionCalls = expeditionCalls || {};
 
             if (ranks.length === 0) {
                 ul.innerHTML = '<li>No ranking data.</li>';
@@ -7762,8 +7777,12 @@
             ranks.forEach(spot => {
                 const li = document.createElement('li');
                 li.className = 'ranking-item';
+                const expe = expeditionCalls[spot.dx_call];
+                const badge = expe
+                    ? `<span class="expedition-badge" title="Expédition DX : ${expe}">🏴 EXPÉ</span>`
+                    : '';
                 li.innerHTML = `
-                    <span class="ranking-call">${spot.dx_call} (${spot.band})</span>
+                    <span class="ranking-call">${spot.dx_call} (${spot.band})${badge}</span>
                     <span class="ranking-score">${spot.score} SPD</span>
                 `;
                 ul.appendChild(li);

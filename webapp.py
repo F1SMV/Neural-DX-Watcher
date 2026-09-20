@@ -27,7 +27,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
-from collections import deque, Counter, defaultdict
+from collections import deque, Counter
 from flask import Flask, render_template, jsonify, request, abort, redirect, url_for, Response
 from pathlib import Path
 import subprocess
@@ -135,7 +135,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '12.6'
+APP_VERSION = '12.7'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
