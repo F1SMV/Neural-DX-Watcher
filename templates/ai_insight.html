@@ -249,6 +249,35 @@
         background:linear-gradient(90deg,rgb(0,60,75),rgb(0,160,180),
             rgb(255,200,0),rgb(255,90,40));}
 
+    /* ── v13 Adaptive Insight : fiabilité mesurée ──────────────────── */
+    .cal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+        gap:12px;margin-bottom:12px;}
+    .cal-card{background:#000;border:1px solid var(--line);border-radius:4px;
+        padding:10px 12px;}
+    .cal-card-head{display:flex;justify-content:space-between;align-items:baseline;
+        margin-bottom:8px;}
+    .cal-model{font-family:'IBM Plex Mono',monospace;font-weight:700;
+        font-size:.9rem;color:var(--text-main);}
+    .cal-rel{font-family:'IBM Plex Mono',monospace;font-size:1.1rem;font-weight:700;
+        color:var(--accent);font-variant-numeric:tabular-nums;}
+    .cal-rel-lbl{display:block;font-size:.52rem;color:var(--dim);font-weight:400;
+        text-align:right;letter-spacing:.03em;}
+    .cal-chart{display:flex;align-items:flex-end;gap:3px;height:60px;
+        padding:4px 0;border-bottom:1px solid var(--line);}
+    .cal-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;
+        justify-content:flex-end;height:100%;}
+    .cal-bar{width:100%;border-radius:2px 2px 0 0;min-height:2px;}
+    .cal-bar-x{font-size:.5rem;color:var(--dim);margin-top:2px;
+        font-family:'IBM Plex Mono',monospace;}
+    .cal-empty{font-size:.6rem;color:var(--dim);font-style:italic;margin:auto;}
+    .cal-metrics{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:.62rem;
+        color:var(--text-main);font-family:'IBM Plex Mono',monospace;
+        font-variant-numeric:tabular-nums;}
+    .cal-n{color:var(--dim);margin-left:auto;}
+    .cal-verdict{font-size:.6rem;margin-top:5px;font-style:italic;}
+    .cal-note{font-size:.62rem;color:var(--dim);font-style:italic;line-height:1.4;
+        padding-top:8px;border-top:1px solid var(--line);}
+
     .footnote{font-size:.68rem;color:var(--dim);margin-top:12px;padding-top:8px;
         border-top:1px solid var(--line);line-height:1.45;}
     .btn-hunt{display:block;text-align:center;text-decoration:none;
@@ -297,6 +326,7 @@
     <div class="panel grid-full" data-panel="heatmap"  id="pi-heatmap"></div>
     <div class="panel grid-full" data-panel="patterns" id="pi-patterns"></div>
     <div class="panel grid-full" data-panel="voacap"   id="pi-voacap"></div>
+    <div class="panel grid-full" data-panel="adaptive" id="pi-adaptive"></div>
 </div>
 
 <script>
@@ -1036,6 +1066,121 @@ function initPanelSorting() {
     });
 }
 
+// ── v13.0 Adaptive Insight : fiabilité mesurée du prédicteur ────────────
+let adaptiveData = null;
+
+const MODEL_LABELS = { es: '6m Es', hf: 'HF', tropo: 'Tropo VHF' };
+
+const adaptiveRenderer = () => {
+    const head = `<div class="panel-header">${ddHandle()}📡 Précision des prévisions
+        <span class="tag">v13 · adaptatif</span></div>
+        <div class="panel-sub">${bisub(
+            "Comme la météo vérifie ses prévisions a posteriori, ce panneau compare automatiquement ce que le moteur avait annoncé avec ce qui s'est réellement passé sur les bandes. Le pourcentage indique la part des prévisions qui se sont confirmées par un spot réel. Un taux faible en HF est normal : la propagation HF est par nature imprévisible — même 5 à 10% de confirmations est un signal exploitable.",
+            "Like a weather service verifying its forecasts, this panel automatically compares what the engine predicted with what actually happened on the bands. The percentage shows how many forecasts were confirmed by a real spot. A low HF rate is normal: HF propagation is inherently unpredictable — even 5-10% confirmation is a usable signal."
+        )}</div>`;
+
+    const d = adaptiveData;
+    if (!d) {
+        return head + `<div class="no-data"><b>Chargement…</b></div>`;
+    }
+
+    // v12.7 : bandeau "dernière vérification / prochain recalcul"
+    let tsBanner = '';
+    if (d.last_verified_ts && d.server_ts) {
+        const agoMin = Math.round((d.server_ts - d.last_verified_ts) / 60);
+        const nextMin = Math.max(0, 30 - (agoMin % 30));
+        let agoTxt = agoMin < 60 ? `il y a ${agoMin} min`
+                   : agoMin < 1440 ? `il y a ${Math.round(agoMin/60)}h${(agoMin%60).toString().padStart(2,'0')}`
+                   : `il y a ${Math.round(agoMin/1440)}j`;
+        let nextTxt = nextMin <= 1 ? "imminent" : `dans ~${nextMin} min`;
+        tsBanner = `<div style="text-align:center;font-size:14px;color:var(--dim);margin:-4px 0 10px 0;letter-spacing:.3px">
+            🔄 Dernière vérification : <span style="color:var(--cyan)">${agoTxt}</span>
+            — prochain recalcul : <span style="color:var(--cyan)">${nextTxt}</span>
+        </div>`;
+    }
+    if (!d.ok) {
+        return head + `<div class="no-data">
+            <b>Pas encore assez de données — le moteur a besoin de quelques jours d'observation.</b>
+            <div class="sub-en">🇬🇧 Not enough data yet — the engine needs a few days of observation.</div>
+        </div>`;
+    }
+
+    // Une carte par modèle ayant au moins quelques prédictions vérifiées
+    const models = ['es', 'hf', 'tropo'].filter(m => d.models[m] && d.models[m].n > 0);
+    if (!models.length) {
+        return head + `<div class="no-data">
+            <b>Le moteur collecte ses premières observations — résultats sous quelques jours.</b>
+            <div class="sub-en">🇬🇧 The engine is gathering initial data — results in a few days.</div>
+        </div>`;
+    }
+
+    const cards = models.map(m => {
+        const mod = d.models[m];
+        const brier = mod.brier || {};
+        const rel = mod.reliability_pct;
+        const ece = mod.ece;
+
+        // Verdict lisible selon la qualité de calibration
+        let eceColor = 'var(--dim)', eceVerdict = '';
+        if (ece !== null && ece !== undefined) {
+            if (ece < 0.10)      { eceColor = '#22c55e'; eceVerdict = "✅ Prévisions bien calibrées — le moteur est réaliste dans ses annonces"; }
+            else if (ece < 0.20) { eceColor = 'var(--warn)'; eceVerdict = "⚠️ Calibration en cours — le moteur affine ses prévisions au fil des jours"; }
+            else                 { eceColor = '#ff5a56'; eceVerdict = "🔧 Le moteur surestime encore les ouvertures — il se recalibre automatiquement"; }
+        }
+
+        // Mini-courbe de calibration : barres score-prédit vs réel
+        const curve = (mod.curve || []).filter(b => !b.low_sample);
+        const bars = curve.map(b => {
+            const h = Math.round(b.observed * 100);
+            const predPct = Math.round(b.predicted_mid * 100);
+            const col = heatColor(b.observed);
+            const tip = `Prévu ~${predPct}% → confirmé ${h}% (${b.n} prévisions)`;
+            return `<div class="cal-bar-wrap" title="${esc(tip)}">
+                <div class="cal-bar" style="height:${Math.max(2,h)}%;background:${col}"></div>
+                <div class="cal-bar-x">${predPct}</div>
+            </div>`;
+        }).join('');
+
+        const brierTxt = brier.brier !== null && brier.brier !== undefined
+            ? `Brier ${brier.brier.toFixed(3)}` : '';
+        const eceTxt = (ece !== null && ece !== undefined) ? `ECE ${(ece*100).toFixed(0)}%` : '';
+
+        return `<div class="cal-card">
+            <div class="cal-card-head">
+                <span class="cal-model">${esc(MODEL_LABELS[m] || m)}</span>
+                <span class="cal-rel" title="Part des prévisions confirmées par un spot réel">${rel !== null ? rel + '%' : '—'}
+                    <span class="cal-rel-lbl">confirmées</span></span>
+            </div>
+            <div class="cal-chart">${bars || '<div class="cal-empty">en attente de données</div>'}</div>
+            <div class="cal-metrics">
+                ${brierTxt ? `<span title="Score de Brier (0 = parfait, 1 = nul) — plus c'est bas, mieux c'est">${esc(brierTxt)}</span>` : ''}
+                ${eceTxt ? `<span style="color:${eceColor}" title="Erreur de calibration : écart entre ce qui est annoncé et ce qui se produit">${esc(eceTxt)}</span>` : ''}
+                <span class="cal-n">${mod.n} prévisions vérifiées</span>
+            </div>
+            ${eceVerdict ? `<div class="cal-verdict" style="color:${eceColor}">${eceVerdict}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    // Note de lecture du graphique
+    const note = `<div class="cal-note">${bisub(
+        "💡 Comment lire le graphique : chaque barre représente un niveau de confiance annoncé par le moteur. Sa hauteur montre le taux réel de confirmation. Quand les barres sont hautes à droite et basses à gauche, le moteur est bien calibré. Ce système est unique : il s'adapte en continu à votre station, votre antenne et votre propagation locale.",
+        "💡 How to read: each bar is a confidence level the engine announced. Its height shows the actual confirmation rate. When bars are high on the right and low on the left, the engine is well calibrated. This system is unique: it continuously adapts to your station, antenna and local propagation."
+    )}</div>`;
+
+    return head + tsBanner + `<div class="cal-grid">${cards}</div>` + note;
+};
+
+async function loadAdaptiveData() {
+    try {
+        const res = await fetch('/api/adaptive/calibration.json');
+        adaptiveData = await res.json();
+    } catch (err) {
+        adaptiveData = { ok: false, reason: String(err) };
+    }
+    const p = panels.find(x => x.key === 'adaptive');
+    if (p) p.render({});
+}
+
 // ── Boucle principale ──────────────────────────────────────────────────
 const panels = [
     new DXPanel('recent',   recentRenderer),
@@ -1043,6 +1188,7 @@ const panels = [
     new DXPanel('heatmap',  heatmapRenderer),
     new DXPanel('patterns', patternsRenderer),
     new DXPanel('voacap',   voacapRenderer),
+    new DXPanel('adaptive', adaptiveRenderer),
 ];
 
 let currentBand = '';
@@ -1101,7 +1247,23 @@ document.addEventListener('DOMContentLoaded', initPanelSorting);
 // Refresh des données toutes les 5 minutes
 updateDashboard();
 setInterval(() => updateDashboard({ useCache: false }), 300000);
+
+// v13.0 — calibration : lente à évoluer, refresh toutes les 30 min
+loadAdaptiveData();
+setInterval(loadAdaptiveData, 1800000);
 </script>
+
+<!-- §24 Auto-Test Widget -->
+<div id="autotest-container" class="panel grid-full">
+    <div class="panel-header">
+        <span>🔄 Auto-Test (Feedback Loop)</span>
+        <span class="tag">v24</span>
+    </div>
+    <div class="no-data">Chargement...</div>
+</div>
+
+<link rel="stylesheet" href="/static/widgets/ai_insight_autotest_widget.css">
+<script src="/static/widgets/ai_insight_autotest_widget.js"></script>
 
 </body>
 </html>
