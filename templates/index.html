@@ -4233,6 +4233,7 @@
       <option value="JT65">JT65</option>
       <option value="PSK31">PSK31</option>
       <option value="RTTY">RTTY</option>
+      <option value="JTTY">JTTY</option>
     </select>
     <!-- Curseur zoom : double-clic sur zone -->
     <label style="font-size:0.82em;opacity:0.8;margin-left:10px;" title="Zoom : réduit la plage de fréquences visible. Double-clic sur le waterfall pour centrer.">Zoom :</label>
@@ -4890,6 +4891,7 @@
 <option value="FT8">FT8</option>
 <option value="JT65">JT65</option>
 <option value="RTTY">RTTY</option>
+<option value="JTTY">JTTY</option>
 <option value="SSTV">SSTV</option>
 <option value="PSK31">PSK31</option>
 <option value="PACTOR">PACTOR</option>
@@ -4933,6 +4935,7 @@
 <option value="All">All Modes</option>
 <option value="FT8">FT8</option>
 <option value="MSK144">MSK144</option>
+<option value="JTTY">JTTY</option>
 <option value="CW">CW</option>
 <option value="SSB">SSB</option>
 <option value="FM">FM</option>
@@ -6347,6 +6350,7 @@
         function modeColor(mode) {
             const m = String(mode || '').toUpperCase();
             if (m.includes('CW')) return '#fbbf24';
+            if (m.includes('JTTY')) return '#ff9e2c';
             if (m.includes('FT8') || m.includes('FT4') || m.includes('DIGI')) return '#a78bfa';
             if (m.includes('SSB') || m.includes('USB') || m.includes('LSB')) return '#22d3ee';
             if (m.includes('FM')) return '#4ade80';
@@ -8201,6 +8205,7 @@
             'FT4':   { bg: 'rgba(80,0,60,0.92)',   border: '#ff00cc', text: '#ff88ee' },
             'FT2':   { bg: 'rgba(60,0,80,0.92)',   border: '#bb00ff', text: '#dd88ff' },
             'RTTY':  { bg: 'rgba(80,40,0,0.92)',   border: '#ff8800', text: '#ffaa44' },
+            'JTTY':  { bg: 'rgba(90,45,0,0.92)',   border: '#ff9e2c', text: '#ffc266' },
             'PSK31': { bg: 'rgba(60,60,0,0.92)',   border: '#dddd00', text: '#ffff44' },
             'JT65':  { bg: 'rgba(0,60,60,0.92)',   border: '#00cccc', text: '#44eeff' },
             'AM':    { bg: 'rgba(60,20,0,0.92)',   border: '#ff6600', text: '#ff9944' },
