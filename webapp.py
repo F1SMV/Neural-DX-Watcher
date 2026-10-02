@@ -2196,6 +2196,7 @@ def _autotest_generate_hourly(hour_utc):
         logger.debug(f"[AUTOTEST] purge/dédup échouée: {_qe}")
 
     n = 0
+    errors = []
     for _b in AutoTest.BANDS:
         if _b in existing:
             continue
@@ -2203,9 +2204,15 @@ def _autotest_generate_hourly(hour_utc):
             _auto_test.predict_for_hour(_b, "FT8", hour_utc)
             n += 1
         except Exception as _pe:
-            logger.debug(f"[AUTOTEST] predict {_b}: {_pe}")
+            errors.append(f"{_b}: {_pe}")
     if n:
         logger.info(f"[AUTOTEST] {n} prédiction(s) générée(s) pour {hour_utc:02d}h UTC")
+    if errors:
+        # v13.0 fix (2026-10-02) : était en logger.debug() → invisible car le
+        # logger est configuré en INFO. Un échec systématique de predict_for_hour()
+        # (table manquante, schéma incompatible...) passait inaperçu indéfiniment,
+        # widget vide sans aucune trace exploitable dans les logs.
+        logger.warning(f"[AUTOTEST] {len(errors)} échec(s) pour {hour_utc:02d}h UTC : {errors[:3]}")
     return n
 
 # Génération initiale au boot (données immédiates, pas d'attente du 1er slot 30 min)
@@ -6084,10 +6091,16 @@ def api_adaptive_drift_stats():
 def api_adaptive_autotest_latest():
     """Récupérer les prédictions auto-test récentes."""
     if not _auto_test:
-        return jsonify({"ok": False}), 200
+        return jsonify({"ok": False, "error": "AutoTest non initialisé (voir logs au boot)"}), 200
     band = request.args.get("band")
     limit = int(request.args.get("limit", 50))
-    preds = _auto_test.get_recent_predictions(limit=limit, band=band)
+    try:
+        preds = _auto_test.get_recent_predictions(limit=limit, band=band)
+    except Exception as e:
+        # v13.0 fix (2026-10-02) : évite une 500 muette — on veut voir la
+        # vraie cause (ex. table/colonne manquante) dans les logs.
+        logger.warning(f"[AUTOTEST] get_recent_predictions a échoué: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 200
     return jsonify({"ok": True, "predictions": preds})
 
 
@@ -6095,8 +6108,12 @@ def api_adaptive_autotest_latest():
 def api_adaptive_autotest_stats():
     """Statistiques auto-test."""
     if not _auto_test:
-        return jsonify({"ok": False}), 200
-    stats = _auto_test.stats()
+        return jsonify({"ok": False, "error": "AutoTest non initialisé (voir logs au boot)"}), 200
+    try:
+        stats = _auto_test.stats()
+    except Exception as e:
+        logger.warning(f"[AUTOTEST] stats() a échoué: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 200
     return jsonify({"ok": True, **stats})
 
 
