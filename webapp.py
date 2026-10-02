@@ -1247,6 +1247,17 @@ def compute_noise_correlation():
     # ── Niveau global (jauge visuelle) ──────────────────────────────────
     # Score heuristique simple, jamais présenté comme une mesure scientifique :
     # sert uniquement à donner un repère visuel rapide (calme → orageux).
+    #
+    # FIX (2026-10-02) : le volet foudre était plafonné à +3, donc un orage
+    # actif au-dessus du QTH ne pouvait JAMAIS déclencher "stormy" (seuil 5)
+    # sans un delta SNR simultané d'au moins -3 dB — delta souvent
+    # indisponible (value_1h_ago = None faute d'historique WSPR/WSJT-X
+    # suffisant). Résultat observé : "ORAGEUX" ne s'allumait quasiment
+    # jamais, même pendant un orage réel. La foudre est maintenant un
+    # signal autonome, capable à elle seule d'atteindre "stormy" si
+    # l'activité est franche (≥3 impacts < 50km) — le SNR reste un
+    # signal complémentaire qui peut faire monter le niveau mais n'est
+    # plus une condition bloquante.
     score = 0
     if value_now is not None and value_1h_ago is not None:
         delta = value_now - value_1h_ago
@@ -1256,9 +1267,22 @@ def compute_noise_correlation():
             score += 2
         elif delta <= -1.5:
             score += 1
-    if strikes_close:
-        score += min(len(strikes_close), 3)
-    elif recent_strikes:
+    else:
+        logger.debug(
+            "compute_noise_correlation: delta SNR indisponible "
+            f"(value_now={value_now}, value_1h_ago={value_1h_ago}, source={source}) "
+            "— composante SNR du score QRN ignorée ce cycle."
+        )
+
+    n_close = len(strikes_close)
+    n_recent = len(recent_strikes)
+    if n_close >= 3:
+        score += 5   # orage actif au-dessus du QTH : suffit seul à atteindre "stormy"
+    elif n_close >= 1:
+        score += 3   # impact(s) proche(s) : suffit seul à atteindre "disturbed"
+    elif n_recent >= 5:
+        score += 2   # activité orageuse large mais plus lointaine (50-300km)
+    elif n_recent >= 1:
         score += 1
 
     if score >= 5:
