@@ -668,31 +668,21 @@ def compute_patterns(db_path: str = DEFAULT_DB_PATH,
                      now: Optional[float] = None, preloaded=None,
                      memory_spots=None) -> dict:
     """
-    Tendance par bande : une fenêtre récente comparée à la précédente.
-
-    La largeur de fenêtre s'adapte à l'historique disponible (moitié de
-    l'étendue, plafonnée à 7 jours) afin que la comparaison soit possible
-    dès une douzaine d'heures de collecte, au lieu d'attendre deux
-    semaines pour afficher quoi que ce soit.
-
-    Une bande sous MIN_SPOTS_FOR_TREND est marquée `insufficient` : elle
-    reste affichée — savoir qu'une bande est calme est une information —
-    mais sans pourcentage trompeur.
+    v13.2 — Tendance par bande : dernières 24 h comparées à la moyenne
+    journalière des jours précédents (jusqu'à 6). Pas de fenêtre vide
+    possible tant qu'il existe au moins 30 h d'historique.
     """
     if now is None:
         now = time.time()
 
     empty_shape = {
-        "bands": [], "window_days": window_days or 7, "window_hours": 0,
+        "bands": [], "window_days": 1, "window_hours": 24,
         "total_recent": 0, "total_previous": 0, "maturity": _maturity(0),
     }
 
     try:
-        # On sonde large : la fenêtre réelle est décidée après lecture de
-        # l'étendue effective de l'historique.
-        max_hours = (window_days * 48) if window_days else 14 * 24
         slots, span = preloaded if preloaded else _load_aggregated(
-            db_path, max_hours, now, memory_spots=memory_spots)
+            db_path, 8 * 24, now, memory_spots=memory_spots)
     except SchemaUnavailable as exc:
         return _empty(str(exc), **empty_shape)
 
@@ -701,62 +691,65 @@ def compute_patterns(db_path: str = DEFAULT_DB_PATH,
 
     if not slots:
         return _empty("aucun spot sur la période", **empty_shape)
-
-    # Comparer deux fenêtres suppose que l'historique les couvre toutes
-    # les deux. En deçà, la fenêtre « précédente » serait vide et chaque
-    # bande apparaîtrait en forte hausse — un artefact, pas une tendance.
-    if not window_days and span["span_hours"] < 12:
-        return _empty("historique trop court pour comparer deux périodes",
+    if span["span_hours"] < 30:
+        return _empty("historique trop court (moins de 30 h) pour comparer",
                       **empty_shape)
 
-    if window_days:
-        window_hours = window_days * 24
-    else:
-        # Deux fenêtres comparables doivent tenir dans l'historique : on
-        # prend donc la moitié de l'étendue, bornée à [6h, 7j].
-        window_hours = int(max(6, min(7 * 24, span["span_hours"] / 2)))
-
     current_slot = int(now // 3600)
-    split_slot = current_slot - window_hours
-    first_slot = current_slot - 2 * window_hours
+    recent = {}
+    prev_days = [dict() for _ in range(6)]   # prev_days[0] = il y a 1 à 2 j, etc.
 
-    recent, previous = {}, {}
     for slot, per_band in slots.items():
-        if slot <= first_slot or slot > current_slot:
+        offset = current_slot - slot
+        if offset < 0:
             continue
-        bucket = recent if slot > split_slot else previous
+        if offset < 24:
+            bucket = recent
+        elif offset < 24 * 7:
+            bucket = prev_days[offset // 24 - 1]
+        else:
+            continue
         for b, n in per_band.items():
             bucket[b] = bucket.get(b, 0) + n
 
-    window_days_eff = window_hours / 24.0
+    # Nombre de jours de référence réellement couverts par l'historique
+    covered = max(1, min(6, int(span["span_hours"] // 24) - 1))
+
     bands = []
-    for b in set(recent) | set(previous):
-        r, p = recent.get(b, 0), previous.get(b, 0)
+    all_bands = set(recent)
+    for d in prev_days[:covered]:
+        all_bands |= set(d)
+
+    for b in all_bands:
+        r = recent.get(b, 0)
+        avg = sum(d.get(b, 0) for d in prev_days[:covered]) / covered
 
         if r < MIN_SPOTS_FOR_TREND:
             trend, change_pct = "insufficient", None
-        elif p == 0:
-            # Activité nouvelle : réelle, mais non chiffrable en pourcentage.
+        elif avg == 0:
             trend, change_pct = "up", None
         else:
-            change_pct = round((r - p) / p * 100, 1)
+            change_pct = round((r - avg) / avg * 100, 1)
             trend = ("up" if change_pct > TREND_THRESHOLD_PCT else
                      "down" if change_pct < -TREND_THRESHOLD_PCT else "stable")
 
         bands.append({
-            "band": b, "recent_count": r, "previous_count": p,
-            "change_pct": change_pct, "trend": trend,
-            "daily_avg": round(r / window_days_eff, 1) if window_days_eff else 0.0,
+            "band": b,
+            "recent_count": r,
+            "previous_count": round(avg, 1),   # moyenne journalière de référence
+            "change_pct": change_pct,
+            "trend": trend,
+            "daily_avg": round(avg, 1),
         })
 
     bands.sort(key=lambda x: -x["recent_count"])
 
     return {
         "available": True, "bands": bands,
-        "window_days": round(window_days_eff, 1),
-        "window_hours": window_hours,
+        "window_days": 1, "window_hours": 24,
+        "baseline_days": covered,
         "total_recent": sum(recent.values()),
-        "total_previous": sum(previous.values()),
+        "total_previous": round(sum(sum(d.values()) for d in prev_days[:covered]) / covered, 1),
         "maturity": maturity,
     }
 

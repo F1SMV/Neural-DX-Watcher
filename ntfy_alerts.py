@@ -1,277 +1,304 @@
+#!/usr/bin/env python3
 """
-ntfy_alerts.py — Alertes push intelligentes NEURAL DX WATCHER v10.0
-====================================================================
-Intégration ntfy.sh (self-hosted ou cloud) pour trois types d'alertes :
-  1. Watchlist spotté
-  2. NEW DXCC sur bande manquante
-  3. Ouverture 6m détectée (surge > threshold)
+Radio Spot Watcher DX — ntfy.sh Alert Engine v1.0
+Envoie des alertes ntfy.sh pour :
+  - New DXCC spotted (jamais travaillé auparavant)
+  - Watchlist call détecté
+  - Ouverture 6m (>5 spots/10min)
 
-Anti-spam : cooldown SQLite par call/type.
-Filtre présence : pause si l'opérateur est sur la page (heartbeat < 45s).
-
-Configuration (variables d'env ou webapp.py) :
-  NTFY_URL      = "https://ntfy.sh/neural-dx-f1smv-XXXXXX"
-  NTFY_TOKEN    = ""        # optionnel si topic privé authentifié
-  NTFY_ENABLED  = True
-  NTFY_COOLDOWN = 900       # 15 min entre deux alertes identiques
-  NTFY_PRESENCE_WINDOW = 45 # secondes — si l'op est là, on se tait
+Usage:
+  python3 ntfy_alerts.py --config /path/to/config.json
+  
+Config example (data/config.json):
+  "ntfy_alerts": {
+    "enabled": true,
+    "ntfy_url": "http://ntfy.sh",  # self-hosted: http://192.168.1.79:9000
+    "topic": "radio-dx-f1smv",
+    "watchlist": ["EA", "JA", "VK", "JT1", "ZL"],
+    "suppress_if_active": true  # pas d'alerte si on regarde déjà la page
+  }
 """
 
-import os
-import time
 import json
 import sqlite3
+import requests
 import logging
-import threading
+from datetime import datetime, timedelta
 from pathlib import Path
-
-try:
-    import requests as _requests
-    _REQUESTS_OK = True
-except ImportError:
-    _REQUESTS_OK = False
+from typing import List, Dict, Set
 
 logger = logging.getLogger("ntfy_alerts")
+logger.setLevel(logging.DEBUG)
 
-NTFY_URL              = os.getenv("NTFY_URL", "")
-NTFY_TOKEN            = os.getenv("NTFY_TOKEN", "")
-NTFY_ENABLED          = os.getenv("NTFY_ENABLED", "1") == "1" and bool(NTFY_URL)
-NTFY_COOLDOWN         = int(os.getenv("NTFY_COOLDOWN", "900"))
-NTFY_PRESENCE_WINDOW  = int(os.getenv("NTFY_PRESENCE_WINDOW", "45"))
-
-# Seuil de spots 6m sur 10 min pour déclencher l'alerte ouverture
-NTFY_6M_SURGE_THRESHOLD = int(os.getenv("NTFY_6M_SURGE_THRESHOLD", "5"))
-
-_ALERT_SCHEMA = """
-PRAGMA journal_mode=WAL;
-CREATE TABLE IF NOT EXISTS alerts_sent (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    key     TEXT NOT NULL UNIQUE,   -- "type:call" ou "type:dxcc:band"
-    ts      REAL NOT NULL,
-    count   INTEGER DEFAULT 1
-);
-CREATE INDEX IF NOT EXISTS idx_alerts_key ON alerts_sent(key);
-"""
-
-
-class NtfyAlerter:
-    """Gestionnaire d'alertes push ntfy.sh."""
-
-    def __init__(self, db_path: str = "data/ntfy_alerts.sqlite"):
-        self._db_path  = Path(db_path)
-        self._lock     = threading.Lock()
-        self._presence_ts: float = 0   # dernière vue opérateur
-        self._6m_surge_alerted: float = 0
-
-        self._init_db()
-
-        if not NTFY_ENABLED:
-            logger.info("NtfyAlerter: NTFY_URL non configuré — alertes désactivées")
-        else:
-            logger.info(f"NtfyAlerter: actif → {NTFY_URL}")
-
-    # ──────────────────────────────────────────────────────────────
-    # DB
-    # ──────────────────────────────────────────────────────────────
-    def _init_db(self):
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        # Connexion PERSISTANTE unique, réutilisée pour tous les appels.
-        # CORRECTIF : l'ancienne implémentation ouvrait une nouvelle
-        # connexion SQLite physique à chaque alerte (_can_alert,
-        # _mark_alerted, get_status...). Sur un cluster actif avec
-        # plusieurs spots/seconde, ça épuise les descripteurs de fichiers
-        # et crée une contention WAL — cause de "unable to open database
-        # file" observée en production sur Pi (carte SD).
-        self._db = sqlite3.connect(
-            str(self._db_path), check_same_thread=False, timeout=30
-        )
-        self._db.row_factory = sqlite3.Row
-        self._db.execute("PRAGMA journal_mode=WAL")
-        self._db.execute("PRAGMA synchronous=NORMAL")
-        self._db.executescript(_ALERT_SCHEMA)
-        self._db.commit()
-
-    def _conn(self) -> sqlite3.Connection:
-        """Retourne la connexion persistante partagée (voir _init_db)."""
-        return self._db
-
-    def close(self):
-        """Fermeture propre à l'arrêt de l'application (optionnel)."""
-        try:
-            self._db.close()
-        except Exception:
-            pass
-
-    # ──────────────────────────────────────────────────────────────
-    # Présence opérateur
-    # ──────────────────────────────────────────────────────────────
-    def record_presence(self):
-        """Appelé depuis POST /api/presence — l'opérateur est en train de regarder."""
-        with self._lock:
-            self._presence_ts = time.time()
-
-    def _operator_present(self) -> bool:
-        with self._lock:
-            return (time.time() - self._presence_ts) < NTFY_PRESENCE_WINDOW
-
-    # ──────────────────────────────────────────────────────────────
-    # Anti-spam
-    # ──────────────────────────────────────────────────────────────
+class NtfyAlertEngine:
+    """Moteur d'alertes ntfy.sh pour Radio Spot Watcher DX"""
+    
+    def __init__(self, db_path: str, config: dict):
+        self.db_path = db_path
+        self.config = config.get("ntfy_alerts", {})
+        self.ntfy_url = self.config.get("ntfy_url", "http://ntfy.sh")
+        self.topic = self.config.get("topic", "radio-dx-alerts")
+        self.watchlist: Set[str] = set(self.config.get("watchlist", []))
+        self.enabled = self.config.get("enabled", False)
+        
+        # Tracking des alertes envoyées (éviter flood)
+        self.sent_alerts: Dict[str, datetime] = {}
+        self.alert_cooldown_sec = 300  # 5 min min entre alertes identiques
+        
     def _can_alert(self, key: str) -> bool:
-        """True si on peut envoyer cette alerte (cooldown expiré ou jamais envoyée)."""
-        now = time.time()
-        try:
-            with self._conn() as conn:
-                row = conn.execute(
-                    "SELECT ts FROM alerts_sent WHERE key=?", (key,)
-                ).fetchone()
-                if row is None:
-                    return True
-                return (now - row["ts"]) > NTFY_COOLDOWN
-        except Exception:
+        """Vérifier si assez de temps s'est écoulé depuis la dernière alerte (key)"""
+        if key not in self.sent_alerts:
             return True
-
-    def _mark_alerted(self, key: str):
-        now = time.time()
-        try:
-            with self._conn() as conn:
-                conn.execute(
-                    "INSERT INTO alerts_sent(key, ts, count) VALUES(?,?,1) "
-                    "ON CONFLICT(key) DO UPDATE SET ts=excluded.ts, count=count+1",
-                    (key, now)
-                )
-        except Exception as e:
-            logger.warning(f"NtfyAlerter._mark_alerted: {e}")
-
-    # ──────────────────────────────────────────────────────────────
-    # Envoi HTTP
-    # ──────────────────────────────────────────────────────────────
-    def _send(self, title: str, message: str,
-              priority: str = "default", tags: list[str] | None = None):
-        if not NTFY_ENABLED:
-            return
-        if not _REQUESTS_OK:
-            logger.warning("ntfy: requests non disponible — pip install requests")
-            return
+        elapsed = (datetime.utcnow() - self.sent_alerts[key]).total_seconds()
+        return elapsed > self.alert_cooldown_sec
+    
+    def _send_ntfy(self, title: str, message: str, priority: str = "default", tags: str = "") -> bool:
+        """
+        POST à ntfy.sh avec headers priorités
+        
+        Priorités: low, default, high, urgent
+        """
+        if not self.enabled:
+            logger.debug(f"Alerts disabled. Skip: {title}")
+            return False
+            
         try:
             headers = {
-                "Title":    title,
+                "Title": title,
+                "Message": message,
                 "Priority": priority,
-                "Tags":     ",".join(tags or ["radio"]),
-                "Content-Type": "text/plain; charset=utf-8",
+                "Tags": tags,  # comma-separated, ex: "radio,dxcc,newdxcc"
             }
-            if NTFY_TOKEN:
-                headers["Authorization"] = f"Bearer {NTFY_TOKEN}"
-            resp = _requests.post(
-                NTFY_URL,
-                data=message.encode("utf-8"),
-                headers=headers,
-                timeout=8,
-            )
-            if resp.status_code >= 300:
-                logger.warning(f"ntfy HTTP {resp.status_code}: {resp.text[:120]}")
+            url = f"{self.ntfy_url}/{self.topic}"
+            resp = requests.post(url, headers=headers, timeout=3)
+            
+            if resp.status_code == 200:
+                logger.info(f"✓ ntfy sent: {title}")
+                return True
             else:
-                logger.info(f"ntfy ✓ {title!r}")
+                logger.warning(f"✗ ntfy failed ({resp.status_code}): {title}")
+                return False
         except Exception as e:
-            logger.warning(f"ntfy send error: {e}")
-
-    # ──────────────────────────────────────────────────────────────
-    # Trigger 1 : Watchlist spotté
-    # ──────────────────────────────────────────────────────────────
-    def on_watchlist_spot(self, spot: dict):
-        """Appelé quand un call de la watchlist est spotté."""
-        if self._operator_present():
-            return
-        call = spot.get("dx_call", "")
-        key  = f"wl:{call}"
-        if not self._can_alert(key):
-            return
-        band = spot.get("band", "")
-        freq = spot.get("freq", "")
-        mode = spot.get("mode", "")
-        cty  = spot.get("country", "")
-        self._send(
-            title    = f"📡 {call} spoté — {cty}",
-            message  = f"{freq} MHz · {band} · {mode}",
-            priority = "high",
-            tags     = ["radio", "bell"],
-        )
-        self._mark_alerted(key)
-
-    # ──────────────────────────────────────────────────────────────
-    # Trigger 2 : NEW DXCC sur bande manquante
-    # ──────────────────────────────────────────────────────────────
-    def on_new_dxcc(self, spot: dict, missing_bands: list[str]):
+            logger.error(f"ntfy POST error: {e}")
+            return False
+    
+    def check_new_dxcc(self, conn: sqlite3.Connection) -> List[Dict]:
         """
-        Appelé si le DXCC du spot n'est pas confirmé LoTW sur une des bandes active.
-        missing_bands = bandes sur lesquelles ce DXCC manque encore.
+        Détecter NEW DXCC : spot sur entité jamais travaillée (pas en LoTW)
+        
+        Retourne: liste {call, entity, band, freq_mhz, snr_db}
         """
-        if self._operator_present():
-            return
-        call = spot.get("dx_call", "")
-        cty  = spot.get("country", "")
-        band = spot.get("band", "")
-        if band not in missing_bands:
-            return
-        key = f"new_dxcc:{cty}:{band}"
-        if not self._can_alert(key):
-            return
-        freq = spot.get("freq", "")
-        mode = spot.get("mode", "")
-        self._send(
-            title    = f"🌍 NEW DXCC — {cty} sur {band}",
-            message  = f"{call} · {freq} MHz · {mode} — DXCC manquant sur {band} !",
-            priority = "urgent",
-            tags     = ["trophy", "tada"],
-        )
-        self._mark_alerted(key)
-
-    # ──────────────────────────────────────────────────────────────
-    # Trigger 3 : Ouverture 6m
-    # ──────────────────────────────────────────────────────────────
-    def on_6m_surge(self, spots_last_10min: int, top_paths: list[str]):
-        """
-        Appelé par analyze_surges() quand une ouverture 6m est détectée.
-        spots_last_10min : nombre de spots 6m dans les 10 dernières minutes.
-        top_paths : ["JA1AA", "EA5BV", …] — premiers callsigns spotés.
-        """
-        if self._operator_present():
-            return
-        if spots_last_10min < NTFY_6M_SURGE_THRESHOLD:
-            return
-        now = time.time()
-        if (now - self._6m_surge_alerted) < NTFY_COOLDOWN:
-            return
-
-        paths_str = " · ".join(top_paths[:4]) if top_paths else "—"
-        self._send(
-            title    = f"⚡ 6m OPEN — {spots_last_10min} spots/10min",
-            message  = f"Ouverture détectée → {paths_str}",
-            priority = "urgent",
-            tags     = ["6m", "lightning", "radio"],
-        )
-        with self._lock:
-            self._6m_surge_alerted = now
-
-    # ──────────────────────────────────────────────────────────────
-    # Statut (pour /api/ntfy/status)
-    # ──────────────────────────────────────────────────────────────
-    def get_status(self) -> dict:
+        alerts = []
+        
         try:
-            with self._conn() as conn:
-                rows = conn.execute(
-                    "SELECT key, ts, count FROM alerts_sent "
-                    "ORDER BY ts DESC LIMIT 20"
-                ).fetchall()
-            recent = [{"key": r["key"], "ts": r["ts"], "count": r["count"]} for r in rows]
-        except Exception:
-            recent = []
-        return {
-            "enabled":         NTFY_ENABLED,
-            "url":             NTFY_URL if NTFY_ENABLED else "",
-            "cooldown_s":      NTFY_COOLDOWN,
-            "presence_window": NTFY_PRESENCE_WINDOW,
-            "operator_present": self._operator_present(),
-            "surge_threshold": NTFY_6M_SURGE_THRESHOLD,
-            "recent_alerts":   recent,
+            # Récupérer les NEW DXCC des 10 dernières minutes
+            cursor = conn.cursor()
+            ten_min_ago = datetime.utcnow() - timedelta(minutes=10)
+            
+            query = """
+            SELECT DISTINCT
+                s.call,
+                s.entity,
+                s.band,
+                s.freq_mhz,
+                s.snr_db,
+                s.timestamp
+            FROM spot_log s
+            LEFT JOIN lotw_log l ON s.call = l.call AND s.entity = l.entity
+            WHERE s.timestamp > ?
+                AND l.call IS NULL  -- pas en LoTW
+                AND s.entity IS NOT NULL
+            ORDER BY s.timestamp DESC
+            LIMIT 20
+            """
+            
+            rows = cursor.execute(query, (ten_min_ago.isoformat(),)).fetchall()
+            
+            for row in rows:
+                call, entity, band, freq_mhz, snr_db, ts = row
+                key = f"newdxcc_{entity}_{band}"
+                
+                if self._can_alert(key):
+                    title = f"🔥 NEW DXCC: {entity}"
+                    msg = f"{call} on {band} @ {freq_mhz:.2f} MHz (SNR {snr_db:+.0f})"
+                    
+                    self._send_ntfy(
+                        title, msg,
+                        priority="high",
+                        tags="newdxcc,alert"
+                    )
+                    
+                    self.sent_alerts[key] = datetime.utcnow()
+                    alerts.append({
+                        "call": call,
+                        "entity": entity,
+                        "band": band,
+                        "freq_mhz": freq_mhz,
+                        "snr_db": snr_db
+                    })
+        
+        except Exception as e:
+            logger.error(f"check_new_dxcc error: {e}")
+        
+        return alerts
+    
+    def check_watchlist(self, conn: sqlite3.Connection) -> List[Dict]:
+        """
+        Déclencher alerte si call de la watchlist apparaît
+        """
+        alerts = []
+        
+        if not self.watchlist:
+            return alerts
+        
+        try:
+            cursor = conn.cursor()
+            five_min_ago = datetime.utcnow() - timedelta(minutes=5)
+            
+            # Chercher les watchlist calls récents (5 dernières minutes)
+            placeholders = ','.join(['?' for _ in self.watchlist])
+            query = f"""
+            SELECT call, entity, band, freq_mhz, snr_db, timestamp
+            FROM spot_log
+            WHERE entity IN ({placeholders})
+                AND timestamp > ?
+            ORDER BY timestamp DESC
+            """
+            
+            params = list(self.watchlist) + [five_min_ago.isoformat()]
+            rows = cursor.execute(query, params).fetchall()
+            
+            for row in rows:
+                call, entity, band, freq_mhz, snr_db, ts = row
+                key = f"watchlist_{entity}_{band}"
+                
+                if self._can_alert(key):
+                    title = f"📡 Watchlist: {entity}"
+                    msg = f"{call} on {band} @ {freq_mhz:.2f} MHz"
+                    
+                    self._send_ntfy(
+                        title, msg,
+                        priority="default",
+                        tags="watchlist"
+                    )
+                    
+                    self.sent_alerts[key] = datetime.utcnow()
+                    alerts.append({
+                        "call": call,
+                        "entity": entity,
+                        "band": band
+                    })
+        
+        except Exception as e:
+            logger.error(f"check_watchlist error: {e}")
+        
+        return alerts
+    
+    def check_6m_opening(self, conn: sqlite3.Connection, threshold: int = 5) -> bool:
+        """
+        Déclencher alerte si Es ouverture 6m forte détectée
+        (> N spots en 10 minutes)
+        """
+        try:
+            cursor = conn.cursor()
+            ten_min_ago = datetime.utcnow() - timedelta(minutes=10)
+            
+            query = """
+            SELECT COUNT(*) as spot_count
+            FROM spot_log
+            WHERE band = '6m' AND timestamp > ?
+            """
+            
+            count = cursor.execute(query, (ten_min_ago.isoformat(),)).fetchone()[0]
+            
+            key = "es_opening_6m"
+            if count >= threshold and self._can_alert(key):
+                title = f"🌍 6m Es OPENING!"
+                msg = f"{count} spots detected in last 10 min — Activity surge"
+                
+                self._send_ntfy(
+                    title, msg,
+                    priority="urgent",
+                    tags="6m,es,opening"
+                )
+                
+                self.sent_alerts[key] = datetime.utcnow()
+                logger.info(f"6m opening alert sent ({count} spots)")
+                return True
+        
+        except Exception as e:
+            logger.error(f"check_6m_opening error: {e}")
+        
+        return False
+    
+    def run_all_checks(self, db_path_or_conn=None) -> Dict:
+        """
+        Exécuter tous les checks en une passe
+        
+        Args:
+            db_path_or_conn: chemin DB (str) ou connexion SQLite existante
+                            Si None, utilise self.db_path
+        """
+        result = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "new_dxcc": [],
+            "watchlist": [],
+            "es_6m": False,
+            "errors": []
         }
+        
+        conn = None
+        close_after = False
+        
+        try:
+            # Résoudre si c'est une connexion ou un chemin
+            if db_path_or_conn is None:
+                db_path = self.db_path
+                conn = sqlite3.connect(db_path)
+                close_after = True
+            elif isinstance(db_path_or_conn, str):
+                conn = sqlite3.connect(db_path_or_conn)
+                close_after = True
+            else:
+                # Assume it's a connection object
+                conn = db_path_or_conn
+                close_after = False
+            
+            conn.row_factory = sqlite3.Row
+            
+            result["new_dxcc"] = self.check_new_dxcc(conn)
+            result["watchlist"] = self.check_watchlist(conn)
+            result["es_6m"] = self.check_6m_opening(conn)
+        
+        except Exception as e:
+            result["errors"].append(str(e))
+            logger.error(f"run_all_checks fatal: {e}")
+        
+        finally:
+            if close_after and conn:
+                conn.close()
+        
+        return result
+
+
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="ntfy.sh Alert Engine for Radio Spot Watcher DX")
+    parser.add_argument("--config", default="data/config.json", help="Config file path")
+    parser.add_argument("--db", default="data/analytics.sqlite", help="Analytics DB path")
+    args = parser.parse_args()
+    
+    # Load config
+    try:
+        with open(args.config) as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        logger.error(f"Config not found: {args.config}")
+        exit(1)
+    
+    # Run
+    engine = NtfyAlertEngine(args.db, config)
+    result = engine.run_all_checks(args.db)  # Passe le chemin DB
+    
+    print(json.dumps(result, indent=2))

@@ -1,0 +1,103 @@
+/* v13.1 — Styling AutoTest Widget */
+
+.autotest-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.autotest-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0,200,0,0.2);
+  padding-bottom: 12px;
+}
+
+.autotest-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-left: 3px solid rgba(0,200,0,0.4);
+  background: rgba(0,200,0,0.08);
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+
+.band-label {
+  font-weight: 700;
+  color: var(--primary);
+  min-width: 60px;
+}
+
+.stat-detail {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.85rem;
+}
+
+.autotest-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 12px;
+}
+
+.autotest-predictions {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.autotest-predictions thead {
+  background: rgba(0,150,200,0.15);
+  border-bottom: 1px solid rgba(0,200,0,0.3);
+}
+
+.autotest-predictions th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: rgba(0,200,255,0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-size: 0.75rem;
+}
+
+.autotest-predictions td {
+  padding: 9px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.8);
+}
+
+/* Score coloré : fond de la cellule selon la validation */
+.autotest-predictions td:nth-child(6) {
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* Rangée avec heure courante */
+.autotest-predictions tr[style*="background: rgba(0,200,0"] {
+  font-weight: 600;
+  color: rgba(0,255,100,0.95);
+}
+
+/* Contraste : lignes alternées légères */
+.autotest-predictions tbody tr:nth-child(2n) {
+  background: rgba(255,255,255,0.01);
+}
+
+/* Hover pour lisibilité */
+.autotest-predictions tbody tr:hover {
+  background: rgba(0,200,255,0.08) !important;
+}
+
+.no-data {
+  padding: 20px;
+  text-align: center;
+  color: rgba(255,255,255,0.5);
+  font-style: italic;
+}

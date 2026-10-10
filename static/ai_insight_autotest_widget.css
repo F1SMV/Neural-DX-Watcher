@@ -1,0 +1,334 @@
+/**
+ * §24 Auto-Test Widget CSS
+ * Styles pour afficher les prédictions et validations
+ */
+
+.autotest-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-family: var(--font-sans, 'Segoe UI', sans-serif);
+    font-size: 0.78rem;
+}
+
+/* ── Diagramme de flux ───────────────────────────────────── */
+
+.autotest-flow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(0, 243, 255, 0.04);
+    border-radius: 8px;
+    border: 1px solid rgba(0, 243, 255, 0.15);
+}
+
+.flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 60px;
+    padding: 8px 6px;
+    border-radius: 6px;
+    background: rgba(0, 243, 255, 0.08);
+    border: 1px solid rgba(0, 243, 255, 0.2);
+    text-align: center;
+}
+
+.flow-number {
+    font-weight: 700;
+    color: var(--accent, #00f3ff);
+    font-size: 1rem;
+}
+
+.flow-label {
+    color: var(--text-main, #a0a0a0);
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.flow-detail {
+    color: var(--dim, #666);
+    font-size: 0.65rem;
+    font-style: italic;
+}
+
+.flow-arrow {
+    color: var(--accent, #00f3ff);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* ── Statistiques ───────────────────────────────────── */
+
+.autotest-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+}
+
+.stat-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 6px;
+    background: rgba(0, 243, 255, 0.05);
+    border: 1px solid rgba(0, 243, 255, 0.15);
+    gap: 4px;
+}
+
+.stat-label {
+    color: var(--dim, #666);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-value {
+    color: var(--text-main, #a0a0a0);
+    font-weight: 700;
+    font-size: 1.1rem;
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── Statistiques par bande ───────────────────────────────────── */
+
+.per-band-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.band-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 4px;
+    background: rgba(0, 243, 255, 0.03);
+    border: 1px solid rgba(0, 243, 255, 0.1);
+}
+
+.band-name {
+    font-weight: 600;
+    color: var(--accent, #00f3ff);
+    min-width: 40px;
+}
+
+.band-data {
+    display: flex;
+    gap: 12px;
+    font-size: 0.7rem;
+}
+
+.band-data .count {
+    color: var(--text-main, #a0a0a0);
+}
+
+.band-data .score {
+    color: var(--dim, #666);
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── Table de prédictions ───────────────────────────────────── */
+
+.autotest-predictions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pred-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+}
+
+.pred-table thead {
+    background: rgba(0, 243, 255, 0.08);
+    border-bottom: 1px solid rgba(0, 243, 255, 0.15);
+}
+
+.pred-table th {
+    color: var(--accent, #00f3ff);
+    padding: 6px 4px;
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pred-table tbody tr {
+    border-bottom: 1px solid rgba(0, 243, 255, 0.08);
+    transition: background 0.15s;
+}
+
+.pred-table tbody tr:hover {
+    background: rgba(0, 243, 255, 0.05);
+}
+
+.pred-table td {
+    padding: 6px 4px;
+    color: var(--text-main, #a0a0a0);
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+.pred-band {
+    font-weight: 600;
+    color: var(--accent, #00f3ff);
+}
+
+.pred-mode {
+    color: var(--dim, #666);
+}
+
+.pred-hour {
+    color: var(--dim, #666);
+}
+
+.pred-prob {
+    color: var(--text-main, #a0a0a0);
+    text-align: right;
+}
+
+.pred-actual {
+    color: var(--success, #22c55e);
+    font-weight: 600;
+}
+
+.pred-score {
+    color: var(--warn, #ffc800);
+    text-align: right;
+}
+
+.pred-status {
+    color: var(--success, #22c55e);
+    font-weight: 700;
+    text-align: center;
+}
+
+/* ── Light theme overrides ───────────────────────────────────── */
+
+body[data-theme='light'] .autotest-flow {
+    background: rgba(0, 102, 255, 0.04);
+    border-color: rgba(0, 102, 255, 0.15);
+}
+
+body[data-theme='light'] .flow-step {
+    background: rgba(0, 102, 255, 0.08);
+    border-color: rgba(0, 102, 255, 0.2);
+}
+
+body[data-theme='light'] .flow-number {
+    color: #0066ff;
+}
+
+body[data-theme='light'] .flow-arrow {
+    color: #0066ff;
+}
+
+body[data-theme='light'] .stat-box {
+    background: rgba(0, 102, 255, 0.05);
+    border-color: rgba(0, 102, 255, 0.15);
+}
+
+body[data-theme='light'] .band-stat {
+    background: rgba(0, 102, 255, 0.03);
+    border-color: rgba(0, 102, 255, 0.1);
+}
+
+body[data-theme='light'] .band-name {
+    color: #0066ff;
+}
+
+body[data-theme='light'] .pred-table thead {
+    background: rgba(0, 102, 255, 0.08);
+    border-bottom-color: rgba(0, 102, 255, 0.15);
+}
+
+body[data-theme='light'] .pred-table th {
+    color: #0066ff;
+}
+
+body[data-theme='light'] .pred-table tbody tr {
+    border-bottom-color: rgba(0, 102, 255, 0.08);
+}
+
+body[data-theme='light'] .pred-table tbody tr:hover {
+    background: rgba(0, 102, 255, 0.05);
+}
+
+body[data-theme='light'] .pred-band {
+    color: #0066ff;
+}
+
+/* ── Dark theme (matrix style) ───────────────────────────────────── */
+
+body[data-theme='matrix'] .autotest-flow {
+    background: rgba(0, 255, 65, 0.04);
+    border-color: rgba(0, 255, 65, 0.2);
+}
+
+body[data-theme='matrix'] .flow-step {
+    background: rgba(0, 255, 65, 0.08);
+    border-color: rgba(0, 255, 65, 0.25);
+}
+
+body[data-theme='matrix'] .flow-number,
+body[data-theme='matrix'] .flow-arrow {
+    color: #00ff41;
+}
+
+body[data-theme='matrix'] .stat-box {
+    background: rgba(0, 255, 65, 0.05);
+    border-color: rgba(0, 255, 65, 0.2);
+}
+
+body[data-theme='matrix'] .stat-value {
+    color: #00ff41;
+}
+
+body[data-theme='matrix'] .band-stat {
+    background: rgba(0, 255, 65, 0.03);
+    border-color: rgba(0, 255, 65, 0.15);
+}
+
+body[data-theme='matrix'] .band-name {
+    color: #00ff41;
+}
+
+body[data-theme='matrix'] .pred-table thead {
+    background: rgba(0, 255, 65, 0.08);
+    border-bottom-color: rgba(0, 255, 65, 0.2);
+}
+
+body[data-theme='matrix'] .pred-table th {
+    color: #00ff41;
+}
+
+body[data-theme='matrix'] .pred-table tbody tr {
+    border-bottom-color: rgba(0, 255, 65, 0.08);
+}
+
+body[data-theme='matrix'] .pred-table tbody tr:hover {
+    background: rgba(0, 255, 65, 0.05);
+}
+
+body[data-theme='matrix'] .pred-band {
+    color: #00ff41;
+}
+
+body[data-theme='matrix'] .pred-status {
+    color: #00ff41;
+}

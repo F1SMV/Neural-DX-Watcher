@@ -1,272 +1,434 @@
-# Neural DX Watcher v12.7
+# 🛰️ Neural DX Watcher
 
-**A smart DXCC hunting web app for the modern radio amateur**, built on Flask + SQLite, running on Raspberry Pi 5 at `192.168.1.81:8000`.
-
-User: **F1SMV** (QTH: JN23, La Seyne-sur-Mer, 43.076°N 5.873°E)  
-Repository: [F1SMV/Neural-DX-Watcher](https://github.com/F1SMV/Neural-DX-Watcher)
+> Real-time DX monitoring platform for amateur radio operators — F1SMV / JN23  
+> Raspberry Pi · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
 
 ---
 
-## 📸 Overview
-![Dashboard Overview](apercu.png)
+## 📸 Preview
+
+![Dashboard preview](apercu.png)
 
 ---
 
-## 🎯 Main Features
+## Contents
 
-### DXCC Hunt Mode (v12.4) ✨
-Dedicated **`/hunt`** route — full-screen interface optimized for real-time hunting:
-- **Target #1 hero card**: large country presentation, flag 🇵🇬, capital, population, UTC offset (live via REST Countries API, 30-day cache)
-- **Leaflet world map** (320px, cockpit 6m pattern): QTH + DX station + dashed link, secondary markers weighted by SPD
-- **Clickable secondary list**: top 15 targets sorted by SPD, click = zoom on map
-- **🏴 EXPÉ badge** (v12.7): highlights active DX expeditions in orange in the DX Wanted table, auto-crossed with ng3k briefing
-- **Real-time band filter**, 15s refresh
-- **localStorage tracking**: follow interesting calls
+- [Overview](#-overview)
+- [Technology stack](#-technology-stack)
+- [Version history](#-version-history)
+  - [v13.1 — Consolidation and release preparation](#v131--consolidation-and-release-preparation)
+  - [v13.0 — Adaptive Insight Engine](#v130--adaptive-insight-engine)
+  - [v12.7 — Fixes and polish](#v127--fixes-and-polish)
+  - [v12.6 — VOACAP HF propagation](#v126--voacap-hf-propagation)
+  - [v12.5 — Birth of the AI Insight Engine](#v125--birth-of-the-ai-insight-engine)
+  - [v12.2 — MSK144 and satellites](#v122--msk144-and-satellites)
+  - [v12.1 — Beacons and lightning](#v121--beacons-and-lightning)
+  - [v11.x — Data and infrastructure](#v11x--data-and-infrastructure)
+  - [v9.5 — Foundations and roadmap](#v95--foundations-and-roadmap)
+- [AI Insight page — Detailed architecture](#-ai-insight-page--detailed-architecture)
+- [Deployment](#-deployment)
+- [Available APIs](#-available-apis)
+- [v13.0 specification baseline](#-v130-specification-baseline)
+- [Next steps](#-next-steps)
 
-### AI Insight (v12.5) ✨
-Dedicated **`/ai_insight`** route — behavioral analysis dashboard, fully bilingual FR/EN:
-- **Recent Activity**: hour-by-hour sparkline (24h), peak and current hour highlighted
-- **Next Hours**: past activity frequency on upcoming slots — bilingual explanations, low-sample slots flagged in orange
-- **When It Opens**: weekday × UTC hour heatmap
-- **Band Trends**: recent vs. previous period comparison
-- **HF Predictions VOACAP (v12.6)**: **8 bands × 24 hours** grid (v12.7: 12m, 17m, 30m added)
-- AJAX refresh every 5 min, maturity bar every minute
-- Drag & drop panels (v12.7), order persisted in localStorage
+---
 
-### HF Predictions VOACAP (v12.6) ✨
-Fifth panel of the AI Insight page — point-to-point predictions via the **VOACAP** engine (US gov, open source):
-- **Free-form input**: callsign (`JA1ABC`), DXCC prefix (`ZS`, `VK`, `EA8`…) or country name — automatic resolution
-- **Local DXCC table** (~60 entities, instant) + Nominatim/OSM geocoding fallback
-- **Band × hour matrix**: 8 bands (10m→80m) × 24 UTC hours, shaded by REL
-- **Current-hour hero**: recommended band right now, REL% and SNR at a glance
-- **DX shortcuts**: USA, Japan, Australia, Brazil, South Africa in one click
-- **24h cache**: stored in `data/voacap_cache.sqlite`
+## 🎯 Overview
 
-**VOACAP setup (one time only):**
+Neural DX Watcher is a personal, web-based DX monitoring application for amateur radio. It combines live DX cluster spots over Telnet, local WSJT-X UDP decodes, solar propagation indicators (SFI/K/A), space weather, VHF/UHF beacons, SGP4 satellite tracking, and weather/lightning correlations.
+
+Since v12.5, the application has included an experimental **adaptive AI Insight Engine** designed to forecast propagation openings, measure prediction errors, and optimize its own parameters overnight — an ambitious research-oriented feature for a single-developer Raspberry Pi project.
+
+---
+
+## 🔧 Technology stack
+
+| Component | Technology |
+|-----------|------------|
+| Backend | Python / Flask (local virtual environment observed with Python 3.13) |
+| Databases | SQLite (`analytics.sqlite`, `predictor.sqlite`) |
+| Frontend | Leaflet.js, SortableJS, Space Grotesk / IBM Plex Mono |
+| Solar data | NOAA SWPC (SFI, K, A) |
+| HF propagation | VOACAP (introduced in v12.6) |
+| Weather / tropospheric conditions | Open-Meteo (850 hPa, humidity, CAPE) |
+| Lightning | Blitzortung MQTT (3×3 grid around the home QTH) |
+| Reception reports | PSK Reporter MQTT with HTTP fallback |
+| WSPR | wspr.live |
+| Satellites | CelesTrak GP API (TLE), SatNOGS (frequencies), SGP4 |
+| DX cluster | Telnet (dxfun.com:8000, dxc.k0xm.net:7300, dxc.nc7j.com:7373) |
+| WSJT-X | Local UDP port 2237 (live decodes) |
+| VHF beacons | dl0tud.tu-dresden.de (IARU Region 1 CSV, monthly auto-update) |
+
+---
+
+## 📜 Version history
+
+### v13.1 — Consolidation and release preparation ← CURRENT
+
+**Period:** October 2026  
+**Status:** Local development version; publication and functional verification remain to be confirmed.
+
+This iteration continues the adaptive-engine work introduced in v13.0. The local file inventory and Git working tree show ongoing work on **AI Insight**, calibration, notifications, and UI components. The following items describe the **observed scope of work**; they are not a claim that every feature has passed production acceptance tests.
+
+#### Observed changes and files
+
+- **AI Insight:** ongoing changes to `templates/ai_insight.html`; a separate `templates/ai_insightv13.1.html` variant is present and should be reviewed before publication.
+- **Calibration and predictions:** `calibration.py` is present and `analytics.py` has local changes. Verify integration and calibration results against actual predictions.
+- **Adaptive Insight Engine:** the `adaptive/` directory contains FSM, backtesting, optimization, model registry, QualityGate, DriftMonitor, NightlyCycle, and related tests. Verify the operational status with a fresh test run for the release.
+- **Auto-Test interface:** CSS and JavaScript assets exist under both `static/` and `static/widgets/`. They differ; verify references before choosing which files to retain.
+- **Notifications:** local changes to `ntfy_alerts.py` and a `static/storm-alert.js` asset are present. Validate notification scenarios before marking them as shipped.
+- **Maintenance:** local changes to `start.sh`, `webapp.py`, and `templates/index.html`; obsolete patch scripts and old `webapp.py` backup copies are marked as deleted in the Git working tree.
+- **Documentation:** aligned French and English READMEs, with versions ordered newest first.
+
+#### Pre-release verification
+
+- Run the applicable adaptive-engine tests and verify startup using `./start.sh`.
+- Confirm that documented API endpoints are actually available, especially VOACAP calculations and calibration indicators.
+- Check static asset and template references before removing apparent duplicates.
+- Do not publish SQLite databases, runtime logs, private configuration files, or API tokens. Review `git status` and `git diff --cached` before pushing.
+- **Local infrastructure:** EXT4 errors were observed on the Raspberry Pi SD card during October 2026 backups. Repair the filesystem offline and test restoration before treating a system image as a verified recovery backup.
+
+---
+
+### v13.0 — Adaptive Insight Engine
+
+**Date:** September 26 – October 1, 2026
+
+This release made the AI Insight Engine **adaptive**: it issues forecasts, measures errors, optimizes parameters nightly, and feeds the results back into live scoring. Development followed a 31-section specification. The v13.0 documentation reported **9 delivered sections and 69/69 unit tests**; this is a historical baseline, not a new v13.1 test result.
+
+#### v13.0 deliverables
+
+| Section | Module | Lines | Tests | Status in v13.0 documentation |
+|---------|--------|-------|-------|------------------------------|
+| §8 | PropagationFSM (7 states × 5 bands) | 460 | 10/10 | ✅ |
+| §12 | Backtester (ECE / Brier / F1) | 200 | 8/8 | ✅ |
+| §13 | Optimizer (grid search) | 210 | 8/8 | ✅ |
+| §14 | Models (versioning and lifecycle) | 280 | 14/14 | ✅ |
+| §14b | Live scoring from `active_model.config` | — | — | ✅ |
+| §15 | QualityGate (4 checks) | 165 | 14/14 | ✅ |
+| §24 | Auto-Test (live feedback loop) | 270 | 5/5 | ✅ |
+| §25 | DriftMonitor | 180 | 4/4 | ✅ |
+| §32 | NightlyCycle (03:00 UTC; 7/14/30 days) | 280 | 6/6 | ✅ |
+
+#### New radio mode: JTTY
+
+**JTTY**, introduced in WSJT-X 3.2.0-rc1, was added to scoring, filters, and UI badges. This asynchronous digital mode, proposed by K1JT, resembles RTTY. The preliminary band plan lists 11 calling frequencies between 1.838 and 144.160 MHz. UI color: orange `#ff9e2c`.
+
+#### Auto-Test widget
+
+A new **🔄 Auto-Test (Feedback Loop)** panel on the AI Insight page displays issued predictions, confirmations, and a freshness score. A bilingual FR/EN legend (14 px, orange) explains the metrics.
+
+---
+
+### v12.7 — Fixes and polish
+
+**Date:** September 2026
+
+- Fixed WSPR callsign formats such as `/P` and `/MM`.
+- Corrected DX geolocation for selected DXCC entities following the v11 `cty.dat` fix.
+- Expanded the HF bands covered by VOACAP calculations.
+- Stabilized drag-and-drop panel rearrangement (SortableJS).
+- Added an expedition badge for active rare prefixes.
+
+---
+
+### v12.6 — VOACAP HF propagation
+
+**Date:** September 2026
+
+Integrated **VOACAP** (Voice of America Coverage Analysis Program), a reference tool for point-to-point HF propagation forecasting:
+
+- Python backend calculations of path probabilities by band (80 m through 10 m) for a home QTH → target region path.
+- AI Insight panel showing probabilities by band and UTC hour.
+- Explicit distinction between **one radio path** and overall band activity.
+
+---
+
+### v12.5 — Birth of the AI Insight Engine
+
+**Date:** September 2026 — *Major turning point*
+
+Neural DX Watcher evolved from a real-time data aggregator into a platform with an **autonomous prediction component**.
+
+#### `analytics.py` module
+
+A self-contained module with its own SQLite database (`data/analytics.sqlite`), kept separate from `predictor.py`. The documented data-source fallback chain is:
+
+1. `predictor.sqlite`, when present and healthy.
+2. `analytics.sqlite`, as the primary source.
+3. An in-memory buffer as the final fallback.
+
+#### First AI Insight page
+
+A full redesign with UTC timestamps on each panel: band propagation, active DXCC entities over two hours, SPD calibration, solar/geomagnetic indicators, and a narrative DX briefing in French and English.
+
+#### Critical production bug
+
+`history_maintenance_worker` wrapped `verify_predictions()` with `except: logger.debug(...)`. After an SD-card power-loss event caused SQLite corruption, errors were silently swallowed for weeks and the measured-reliability panel stopped updating. The documented fix raised background-worker error logging to at least `WARNING`.
+
+---
+
+### v12.2 — MSK144 and satellites
+
+**Date:** September 2026
+
+- **MSK144:** corrected detection range (144,350–144,370 kHz).
+- **PSK Reporter:** real-time “MY SIGNAL” MQTT feed showing who receives the home station, without HTTP polling.
+- **Satellites:** fully local SGP4-based co-visibility panel showing two satellites simultaneously visible from the QTH, without an external dependency such as HamClock (hams.at).
+- **AO-92 / AO-109:** missing TLEs are expected because these satellites re-entered in 2024, not an application bug.
+
+---
+
+### v12.1 — Beacons and lightning
+
+**Date:** September 2026
+
+- **Beacons page** (`weather.html`): IARU Region 1 beacon reception panel and a monthly update worker fetching data from dl0tud.tu-dresden.de.
+- **Basemap:** migrated from CARTO to Esri Dark Gray Canvas when CARTO began requiring API keys. Tile order: `{z}/{y}/{x}`.
+- **Critical regression repaired:** `get_weather_alerts()` had accidentally been removed by an overly broad `str_replace` operation.
+
+---
+
+### v11.x — Data and infrastructure
+
+**Date:** August 2026
+
+- **NOAA Kp:** fixed parsing of a JSON array of objects, `[ {"time_tag": ..., "Kp": ...} ]`; the previous parser had silently returned `None`.
+- **Blitzortung MQTT:** corrected slash-separated topic format (`blitzortung/1.1/s/p/e/#`); previously the connection succeeded (`CONNACK=0`) but no data arrived.
+- **`cty.dat` longitude:** standardized `lon = -raw_lon` to convert west-positive coordinates to conventional east-positive longitude; the earlier conditional mirrored some Asian entities into the Atlantic.
+- **Distances:** filtered implausible distances (the historical FT8 limit was around 1,000 km; half the Earth's circumference is approximately 20,037 km).
+- **PSK Reporter MQTT:** used topic `pskr/filter/v2/+/+/{MY_CALL}/+/#`, prioritizing MQTT with transparent HTTP fallback.
+
+---
+
+### v9.5 — Foundations and roadmap
+
+**Date:** Summer 2026
+
+The first published release featured a functional cockpit: a live Leaflet 6 m map, DX feed, HF/VHF band tiles, and basic satellite tracking. Its roadmap established the longer-term direction:
+
+1. **Predictive engine:** probabilistic scoring by band, hour, and season → *implemented in v13.0*.
+2. **ntfy.sh push alerts:** mobile notifications for rare spots and 6 m openings → *in progress*.
+3. **DXCC hunting mode:** live LoTW cross-checks → *in progress*.
+4. **24-hour timeline replay:** hour-by-hour Sporadic-E replay scrubber → *planned*.
+5. **WSJT-X statistics:** maximum decoded distance by band and hour → *planned*.
+
+---
+
+## 🧠 AI Insight page — Detailed architecture
+
+The `/ai-insight` page is the experimental core introduced with Neural DX Watcher v13.0 and developed further in v13.1.
+
+### Closed-loop architecture
+
+```text
+Live spots (Telnet DX cluster + WSJT-X UDP)
+    |
+    v
+§8  PropagationFSM — 7 states × 5 bands
+    IDLE → RISING → OPENING → STRONG → PEAK → DECLINING → CLOSED
+    Timestamps the start, peak, and end of each opening
+    |
+    v
+§12 Backtester — replays SQLite history
+    Computes ECE / Brier / F1
+    |
+    v
+§13 Optimizer — grid search
+    Tunes distance_bonus, FT8 weighting, and SPD cap
+    Selects the configuration with the best ECE
+    |
+    v
+§14 Models + §15 QualityGate
+    CANDIDATE → VALIDATED → ACTIVE → DEPRECATED
+    Promotion checks: ECE < 0.20; F1 > 0.60;
+    N_predictions > 10,000; drift < 5% vs. active model
+    Failed checks → reject candidate, keep existing model
+    |
+    v
+§14b calculate_spd_score() — live scoring
+    Dynamically reads active_model.config on each call
+    |
+    +------------------------------+
+    |                              |
+    v                              v
+§32 NightlyCycle               §25 DriftMonitor
+    Runs at 03:00 UTC              Watches rolling ECE
+    Tests 7/14/30-day windows      Flags degradation
+    Promotes the best model            |
+                                       v
+                                   §24 Auto-Test
+                                       10 predictions/hour
+                                       Checks against actual spots
+                                       score = 1 - age_minutes/60
+                                       Continuously feeds DriftMonitor
+```
+
+### Key design concepts
+
+**1. Nightly self-calibration (NightlyCycle)**
+
+SPD scoring parameters are no longer all hard-coded constants. At 03:00 UTC, the documented cycle replays 7, 14, and 30 days of history, evaluates which window predicts subsequent propagation most effectively, and promotes the best model if all four checks pass.
+
+**2. Immutable model versioning and rollback**
+
+Each tested configuration is recorded in SQLite (`model_versions`). The lifecycle is `CANDIDATE → VALIDATED → ACTIVE → DEPRECATED`, with rollback support if a promotion underperforms.
+
+**3. Seven-state propagation FSM across five bands**
+
+`PropagationFSM` tracks five bands independently, timestamps openings from onset through peak to closure, and makes these observations available for subsequent training and evaluation.
+
+**4. Live Auto-Test feedback**
+
+`adaptive/auto_test.py` is documented as issuing ten probabilistic predictions per hour (one FT8 prediction per band) and checking them against incoming spots in a ±1-hour window. Freshness examples: a confirmation after two minutes scores about 0.97; after 55 minutes, about 0.08. Unconfirmed predictions older than 24 hours are purged.
+
+**5. Dynamic SPD scoring (§14 integration)**
+
+`calculate_spd_score()` reads the active configuration via `ModelRegistry.get_active_model()` on each call. This completes the conceptual feedback loop: observations → evaluation → model selection → live scoring → new observations.
+
+### AI Insight panels
+
+| Panel | Data | Documented refresh interval |
+|-------|------|-----------------------------|
+| Band propagation | 30-minute spots, FSM states | 30 s |
+| Solar + geomagnetic | NOAA SFI/K/A | 5 min |
+| DX briefing (FR/EN) | Automated narrative summary | 2 min |
+| VOACAP HF | Path probabilities by band and hour | Manual |
+| SPD calibration | Active-model ECE/F1 | 5 min |
+| FSM states | Current state by band | 30 s |
+| Optimizer history | Runs, ECE, promotions | 1 min |
+| Model versions | ACTIVE / CANDIDATE / DEPRECATED | 1 min |
+| DriftMonitor | Rolling ECE, drift alerts | 1 min |
+| 🔄 Auto-Test | Live predictions and confirmations | 10 s |
+
+### Understanding the Auto-Test widget
+
+```text
+Predictions: 11
+  → One prediction per band at each UTC hour (10 bands = 10 predictions)
+  → Purged after 24 hours if no spot confirms them
+
+Confirmed: 5 (45%)
+  → Five predicted bands received a real spot within the hour
+  → The other six did not receive a matching spot
+
+Score: 0.98
+  → Mean freshness of confirmations
+  → 0.98 means spots arrived almost immediately
+  → A lower score indicates later confirmation (near 60 minutes)
+
+Each confirmation feeds DriftMonitor → NightlyCycle at 03:00 UTC.
+```
+
+### Supported radio modes
+
+| Mode | Key frequencies | UI color |
+|------|-----------------|----------|
+| FT8 | 14.074, 7.074, 50.313 MHz… | Purple `#a78bfa` |
+| FT4 | 14.080, 7.047 MHz… | Pink `#ff00cc` |
+| CW | Band-specific CW segments | Yellow `#fbbf24` |
+| SSB | Band-specific SSB segments | Cyan `#22d3ee` |
+| MSK144 | 144.360 MHz ±10 kHz | Dark cyan |
+| PSK31 | 14.070–14.071 MHz | Yellow-green |
+| RTTY | Band-specific RTTY segments | Orange `#ff8800` |
+| **JTTY** | **11 frequencies: 1.838–144.160 MHz** | **Orange `#ff9e2c`** |
+| JT65 | JT65 segments | Cyan |
+| AM / FM | AM/FM segments | Green |
+
+---
+
+## 🚀 Deployment
+
 ```bash
-bash ~/.claude/skills/voacap/scripts/setup.sh
+git clone https://github.com/F1SMV/Neural-DX-Watcher.git
+cd Neural-DX-Watcher
+./start.sh
 ```
 
-### Propagation & Forecasting
-- **VOACAP Rapid**: precise HF path to selected zone (5min)
-- **Tropospheric indicators**: 850hPa inversion, humidity, CAPE
-- **Blitzortung MQTT**: real-time lightning (3×3 grid around QTH), RF/QRN correlation
-- **WSPR global**: spots per band, individual callsigns + real QTH distances (v12.7), 2m radar confirmation
+> ⚠️ **Use `./start.sh`** rather than invoking `python3 webapp.py` directly. The script activates the virtual environment and handles application startup; review its current behavior before deployment.
 
-### Satellites & Beacons
-- **Co- and counter-aperture visibility**: SGP4, 48h horizon, ≥30s overlap
-- **VHF/UHF/SHF beacons**: 62 IARU beacons, monthly auto-update from dl0tud.tu-dresden.de
-- **SatNOGS for frequencies**
-
-### LoTW Management & Stats
-- **Native LoTW integration**: disk cache 6589 QSOs, periodic sync
-- **Dxcc_hunt.py**: scoring engine per band, rarity + distance, internal database
-- **ARRL / ng3k Briefing**: recent DX news, active expeditions crossed with spots
-
-### Backend Architecture
-- **`webapp.py`**: 7700+ lines, Python 3.13, Flask, SQLite
-- **`analytics.py`**: autonomous AI Insight engine, dedicated `data/analytics.sqlite`
-- **`voacap_adapter.py`**: VOACAP wrapper + 24h SQLite cache
-- **`country_meta.py`**: country enrichment (flag, capital, population, TZ) — 30-day cache
-- **`dxcc_hunt.py`**: pure DXCC Hunt logic (injectable, testable, 13/13 tests ✅)
-- **`ntfy_alerts.py`**: desktop/email notifications (v10.0, complete)
+| URL | Page |
+|-----|------|
+| `http://<RASPBERRY_PI_IP>:8000` | Home + 6 m cockpit |
+| `http://<RASPBERRY_PI_IP>:8000/ai-insight` | AI Insight Engine |
+| `http://<RASPBERRY_PI_IP>:8000/satellites` | Satellite tracking |
+| `http://<RASPBERRY_PI_IP>:8000/hunt` | DXCC hunting |
+| `http://<RASPBERRY_PI_IP>:8000/weather` | Weather + beacons + lightning |
 
 ---
 
-## v12.7 — Detailed Changelog
+## 📡 Available APIs
 
-### New Features
-- **🏴 EXPÉ badge in DX Wanted** (`index.html`, `webapp.py`)
-  - Automatic cross-check: cluster spots ↔ ng3k briefing — any call active in both sources gets an orange badge in the DX Wanted (Top 10) table
-  - Callsigns extracted from ng3k titles (prefix ≥ 4 chars with digit, end date in the future)
-  - Exposed via `wanted.json` → `expedition_calls: {call: country}`
+### Spots and DX
 
-- **VOACAP: 8 bands** (up from 5) — 12m (24.9 MHz), 17m (18.1 MHz), 30m (10.1 MHz) added in `ai_insight.html` and default freqs of `/api/voacap/predict`
+| Endpoint | Description |
+|----------|-------------|
+| `GET /spots.json?band=6m&mode=FT8` | Spots filtered by band and mode |
+| `GET /api/map/spots.json` | Geolocated map spots |
+| `GET /api/wsjtx/spots.json` | Live WSJT-X decodes |
+| `GET /api/weather/wspr.json` | 2 m WSPR confirmation |
+| `GET /api/psk_reporter.json` | PSK Reporter reception reports |
 
-- **AI Insight drag & drop**: panels rearrangeable by drag (SortableJS), order persisted under `ai_insight_panel_order` localStorage key
+### Propagation and solar data
 
-- **WSPR 2m confirmation enriched**: individual callsigns and real TX→QTH distances (Haversine) displayed instead of an anonymous count
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/solar.json` | SFI/K/A and propagation status |
+| `GET /api/voacap.json` | VOACAP forecasts by band/region |
+| `GET /api/briefing.json?lang=en` | Narrative DX briefing |
 
-### Fixes
-- **DX geolocation**: fixed KH8→Michigan bug (American Samoa now correctly placed) and 8 Pacific/Caribbean entities (KH0 Mariana, KH1 Baker-Howland, KH2 Guam, KH4 Midway, KH5 Palmyra, KH7K Kure, KH8/s Swains, 5W Samoa)
-  - Bug 1: `CALLSIGN_ZONES` had `'AH': USA` mapping all AH* to Missouri
-  - Bug 2: step 3 of the resolver (zone digit extraction) wrongly applied to KH*/AH*/KP*
-  - Bug 3: post-parsing cty.dat overrides for entries with incorrect longitude signs
+### Adaptive Insight Engine (introduced in v13.0)
 
-### Infrastructure & Cleanup
-- `APP_VERSION` → `'12.7'`
-- `defaultdict` removed from imports (unused)
-- `start.sh`: `paho-mqtt` added to dependency check, `telnetlib3` removed (not in `requirements.txt`)
-- Full webapp.py audit: 252 functions, 0 syntax errors, Haversine calculations validated
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/adaptive/fsm.json` | Live FSM states by band |
+| `GET /api/adaptive/events.json` | Detected opening history |
+| `GET /api/adaptive/fsm_stats.json` | Aggregate FSM statistics |
+| `POST /api/adaptive/optimize.json` | Manually trigger optimizer |
+| `GET /api/adaptive/optimizer_runs.json` | Optimization run history |
+| `GET /api/adaptive/models/active.json` | Active model and configuration |
+| `GET /api/adaptive/models/candidates.json` | Pending model candidates |
+| `GET /api/adaptive/models/versions.json` | All model versions |
+| `GET /api/adaptive/qg/status.json` | QualityGate thresholds and status |
+| `POST /api/adaptive/qg/validate/<id>.json` | Manually validate a candidate |
+| `GET /api/adaptive/nightly/latest.json` | Latest NightlyCycle runs |
+| `POST /api/adaptive/nightly/run.json` | Manually trigger NightlyCycle |
+| `GET /api/adaptive/autotest/stats.json` | Aggregate Auto-Test metrics |
+| `GET /api/adaptive/autotest/latest.json` | Latest predictions and confirmations |
+| `POST /api/adaptive/autotest/predict.json` | Create a manual prediction |
 
----
-
-## v12.6 — Detailed Changelog
-
-### New Features
-- **HF Predictions VOACAP panel** in AI Insight (`ai_insight.html`)
-  - Band × hour matrix (10m→80m / UTC 00-23), shaded by circuit reliability (REL)
-  - Current-hour hero: recommended band + REL% + SNR at a glance
-  - Unified input: callsign, DXCC prefix or country name → auto-resolution
-  - 5 DX shortcuts, 24h SQLite cache, graceful fallback if `voacapl` not installed
-
-- **`voacap_adapter.py`** (new module): wraps `voacap_predict.py` (Reid skill), VOACAP output parser, autonomous SQLite cache
-- **Route `POST /api/voacap/predict`**: SSN auto-derived from current NOAA SFI if not provided
-
-### Cleanup
-- `APP_VERSION` → `'12.6'`
-- Removed orphaned route `@app.route("/ai.html")`
-- `requirements.txt` fully rewritten: exact dependencies, VOACAP setup notes
+> API routes are documented from the supplied v13.0 README; availability in v13.1 must be verified against the running application.
 
 ---
 
-## v12.5 — Detailed Changelog
+## 📊 v13.0 specification baseline
 
-### New Features
-- **Redesigned AI Insight page** (`ai_insight.html`, `/ai_insight` route)
-  - Fully autonomous `analytics.py` module: dedicated `data/analytics.sqlite`
-  - 4 dynamic panels: Recent Activity, Next Hours, When It Opens, Band Trends
-  - AJAX refresh every 5 min, maturity bar every minute
+**Historical v13.0 documentation: 9 of 31 sections delivered; 69 of 69 tests passing.** These figures have not been revalidated for v13.1.
 
-### UX Improvements
-- **"Next Hours" panel clarity**: bilingual FR/EN subtitles, low-sample slots (< 5 obs.) flagged in orange, callout accents switched to orange
-
-### Fixes
-- **`dxcc_hunt.py`**: physically impossible distances filtered out
-- **`weather.html`**: CARTO → Esri Dark Gray Canvas migration, fixed `{z}/{y}/{x}` tile ordering
-- **`hunt.html`**: Leaflet map stabilization (staggered `invalidateSize`, zero gray borders)
-
----
-
-## v12.4 — Detailed Changelog
-
-### New Features
-- **Complete DXCC Hunt mode** (routes `/hunt`, `/api/hunt/data`)
-  - Sort by continuous SPD score (rarity + distance + split + mode)
-  - Target #1 enriched (flag, capital, population, UTC offset)
-  - Multi-target secondary markers on map, weighted by SPD
-  - Clickable navigation: click secondary target → zoom map
-
-- **`country_meta.py`**: DXCC country enrichment (REST Countries API v3.1, 30-day cache, graceful fallback)
-- **🎯 HUNT nav link** + blinking indicator (20s animation), localStorage watchlist
-
-### Critical Fixes
-- DXCC Hunt sort: replaced boolean `is_rare` with continuous SPD score
-- Hunt Leaflet map: `worldCopyJump: true`, `center: QTH`, `zoom: 2`, zero gray borders
-
-### Tests
-- 13/13 unit tests `dxcc_hunt.py`
-- 16/16 unit tests `country_meta.py`
+| Section | Feature | v13.0 documented status |
+|---------|---------|-------------------------|
+| §8 | PropagationFSM | ✅ Live |
+| §12 | Backtester | ✅ Live |
+| §13 | Optimizer | ✅ Live |
+| §14 | Models (versioning) | ✅ Live |
+| §14b | Dynamic scoring | ✅ Live |
+| §15 | QualityGate | ✅ Live |
+| §24 | Auto-Test (feedback loop) | ✅ Live |
+| §25 | DriftMonitor | ✅ Live |
+| §32 | NightlyCycle | ✅ Live |
+| §2 | Distribution (GitHub / Docker) | 🔜 Planned |
 
 ---
 
-## 🚀 Quick Start
+## 🔭 Next steps
 
-### Requirements
-- Python 3.13 + venv
-- Raspberry Pi 5 (or Linux x64)
-- Network port: 8000 (Flask)
-
-### Deploy on Pi
-```bash
-cd ~/Spot-Watcher-DX
-cp webapp.py country_meta.py dxcc_hunt.py voacap_adapter.py .
-cp templates/*.html templates/
-pkill -f "python.*webapp.py"
-bash start.sh
-```
-
-### Verify
-```bash
-curl http://192.168.1.81:8000/hunt
-curl 'http://192.168.1.81:8000/api/hunt/data?band=20m'
-curl -s 'http://192.168.1.81:8000/wanted.json' | python3 -m json.tool | grep expedition
-```
+- **ntfy.sh alerts:** mobile notifications for rare spots and 6 m openings.
+- **DXCC hunting:** live LoTW cross-checks, showing only missing entities.
+- **24-hour timeline replay:** review Sporadic-E openings hour by hour.
+- **JTTY live:** active tracking when a stable WSJT-X 3.2.0 release is available.
+- **§24b:** predictions informed by SFI and UTC hour.
 
 ---
 
-## 📊 Key Modules
-
-| File | Role | Status |
-|------|------|--------|
-| `webapp.py` | Flask backend | ✅ v12.7 |
-| `analytics.py` | AI Insight engine (autonomous, own cache) | ✅ v12.5 |
-| `voacap_adapter.py` | VOACAP wrapper + 24h cache | ✅ v12.6 |
-| `ai_insight.html` | AI Insight UI + HF Predictions (bilingual FR/EN) | ✅ v12.7 |
-| `index.html` | Dashboard + DX Wanted + Expé badge | ✅ v12.7 |
-| `dxcc_hunt.py` | Hunt DXCC engine | ✅ 13/13 tests |
-| `country_meta.py` | Country enrichment (30d cache) | ✅ 16/16 tests |
-| `hunt.html` | Hunt UI (Leaflet, SPD markers) | ✅ Cockpit 6m |
-| `start.sh` | Launch + dependency check | ✅ v12.7 |
-
----
-
-## 🔧 Advanced Config
-
-### DX Clusters
-```python
-CLUSTERS = [
-    'dxfun.com:8000',
-    'dxc.k0xm.net:7300',
-    'dxc.nc7j.com:7373',
-]
-```
-
-### LoTW
-- Disk cache: `data/lotw_cache.json`
-- Test ADIF: `lotw_debug_qsl.adi` (6589 QSOs)
-
-### Beacons
-- Source: `dl0tud.tu-dresden.de/beacons`
-- Auto-update monthly
-- Local ref: `data/beacons_reference.json`
-
----
-
-## 📡 Public APIs
-
-```
-GET  /hunt                        → Hunt HTML page
-GET  /api/hunt/data?band=20m      → Hunt JSON
-GET  /wanted.json                 → DX Wanted + expedition_calls
-POST /api/voacap/predict          → HF VOACAP predictions
-GET  /weather                     → Weather + Blitzortung
-GET  /satellites                  → Sat visibility
-GET  /api/weather/wspr.json       → WSPR snapshot (callsigns + distances)
-```
-
----
-
-## 🧪 Development
-
-### Tests
-```bash
-python3 test_dxcc_hunt.py      # 13/13
-python3 test_country_meta.py   # 16/16
-```
-
-### Pre-deployment check
-```bash
-python3 -m py_compile webapp.py
-node --check templates/ai_insight.html
-node --check templates/index.html
-```
-
----
-
-## 📝 License & Credits
-
-- **Code**: F1SMV, MIT — built with Claude AI (Anthropic)
-- **Data**
-  - Esri Imagery (© Esri)
-  - IARU-R1 Beacons (DJ5CW, TU Dresden)
-  - REST Countries API v3.1
-  - LoTW ARRL
-  - Blitzortung MQTT
-  - VOACAP (US gov, open source)
-  - ng3k.com (DX expeditions)
-
----
-
-**v12.7** — September 2026  
-*"Hunt smarter, not harder"*
+*Neural DX Watcher v13.1 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
+*Historical release notes retained from the earlier French README; documentation updated October 2026.*

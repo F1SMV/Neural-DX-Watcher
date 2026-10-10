@@ -62,6 +62,21 @@ except ImportError:
         def get_status(self): return {"enabled": False}
         def _send(self, **kw): pass
 
+# ── v13.0 — Adaptive Insight Engine (calibration OODA) ──────────────────────
+# Lit prediction_log (rempli par predictor.verify_predictions) et en dérive des
+# probabilités calibrées + Brier score. Lecture seule, aucune table créée.
+try:
+    from calibration import Calibrator
+    _CALIBRATOR_OK = True
+except ImportError:
+    _CALIBRATOR_OK = False
+    class Calibrator:
+        def __init__(self, *a, **kw): pass
+        def summary(self, *a, **kw): return {"ok": False, "reason": "module calibration absent", "models": {}}
+        def calibrate(self, raw_score, *a, **kw):
+            return {"calibrated": raw_score, "raw": raw_score, "status": "PREDICTED"}
+
+
 try:
     from dxcc_hunt import compute_hunt_list
     _HUNT_OK = True
@@ -77,6 +92,78 @@ except ImportError:
     _COUNTRY_META_OK = False
     def get_country_meta(*a, **kw):
         return None
+
+try:
+    from expedition import extract_expeditions, match_calls
+    _EXPEDITION_OK = True
+except ImportError:
+    _EXPEDITION_OK = False
+    def extract_expeditions(*a, **kw): return {}
+    def match_calls(*a, **kw): return {}
+
+# v13.0 — Propagation Events FSM (CDC §8)
+try:
+    from adaptive.events import PropagationFSM
+    _FSM_OK = True
+except ImportError:
+    _FSM_OK = False
+    PropagationFSM = None
+
+# v13.0 — Backtester + Optimizer (CDC §12+13)
+try:
+    from adaptive.backtester import Backtester
+    from adaptive.optimizer import Optimizer
+    _BACKTEST_OK = True
+except Exception as _be:
+    _BACKTEST_OK = False
+    Backtester = Optimizer = None
+    print(f"[WARN] Backtester/Optimizer import failed: {_be}", file=__import__('sys').stderr)
+
+# v13.0 — Adaptive Models + Quality Gate (CDC §14+15)
+try:
+    from adaptive.models import ModelRegistry
+    from adaptive.quality_gate import QualityGate
+    _MODELS_OK = True
+except Exception as _me:
+    _MODELS_OK = False
+    ModelRegistry = QualityGate = None
+    print(f"[WARN] Models/QualityGate import failed: {_me}", file=__import__('sys').stderr)
+
+# v13.0 — Nightly Cycle (CDC §32)
+try:
+    from adaptive.nightly_cycle import NightlyCycle
+    _NIGHTLY_OK = True
+except Exception as _ne:
+    _NIGHTLY_OK = False
+    NightlyCycle = None
+    print(f"[WARN] NightlyCycle import failed: {_ne}", file=__import__('sys').stderr)
+
+# v13.0 — Drift Monitor (CDC §25)
+try:
+    from adaptive.drift_monitor import DriftMonitor
+    _DRIFT_OK = True
+except Exception as _de:
+    _DRIFT_OK = False
+    DriftMonitor = None
+    print(f"[WARN] DriftMonitor import failed: {_de}", file=__import__('sys').stderr)
+
+# v13.0 — Auto-Test (CDC §24)
+try:
+    try:
+        from adaptive.auto_test import AutoTest
+    except ModuleNotFoundError:
+        # v13.1 : tolère l'ancien nom de fichier adaptive/adaptive_auto_test.py (cas d'une
+        # restauration/sauvegarde où le renommage en auto_test.py n'a pas été conservé).
+        # Sans ce repli, tout §24 (Auto-Test) est désactivé et la page AI Insight reste vide.
+        from adaptive.adaptive_auto_test import AutoTest
+        print("[WARN] adaptive/auto_test.py introuvable — repli sur adaptive/adaptive_auto_test.py "
+              "(renommer le fichier : git mv adaptive/adaptive_auto_test.py adaptive/auto_test.py)",
+              file=__import__('sys').stderr)
+    _AUTOTEST_OK = True
+except Exception as _ate:
+    _AUTOTEST_OK = False
+    AutoTest = None
+    print(f"[WARN] AutoTest import failed: {_ate}", file=__import__('sys').stderr)
 
 try:
     import analytics as _analytics_mod
@@ -135,7 +222,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '12.7'
+APP_VERSION = '13.1'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -151,11 +238,22 @@ WSJTX_SPOT_LIFETIME = 600    # Durée de vie d'un spot WSJT-X (10 min)
 
 # --- LISTE DES PRÉFIXES RARES (pour entités réellement rares) ---
 RARE_PREFIXES = [
-    'DP0', 'DP1', 'RI1', '8J1', 'VP8', 'KC4',
-    '3Y', '3C', 'P5', 'BS7', 'BV9', 'CE0', 'CY9', 'EZ', 'FT5', 'FT8', 'VK0', 'VK7',
-    'HV', '1A', '4U', 'E4', 'SV/A', 'T88', '9J', 'XU', '3D2', 'S21', 'H40',
-    'KH0', 'KH1', 'KH3', 'KH4', 'KH7', 'KH9', 'KP1', 'KP5', 'T5', 'T31', 'T33', 'YV0',
-    'YK', 'VK0', 'VK9', 'VP0', 'V21', 'XF4', 'XZ', 'ZK', 'ZL8', 'ZL7', 'ZL9',
+    # Antarctique & sub-antarctique
+    'DP0', 'DP1', 'RI1', '8J1', 'VP8', 'KC4', 'ZS8',
+    # Top Most Wanted (Club Log)
+    '3Y', '3C', '3C0', 'P5', 'BS7', 'BV9', 'BQ9', 'CE0', 'CY9',
+    'FT5', 'FT/G', 'FT/J', 'FT/T', 'FT/W', 'FT8',
+    'VK0', 'VK7', 'VK9C', 'VK9X', 'VK9N',
+    'HV', '1A', '4U', 'E4', 'SV/A',
+    # Pacifique rare
+    'T88', 'T2', 'T31', 'T32', 'T33', 'C21', '3D2', 'H40', 'ZK', 'ZL7', 'ZL8', 'ZL9',
+    'KH0', 'KH1', 'KH3', 'KH4', 'KH7', 'KH9', 'KP1', 'KP5',
+    # Asie rare
+    'A5', 'XU', 'XZ', 'S21', 'VU4', 'VU7',
+    # Afrique rare
+    '5A', '7O', '9J', '9U', '9X', 'D6', 'J5', 'T5', 'TJ', 'TL', 'TN', 'TT', 'TY', 'XT',
+    # Amérique / Atlantique rare
+    'YK', 'YV0', 'VP0', 'V21', 'XF4', 'ZD7', 'ZD9', 'EZ',
 ]
 
 TOP_RANKING_LIMIT = 10
@@ -1007,6 +1105,40 @@ def get_ambient_activity():
 
     return {"source": "none", "band": None, "value_now": None, "value_1h_ago": None}
 
+# ── v13.1 §homepage — Alerte orage proximité (sécurité, indépendante du QRN) ──
+# Volontairement DÉCOUPLÉE de compute_noise_correlation() : l'opérateur veut
+# savoir "y a-t-il de la foudre proche de moi maintenant", pas un indice de
+# bruit radio composite. Un seul impact < 30km doit suffire à alerter —
+# contrairement au palier ORAGEUX (§weather) qui exige 3+ impacts.
+STORM_ALERT_RADIUS_KM = 30
+STORM_ALERT_WINDOW_MIN = 20
+
+def get_storm_proximity_alert():
+    """Impact de foudre le plus proche dans les STORM_ALERT_WINDOW_MIN dernières
+    minutes, dans un rayon de STORM_ALERT_RADIUS_KM. Utilisé pour l'alerte
+    visuelle/sonore sur la page d'accueil (sécurité opérateur — mât, antenne,
+    présence dehors)."""
+    cutoff = time.time() - STORM_ALERT_WINDOW_MIN * 60
+    with lightning_lock:
+        strikes = [s for s in lightning_buffer if s["ts"] >= cutoff and s["dist_km"] <= STORM_ALERT_RADIUS_KM]
+    if not strikes:
+        return {
+            "alert": False, "distance_km": None, "strikes_count": 0,
+            "last_strike_ts": None, "bearing_compass": None,
+            "radius_km": STORM_ALERT_RADIUS_KM, "window_min": STORM_ALERT_WINDOW_MIN,
+        }
+    nearest = min(strikes, key=lambda s: s["dist_km"])
+    most_recent = max(strikes, key=lambda s: s["ts"])
+    return {
+        "alert": True,
+        "distance_km": nearest["dist_km"],
+        "strikes_count": len(strikes),
+        "last_strike_ts": most_recent["ts"],
+        "bearing_compass": nearest["bearing_compass"],
+        "radius_km": STORM_ALERT_RADIUS_KM,
+        "window_min": STORM_ALERT_WINDOW_MIN,
+    }
+
 # ── Corrélation bruit / météo ────────────────────────────────────────────
 def _s_unit_hint(delta_db):
     """Convertit un écart en dB en équivalent 'points S' (repère radioamateur
@@ -1158,6 +1290,17 @@ def compute_noise_correlation():
     # ── Niveau global (jauge visuelle) ──────────────────────────────────
     # Score heuristique simple, jamais présenté comme une mesure scientifique :
     # sert uniquement à donner un repère visuel rapide (calme → orageux).
+    #
+    # FIX (2026-10-02) : le volet foudre était plafonné à +3, donc un orage
+    # actif au-dessus du QTH ne pouvait JAMAIS déclencher "stormy" (seuil 5)
+    # sans un delta SNR simultané d'au moins -3 dB — delta souvent
+    # indisponible (value_1h_ago = None faute d'historique WSPR/WSJT-X
+    # suffisant). Résultat observé : "ORAGEUX" ne s'allumait quasiment
+    # jamais, même pendant un orage réel. La foudre est maintenant un
+    # signal autonome, capable à elle seule d'atteindre "stormy" si
+    # l'activité est franche (≥3 impacts < 50km) — le SNR reste un
+    # signal complémentaire qui peut faire monter le niveau mais n'est
+    # plus une condition bloquante.
     score = 0
     if value_now is not None and value_1h_ago is not None:
         delta = value_now - value_1h_ago
@@ -1167,9 +1310,22 @@ def compute_noise_correlation():
             score += 2
         elif delta <= -1.5:
             score += 1
-    if strikes_close:
-        score += min(len(strikes_close), 3)
-    elif recent_strikes:
+    else:
+        logger.debug(
+            "compute_noise_correlation: delta SNR indisponible "
+            f"(value_now={value_now}, value_1h_ago={value_1h_ago}, source={source}) "
+            "— composante SNR du score QRN ignorée ce cycle."
+        )
+
+    n_close = len(strikes_close)
+    n_recent = len(recent_strikes)
+    if n_close >= 3:
+        score += 5   # orage actif au-dessus du QTH : suffit seul à atteindre "stormy"
+    elif n_close >= 1:
+        score += 3   # impact(s) proche(s) : suffit seul à atteindre "disturbed"
+    elif n_recent >= 5:
+        score += 2   # activité orageuse large mais plus lointaine (50-300km)
+    elif n_recent >= 1:
         score += 1
 
     if score >= 5:
@@ -1722,6 +1878,7 @@ def cluster_spots(spots, max_dist_km=800):
 
 # --- CACHES GLOBAUX et INITIALISATION QTH ---
 spots_buffer = deque(maxlen=6000)
+_prop_fsm = None  # Initialisé après user_lat/user_lon
 # --- SPOT HISTORY (Tracking Watchlist) ---
 SPOT_HISTORY_MAX = 20000
 spot_history = deque(maxlen=SPOT_HISTORY_MAX)
@@ -1743,6 +1900,7 @@ watchlist    = set()
 # pour la résolution DXCC (corrige l'ancien bug _extract_prefix()).
 predictor = Predictor(db_path="data/predictor.sqlite", my_call=MY_CALL, cty_path=CTY_FILE)
 alerter   = NtfyAlerter(db_path="data/ntfy_alerts.sqlite")
+calibrator = Calibrator(db_path="data/predictor.sqlite")  # v13.1 — lit prediction_log, lecture seule
 wl_activity  = {}        # {call_upper: timestamp_float} — dernier spot vu
 wl_activity_lock = threading.Lock()
 surge_bands = []
@@ -1910,6 +2068,15 @@ FT8_VHF_FREQ_RANGE_KHZ = (144171, 144177)
 # --- FRÉQUENCES PSK31 (en kHz) ---
 PSK31_HF_FREQ_RANGE_KHZ = (14070, 14071)
 
+# --- FRÉQUENCES JTTY (WSJT-X 3.2.0-rc1, en kHz) ---
+# Mode numérique non synchronisé type RTTY. Points de rendez-vous proposés par K1JT
+# (source: passion-radio.org / Moon-Net #58710). PRÉLIMINAIRES, susceptibles d'évoluer.
+# NB: 10140 (30m), 14090 (20m) et 18100 (17m) chevauchent FT4/FT8 : sur ces 3 fréquences
+# la détection par fréquence seule est ambiguë → JTTY n'est retenu que via le champ
+# mode WSJT-X ou le commentaire ("JTTY"). Les 8 autres fréquences sont sans collision.
+JTTY_FREQS_KHZ = [1838, 3575, 7090, 10140, 14090, 18100, 21090, 24920, 28090, 50160, 144160]
+JTTY_TOLERANCE_KHZ = 0.5
+
 
 # --- SSL BYPASS ---
 try:
@@ -1961,6 +2128,167 @@ user_lon = initial_lon if initial_lon is not None else DEFAULT_LON_JN23
 # Avant: load_user_config() était appelée ligne 7328 (trop tard)
 # Après: user_lat/lon sont recalculés dès le démarrage
 load_user_config()
+
+# v13.1 — Propagation Events FSM (CDC §8) — init APRÈS config chargée
+if _FSM_OK:
+    try:
+        _prop_fsm = PropagationFSM(
+            db_path="data/predictor.sqlite",
+            user_lat=user_lat, user_lon=user_lon)
+        logger.info("PropagationFSM initialisée.")
+    except Exception as _fe:
+        logger.warning(f"PropagationFSM init: {_fe}")
+        _prop_fsm = None
+
+# v13.1 — Backtester + Optimizer (CDC §12+13)
+_optimizer = None
+if _BACKTEST_OK:
+    try:
+        _optimizer = Optimizer(
+            db_predictor="data/predictor.sqlite",
+            db_analytics="data/analytics.sqlite")
+        logger.info("Optimizer initialisé.")
+    except Exception as _oe:
+        logger.warning(f"Optimizer init échoué: {_oe}")
+        import traceback
+        logger.debug(traceback.format_exc())
+        _optimizer = None
+
+# v13.1 — Adaptive Models + Quality Gate (CDC §14+15) — init APRÈS config
+_model_registry = None
+_quality_gate = None
+if _MODELS_OK:
+    try:
+        _model_registry = ModelRegistry(db_path="data/predictor.sqlite")
+        _quality_gate = QualityGate(db_path="data/predictor.sqlite")
+        logger.info("ModelRegistry + QualityGate initialisés.")
+    except Exception as _me:
+        logger.warning(f"Models/QG init échoué: {_me}")
+        _model_registry = _quality_gate = None
+
+# v13.1 — Nightly Cycle (CDC §32) — init APRÈS optimizer
+_nightly_cycle = None
+if _NIGHTLY_OK and _optimizer:
+    try:
+        _nightly_cycle = NightlyCycle(
+            db_predictor="data/predictor.sqlite",
+            db_analytics="data/analytics.sqlite"
+        )
+        logger.info("NightlyCycle initialisé.")
+    except Exception as _ne:
+        logger.warning(f"NightlyCycle init échoué: {_ne}")
+        _nightly_cycle = None
+
+# v13.1 — Drift Monitor (CDC §25)
+_drift_monitor = None
+if _DRIFT_OK:
+    try:
+        _drift_monitor = DriftMonitor(db_path="data/predictor.sqlite")
+        logger.info("DriftMonitor initialisé.")
+    except Exception as _de:
+        logger.warning(f"DriftMonitor init échoué: {_de}")
+        _drift_monitor = None
+
+# v13.1 — Auto-Test (CDC §24)
+_auto_test = None
+if _AUTOTEST_OK:
+    try:
+        _auto_test = AutoTest(db_path="data/predictor.sqlite")
+        logger.info("AutoTest initialisé.")
+    except Exception as _ate:
+        logger.warning(f"AutoTest init échoué: {_ate}")
+        _auto_test = None
+
+logger.info(f"[BOOT] _BACKTEST_OK={_BACKTEST_OK}, _optimizer={'OK' if _optimizer else 'FAILED'}, "
+           f"_MODELS_OK={_MODELS_OK}, _NIGHTLY_OK={_NIGHTLY_OK}, _DRIFT_OK={_DRIFT_OK}, _AUTOTEST_OK={_AUTOTEST_OK}")
+
+# v13.1 §24 — Génération horaire des prédictions Auto-Test.
+# Sans ça, aucune prédiction live n'existe → rien à valider → widget vide.
+# Idempotent : ne recrée pas une prédiction déjà présente pour la même (bande, heure).
+def _autotest_generate_hourly(hour_utc):
+    """Génère 1 prédiction FT8 par bande pour l'heure UTC donnée, sans doublon.
+
+    validate_spot() ne matche que sur la bande (pas le mode) et exige une
+    prédiction de < 60 min → une prédiction FT8/bande/heure suffit à armer
+    la validation par n'importe quel spot (FT8, CW, SSB...) de cette bande.
+    """
+    if not _auto_test:
+        return 0
+    # Purge + anti-doublon dans une seule connexion
+    existing = set()
+    try:
+        _c = sqlite3.connect("data/predictor.sqlite")
+        _cur = _c.cursor()
+        # Purge : prédictions jamais validées de +24h (bandes restées fermées).
+        # Sans ça le ratio validé/total s'effondre dans le temps.
+        _cur.execute(
+            "DELETE FROM auto_test_predictions "
+            "WHERE validation_ts IS NULL AND ts_created < ?",
+            (time.time() - 86400,),
+        )
+        # Bandes déjà prédites pour cette heure dans les 2 dernières heures (anti-doublon)
+        _cur.execute(
+            "SELECT DISTINCT band FROM auto_test_predictions "
+            "WHERE hour_utc = ? AND ts_created >= ?",
+            (hour_utc, time.time() - 7200),
+        )
+        existing = {r[0] for r in _cur.fetchall()}
+        _c.commit()
+        _c.close()
+    except Exception as _qe:
+        logger.debug(f"[AUTOTEST] purge/dédup échouée: {_qe}")
+
+    n = 0
+    errors = []
+    for _b in AutoTest.BANDS:
+        if _b in existing:
+            continue
+        try:
+            _auto_test.predict_for_hour(_b, "FT8", hour_utc)
+            n += 1
+        except Exception as _pe:
+            errors.append(f"{_b}: {_pe}")
+    if n:
+        logger.info(f"[AUTOTEST] {n} prédiction(s) générée(s) pour {hour_utc:02d}h UTC")
+    if errors:
+        # v13.0 fix (2026-10-02) : était en logger.debug() → invisible car le
+        # logger est configuré en INFO. Un échec systématique de predict_for_hour()
+        # (table manquante, schéma incompatible...) passait inaperçu indéfiniment,
+        # widget vide sans aucune trace exploitable dans les logs.
+        logger.warning(f"[AUTOTEST] {len(errors)} échec(s) pour {hour_utc:02d}h UTC : {errors[:3]}")
+    return n
+
+# Génération initiale au boot (données immédiates, pas d'attente du 1er slot 30 min)
+if _auto_test:
+    try:
+        _autotest_generate_hourly(time.gmtime(time.time()).tm_hour)
+    except Exception as _ate:
+        logger.warning(f"[AUTOTEST] Génération initiale échouée: {_ate}")
+
+# v13.1 — L'instance Auto-Test peut échouer au boot (base verrouillée, disque occupé...) puis devenir
+# disponible. Avant : _auto_test restait None jusqu'au prochain redémarrage → pavés Auto-Test vides.
+_auto_test_last_retry = 0.0
+def _get_auto_test():
+    """Retourne l'instance AutoTest ; retente l'initialisation (au plus 1×/60 s) si elle a échoué."""
+    global _auto_test, _auto_test_last_retry
+    if _auto_test is not None:
+        return _auto_test
+    if not _AUTOTEST_OK:
+        return None
+    now = time.time()
+    if now - _auto_test_last_retry < 60:
+        return None
+    _auto_test_last_retry = now
+    try:
+        _auto_test = AutoTest(db_path="data/predictor.sqlite")
+        logger.info("AutoTest initialisé (reprise après échec au démarrage).")
+        try:
+            _autotest_generate_hourly(time.gmtime(time.time()).tm_hour)
+        except Exception as _ge:
+            logger.warning(f"[AUTOTEST] Génération après reprise: {_ge}")
+    except Exception as _ie:
+        logger.warning(f"AutoTest init (nouvelle tentative) échoué: {_ie}")
+    return _auto_test
 
 def is_meteor_shower_active():
     now = time.gmtime(time.time())
@@ -2126,7 +2454,24 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-def calculate_spd_score(call, band, mode, comment, country, dist_km):
+def calculate_spd_score(call, band, mode, comment, country, dist_km, config=None):
+    """
+    Calcule le SPD score d'un spot.
+    
+    Args:
+        config: dict avec clés "distance_bonus_hf" (défaut 5)
+    """
+    # Charger config active si non fournie
+    if config is None:
+        try:
+            active = _model_registry.get_active_model() if _model_registry else None
+            config = active.get("config", {}) if active else {}
+        except Exception:
+            config = {}
+    
+    # Valeurs par défaut
+    distance_bonus_hf = config.get("distance_bonus_hf", 5)
+    
     score = 10
     call = call.upper()
     comment = (comment or "").upper()
@@ -2147,7 +2492,13 @@ def calculate_spd_score(call, band, mode, comment, country, dist_km):
         score += 10
 
     if dist_km and dist_km > 1000:
-        distance_bonus = min(20, 20 * math.log10(dist_km / 1000))
+        if band in VHF_BANDS or band == 'QO-100':
+            # VHF/satellite : la distance EST l'indicateur de propagation
+            distance_bonus = min(20, 20 * math.log10(dist_km / 1000))
+        else:
+            # HF : la distance est normale, pas un signal fort de propagation
+            # Cap adaptatif depuis active_model.config["distance_bonus_hf"]
+            distance_bonus = min(distance_bonus_hf, distance_bonus_hf * math.log10(dist_km / 1000))
         score += distance_bonus
 
     if band == 'QO-100':
@@ -2155,8 +2506,10 @@ def calculate_spd_score(call, band, mode, comment, country, dist_km):
     elif band in VHF_BANDS:
         score += 30
 
-    if band in ['10m', '12m', '15m']:
-        score += 15
+    # v12.7 : bonus 10/12/15m SUPPRIMÉ — données vérifiées (n=2761) :
+    # 10m prédit 41% vs réalisé 3.3% (x12.5 sur-confiant)
+    # Le bonus gonflait artificiellement le score sans refléter la réalité.
+    # (anciennement : if band in ['10m', '12m', '15m']: score += 15)
 
     return min(int(score), 100)
 
@@ -2282,6 +2635,11 @@ def get_band_and_mode_smart(freq_float, comment):
     psk31_min, psk31_max = PSK31_HF_FREQ_RANGE_KHZ
     is_psk31 = (band == "20m" and psk31_min <= freq_khz <= psk31_max)
 
+    # JTTY (WSJT-X 3.2) — fréquences de rendez-vous proposées. Priorité basse :
+    # placé APRÈS FT4/FT8 dans le bloc PRIORITE pour que les collisions
+    # (10140/14090/18100) restent FT4/FT8 sauf override explicite par le commentaire.
+    is_jtty = any(abs(freq_khz - jf) <= JTTY_TOLERANCE_KHZ for jf in JTTY_FREQS_KHZ)
+
     # PRIORITE
     if is_ft2_hf:
         mode = "FT2"
@@ -2291,6 +2649,8 @@ def get_band_and_mode_smart(freq_float, comment):
         mode = "FT8"
     elif is_psk31:
         mode = "PSK31"
+    elif is_jtty:
+        mode = "JTTY"
 
     # CW
     if mode == "SSB":
@@ -2310,6 +2670,8 @@ def get_band_and_mode_smart(freq_float, comment):
         mode = "FT4"
     elif "FT8" in comment:
         mode = "FT8"
+    elif "JTTY" in comment:
+        mode = "JTTY"
     elif "CW" in comment and mode == "SSB":
         mode = "CW"
     elif "FM" in comment:
@@ -2366,12 +2728,13 @@ def load_cty_dat(force_download: bool = False):
                 try:
                     lat = float(p[4])
                     # cty.dat convention : longitude stockée en degrés OUEST positifs.
-                    # Conversion en degrés EST (standard géographique) : lon_E = -lon_cty
-                    # MAIS certaines entrées modernes (dont Big Omaha et country-files.com)
-                    # stockent déjà en EST (valeurs négatives pour les longitudes Ouest).
-                    # Test : si p[5] est négatif → déjà en Est → pas de conversion.
+                    # L'Est y est donc NÉGATIF. Conversion en degrés EST (standard
+                    # géographique / Leaflet) : lon_E = -lon_cty, INCONDITIONNEL.
+                    # (l'ancien garde `if raw_lon >= 0` laissait l'Est négatif → toutes
+                    #  les entités à l'Est finissaient dans l'hémisphère miroir :
+                    #  Ukraine dans l'Atlantique, Corée au large de la Californie.)
                     raw_lon = float(p[5])
-                    lon = -raw_lon if raw_lon >= 0 else raw_lon
+                    lon = -raw_lon
                 except Exception:
                     lat, lon = 0.0, 0.0
                 try:
@@ -2394,23 +2757,25 @@ def load_cty_dat(force_download: bool = False):
             if download_cty():
                 return load_cty_dat(force_download=False)
 
-        # ── Corrections post-parsing : entrées cty.dat avec signe de longitude erroné ──
-        # Le fichier country-files.com utilise une convention mixte : certaines entrées
-        # Pacifique Ouest sont stockées avec une longitude négative (déjà en Est) alors
-        # que d'autres sont positives (convention Ouest). Notre parseur applique -lon si
-        # lon >= 0, ce qui est correct pour la majorité mais faux pour ces 8 entités.
-        # On corrige directement dans prefix_db après le parsing plutôt que de complexifier
-        # le parseur avec des cas particuliers.
-        _CTY_LON_FIXES = {
-            # Préfixe : (lat, lon_correct_en_Est)   raison
-            '5W':    (-13.93,  171.70),  # Samoa indépendantes — cty positif → parseur donne -171.70 ❌
-            'KH0':   ( 15.18,  145.72),  # Mariannes — cty déjà négatif (-145.72) → reste ❌
-            'KH1':   (  0.00,  176.00),  # Baker & Howland — cty positif → -176.00 ❌
-            'KH2':   ( 13.37,  144.70),  # Guam — cty déjà négatif (-144.70) → reste ❌
-            'KH4':   ( 28.20,  177.37),  # Midway — cty positif → -177.37 ❌
-            'KH5':   (  5.87,  162.07),  # Palmyra & Jarvis — cty positif → -162.07 ❌
-            'KH7K':  ( 29.00,  178.00),  # Kure Island — cty positif → -178.00 ❌
-            'KH8/s': (-11.05,  171.25),  # Swains Island — cty positif → -171.25 ❌
+        # ── Corrections post-parsing : NEUTRALISÉES ──
+        # Ces rustines compensaient l'ancien parseur (`lon = -raw_lon if raw_lon >= 0
+        # else raw_lon`) qui laissait l'Est négatif. Le parseur est désormais correct
+        # (`lon = -raw_lon` inconditionnel) : il donne le bon signe pour TOUTES les
+        # entités, Est comme Ouest. Validé contre cty.dat sur UR/HL/JA/VK/KH2/5W/KH5.
+        # La table est conservée sous _CTY_LON_FIXES_OLD à titre d'archive : plusieurs
+        # de ses valeurs (5W, KH1, KH4, KH5, KH7K, KH8/s) avaient un signe FAUX et
+        # replaçaient Samoa/Palmyra/Midway du mauvais côté du Pacifique.
+        _CTY_LON_FIXES = {}
+        _CTY_LON_FIXES_OLD = {
+            # Préfixe : (lat, lon)   — ARCHIVE, ne pas réactiver sans revérifier le signe
+            '5W':    (-13.93,  171.70),
+            'KH0':   ( 15.18,  145.72),
+            'KH1':   (  0.00,  176.00),
+            'KH2':   ( 13.37,  144.70),
+            'KH4':   ( 28.20,  177.37),
+            'KH5':   (  5.87,  162.07),
+            'KH7K':  ( 29.00,  178.00),
+            'KH8/s': (-11.05,  171.25),
         }
         for pfx, (fix_lat, fix_lon) in _CTY_LON_FIXES.items():
             if pfx in prefix_db:
@@ -2641,33 +3006,157 @@ def get_country_info(call):
     return best
 
 # --- WORKERS ---
+_maint_last_run = 0.0
+
+def _sync_missing_dxcc_from_lotw():
+    """Alimente la table « DXCC manquants » du prédicteur à partir des données LoTW et des spots
+    récents (logique auparavant intégrée à la route /api/predictions, à l'identique)."""
+    try:
+        with lotw_lock:
+            dxcc_by_band = lotw_data.get("dxcc_by_band", {})
+        if dxcc_by_band:
+            missing = []
+            for band, confirmed_set in dxcc_by_band.items():
+                for s in list(spots_buffer)[-500:]:
+                    cty = s.get("country", "")
+                    if cty and cty != "Unknown" and cty not in confirmed_set:
+                        missing.append({"dxcc": cty, "band": band,
+                                        "mode": s.get("mode", "")})
+            if missing:
+                predictor.sync_missing_dxcc(missing)
+                predictor.invalidate_cache()
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _predictor_calibration_sample(sfi, kp, max_targets=40, horizon_h=6):
+    """v13.1 — Échantillon d'AUTO-CALIBRATION, utilisé quand aucune liste LoTW de DXCC manquants n'existe
+    (cache LoTW perdu, jamais synchronisé...). Le prédicteur ne journalise que des prédictions « DXCC
+    manquants » : sans LoTW il n'en émet aucune, donc rien n'est jamais vérifié et le panneau
+    « Précision & calibration » reste vide indéfiniment.
+    Ici on prend les couples (pays, bande) RÉCEMMENT ACTIFS dans les spots reçus et on journalise, avec le
+    vrai scoring du prédicteur, la prédiction « ce pays sera-t-il de nouveau spotté sur cette bande dans
+    les prochaines heures ? ». verify_predictions() les confronte ensuite aux spots réellement reçus.
+    Ces lignes ne touchent PAS à la liste « DXCC manquants » (la page d'accueil reste inchangée)."""
+    try:
+        import datetime as _dtm
+        seen, targets = set(), []
+        for s in reversed(list(spots_buffer)[-1500:]):
+            cty, band = s.get("country", ""), s.get("band", "")
+            if not cty or cty == "Unknown" or not band or (cty, band) in seen:
+                continue
+            seen.add((cty, band))
+            targets.append((cty, band))
+            if len(targets) >= max_targets:
+                break
+        if not targets:
+            return 0
+        now = time.time()
+        rows = []
+        for delta_h in range(1, horizon_h + 1):
+            future_ts = now + delta_h * 3600
+            fdt = _dtm.datetime.fromtimestamp(future_ts, tz=_dtm.timezone.utc)
+            for cty, band in targets:
+                info = predictor._resolver.resolve(cty)
+                prefix = info["prefix"] if info else cty.upper()[:3]
+                score, model = predictor._score_window(fdt.month, fdt.hour, band, prefix, sfi, kp)
+                rows.append({"ts_utc": int(future_ts), "band": band, "dxcc": cty, "prefix": prefix,
+                             "model": model, "score": round(score, 3)})
+        predictor._log_predictions(rows, now)
+        return len(rows)
+    except Exception as _ce:
+        logger.warning(f"[CALIB] échantillon d'auto-calibration échoué : {_ce}")
+        return 0
+
+
+def _predictor_autolog():
+    """v13.1 — prediction_log (source de la calibration) n'était alimentée QUE par la route
+    /api/predictions, appelée par la page d'accueil, et seulement pour les DXCC manquants issus de LoTW.
+    Sans onglet ouvert sur la page d'accueil, ou sans cache LoTW, aucune prédiction n'était journalisée
+    → jamais rien à vérifier → panneau « Précision & calibration » vide à vie.
+    On déclenche donc la génération côté serveur ; à défaut de liste LoTW, échantillon d'auto-calibration."""
+    try:
+        with solar_lock:
+            _s = float(solar_cache.get("sfi") or 120)
+            _k = float(solar_cache.get("kp") or 2)
+    except Exception:
+        _s, _k = 120.0, 2.0
+    _sync_missing_dxcc_from_lotw()
+    preds = []
+    try:
+        preds = predictor.get_predictions(sfi=_s, kp=_k)
+    except Exception as _pe:
+        logger.warning(f"predictor.get_predictions (auto) a échoué : {_pe}")
+    if not preds:
+        n = _predictor_calibration_sample(_s, _k)
+        if n:
+            logger.info(f"[CALIB] {n} prédictions d'auto-calibration soumises (aucun DXCC manquant LoTW)")
+
 def history_maintenance_worker():
     """Tâche de maintenance pour décaler l'historique 30min/12h à chaque période."""
     threading.current_thread().name = 'HistoryWorker'
     logger.info("HistoryWorker démarré (30min/12h).")
+    global _maint_last_run
+    _predictor_autolog()      # prédictions de calibration dès le démarrage (sans attendre HH:30)
     while True:
+        # v13.1 fix : attendre la PROCHAINE frontière HH:00 / HH:30 puis ne passer qu'UNE fois.
+        # Avant : à HH:00:05 le calcul d'attente retombait à 0 s (minute % 30 == 0) → le corps de boucle
+        # se rejouait toutes les ~6 s pendant une minute (≈10 passages/slot : rotation de l'historique
+        # 30 min décalée ×10, cycle nocturne relancé en rafale, vérifications dupliquées).
+        _now = time.time()
+        seconds_until_next_slot = (int(_now // 1800) + 1) * 1800 - _now
+        logger.debug(f"Prochaine rotation dans {int(seconds_until_next_slot)} secondes.")
+        time.sleep(seconds_until_next_slot + 5)
         now_utc = time.gmtime(time.time())
         current_minute = now_utc.tm_min
         current_hour = now_utc.tm_hour
-        minutes_until_next_slot = (30 - (current_minute % 30)) % 30
-        seconds_until_next_slot = minutes_until_next_slot * 60 - now_utc.tm_sec
-
-        # Correction : on s'assure que le temps est toujours positif
-        if seconds_until_next_slot < 0:
-            seconds_until_next_slot = 0
-
-        logger.debug(f"Prochaine rotation dans {seconds_until_next_slot} secondes.")
-        time.sleep(seconds_until_next_slot + 5)
+        _maint_last_run = time.time()
         save_wl_activity()   # persister l'activité watchlist toutes les 30 min
         if _ANALYTICS_OK:
             try: _analytics_mod.cleanup_store(90)
             except Exception as _ce: logger.debug(f"analytics.cleanup_store: {_ce}")
         try: predictor.cleanup_old_data(90)
         except Exception: pass
+        _predictor_autolog()   # v13.1 : alimente prediction_log sans navigateur ouvert
         # v11 : vérifier les prédictions échues contre les spots réels reçus
         # — alimente la fiabilité mesurée affichée dans le panel cockpit.
-        try: predictor.verify_predictions()
-        except Exception as e: logger.debug(f"predictor.verify_predictions: {e}")
+        # v12.7 : WARNING et non DEBUG — un échec récurrent (ex. base corrompue)
+        # doit être VISIBLE, pas avalé en silence pendant des semaines.
+        try:
+            predictor.verify_predictions()
+        except Exception as e:
+            logger.warning(f"predictor.verify_predictions a échoué : {e}")
+
+        # v13.0 — Optimisation auto une fois par jour (3h UTC)
+        # v13.0 §32 — Multi-window cycle nocturne
+        if _nightly_cycle and current_hour == 3 and current_minute < 5:
+            try:
+                logger.info("[NIGHTLY] Lancement cycle nocturne multi-window (7d/14d/30d)...")
+                result = _nightly_cycle.run()
+                logger.info(f"[NIGHTLY] Résultat: {result}")
+            except Exception as _nightly_e:
+                logger.warning(f"[NIGHTLY] Cycle échoué: {_nightly_e}")
+        elif _optimizer and current_hour == 3 and current_minute < 5:
+            # Fallback si NightlyCycle pas dispo
+            try:
+                logger.info("[OPT] Lancement optimisation nocturne (fallback)...")
+                _optimizer.optimize(
+                    param_grid={
+                        "distance_bonus_hf": [3, 5, 7],
+                    },
+                    lookback_days=30
+                )
+                logger.info("[OPT] Optimisation complétée.")
+            except Exception as _opt_e:
+                logger.warning(f"[OPT] Optimisation échouée: {_opt_e}")
+
+        # v13.0 §24 — Prédictions Auto-Test de l'heure courante (idempotent, ~chaque 30 min)
+        try:
+            _autotest_generate_hourly(time.gmtime(time.time()).tm_hour)
+        except Exception as _ate:
+            logger.warning(f"[AUTOTEST] Génération horaire: {_ate}")
 
         with history_lock:
             for band in HISTORY_BANDS:
@@ -2847,6 +3336,21 @@ def telnet_worker():
                         }
                         spots_buffer.append(spot_obj)
 
+                        # ── v13.0 : Auto-Test (CDC §24) ────────────────
+                        if _auto_test:
+                            try:
+                                ts_spot = spot_obj.get('timestamp', time.time())
+                                _auto_test.validate_spot(ts_spot, band, dx_call, mode=mode, drift_monitor=_drift_monitor)
+                            except Exception as _ate:
+                                logger.debug(f"auto_test.validate_spot: {_ate}")
+
+                        # ── v13.0 : Propagation Events FSM ────────────────
+                        if _prop_fsm:
+                            try:
+                                _prop_fsm.feed_spot(spot_obj)
+                            except Exception as _fsm_e:
+                                logger.debug(f"prop_fsm.feed_spot: {_fsm_e}")
+
                         # ── v10.0 : Predictor — collecte SQLite ─────────────
                         try:
                             _is_wl = spot_obj.get("dx_call","").upper() in watchlist
@@ -2863,7 +3367,12 @@ def telnet_worker():
                             try:
                                 _analytics_mod.record_spot(spot_obj)
                             except Exception as _ae:
-                                logger.debug(f"analytics.record_spot: {_ae}")
+                                # v13.1 fix : était en logger.debug() → invisible
+                                # (logger configuré en INFO, cf. bug AutoTest identique).
+                                # Un échec systématique de record_spot() produisait un
+                                # "Activité récente" quasi plat pendant des heures sans
+                                # aucune trace exploitable dans les logs.
+                                logger.warning(f"[ANALYTICS] record_spot a échoué: {_ae}")
 
                         # ── v10.0 : Alertes ntfy ───────────────────────────
                         try:
@@ -3084,6 +3593,24 @@ def api_spot():
         return jsonify({'ok': False, 'error': 'Cluster not connected'}), 503
     logger.info(f"Spot TX: {cmd}")
     return jsonify({'ok': True, 'sent': cmd})
+
+
+@app.route('/api/callsign/resolve')
+def api_callsign_resolve():
+    """Résout un indicatif via la base cty.dat / géolocalisation déjà chargée."""
+    call = (request.args.get('call') or '').upper().strip()
+    if not call or not re.match(r'^[A-Z0-9/]{3,20}$', call):
+        return jsonify({'ok': False, 'error': 'Indicatif invalide'}), 400
+    info = get_country_info(call)
+    lat, lon, precise = get_precise_latlon(call)
+    country = info.get('c', 'Unknown')
+    if (not lat and not lon) or country == 'Unknown':
+        return jsonify({'ok': False, 'call': call, 'error': 'Indicatif non résolu dans cty.dat'}), 404
+    return jsonify({
+        'ok': True, 'call': call, 'country': country,
+        'dxcc_num': info.get('dxcc_num', 0),
+        'lat': lat, 'lon': lon, 'precise': bool(precise)
+    })
 
 @app.route('/user_location.json')
 def get_user_location():
@@ -3319,7 +3846,26 @@ def get_ranking():
         return top
     hf_spots = [s for s in active if s['type'] == 'HF']
     vhf_spots = [s for s in active if s['type'] == 'VHF']
-    return jsonify({"hf": get_top_for_list(hf_spots), "vhf": get_top_for_list(vhf_spots)})
+    
+    # Extraire expéditions en cours du briefing en cache
+    expedition_calls = {}
+    try:
+        with briefing_lock:
+            briefing_payload = briefing_cache.get("payload")
+        if briefing_payload and briefing_payload.get("items"):
+            expeditions = extract_expeditions(briefing_payload)
+            all_calls = set()
+            for spots_list in [hf_spots, vhf_spots]:
+                all_calls.update(s.get('dx_call', '').upper() for s in spots_list if s.get('dx_call'))
+            expedition_calls = match_calls(list(all_calls), expeditions)
+    except Exception as e:
+        logger.debug(f"expedition extraction in /wanted.json: {e}")
+    
+    return jsonify({
+        "hf": get_top_for_list(hf_spots),
+        "vhf": get_top_for_list(vhf_spots),
+        "expedition_calls": expedition_calls
+    })
 
 def _parse_end_date_from_title(title):
     """Extrait la date de fin depuis un titre NG3K.
@@ -5211,6 +5757,18 @@ def _wsjtx_inject_spot(decode, dial_freq_hz, wsjtx_mode):
 
     spots_buffer.append(spot_obj)
     wsjtx_spots.append(spot_obj)
+    
+    # v13.0 : Auto-Test (CDC §24)
+    if _auto_test:
+        try:
+            _auto_test.validate_spot(now, band, dx_call, mode=mode, drift_monitor=_drift_monitor)
+        except Exception as _ate:
+            logger.debug(f"auto_test.validate_spot (WSJTX): {_ate}")
+    
+    # v13.0 : FSM
+    if _prop_fsm:
+        try: _prop_fsm.feed_spot(spot_obj)
+        except Exception: pass
     # Mettre à jour l'activité watchlist
     _dx = spot_obj.get("dx_call", "").upper()
     if _dx and _dx in watchlist:
@@ -5495,6 +6053,276 @@ def api_weather_lightning():
     })
 
 
+# ── v13.0 : API Propagation Events FSM (CDC §8) ──────────────────────
+
+@app.route("/api/adaptive/fsm.json")
+def api_adaptive_fsm():
+    """État courant de toutes les bandes suivies par la FSM."""
+    if not _prop_fsm:
+        return jsonify({"ok": False, "reason": "FSM non initialisée"}), 200
+    return jsonify({"ok": True, "states": _prop_fsm.get_all_states()})
+
+@app.route("/api/adaptive/events.json")
+def api_adaptive_events():
+    """Événements de propagation récents (terminés)."""
+    if not _prop_fsm:
+        return jsonify({"ok": False, "events": []}), 200
+    band = request.args.get("band")
+    limit = request.args.get("limit", default=20, type=int)
+    return jsonify({"ok": True, "events": _prop_fsm.recent_events(band, limit)})
+
+@app.route("/api/adaptive/fsm_stats.json")
+def api_adaptive_fsm_stats():
+    """Statistiques globales des événements de propagation."""
+    if not _prop_fsm:
+        return jsonify({"ok": False}), 200
+    return jsonify({"ok": True, **_prop_fsm.stats()})
+
+
+# ── v13.0 : API Backtester + Optimizer (CDC §12+13) ──────────────────
+
+@app.route("/api/adaptive/optimize.json", methods=["POST"])
+def api_adaptive_optimize():
+    """Lance une optimisation de config (lourde, async recommandé)."""
+    if not _optimizer:
+        return jsonify({"ok": False, "error": "Optimizer pas disponible"}), 200
+    
+    # Stub : simplement lancer une optimize light
+    # En prod, ceci serait un job background (celery, rq, etc.)
+    param_grid = request.json.get("param_grid", {
+        "distance_bonus_hf": [3, 5, 7],
+    })
+    lookback_days = request.json.get("lookback_days", 30)
+    
+    try:
+        best_cfg, best_metrics = _optimizer.optimize(
+            param_grid=param_grid,
+            lookback_days=lookback_days
+        )
+        
+        # v13.0 — §14+15 : Créer une candidate et valider
+        candidate_id = None
+        qg_result = None
+        if _model_registry and best_cfg:
+            candidate_id = _model_registry.create_candidate(
+                config=best_cfg,
+                source_run_id=None,  # ID de la run seria mieux (TODO)
+                metrics=best_metrics
+            )
+            logger.info(f"[MODEL] Candidate {candidate_id} created from optimize")
+            
+            # Auto-valider
+            if _quality_gate and candidate_id:
+                qg_result = _quality_gate.validate_and_promote(candidate_id)
+                logger.info(f"[QG] Validation result: promoted={qg_result.get('promoted')}")
+        
+        return jsonify({
+            "ok": True,
+            "best_config": best_cfg,
+            "best_metrics": best_metrics,
+            "candidate_id": candidate_id,
+            "qg_result": qg_result,
+        })
+    except Exception as e:
+        logger.warning(f"api_optimize: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 200
+
+@app.route("/api/adaptive/optimizer_runs.json")
+def api_adaptive_optimizer_runs():
+    """Historique des runs d'optimisation."""
+    if not _optimizer:
+        return jsonify({"ok": False, "runs": []}), 200
+    limit = request.args.get("limit", default=20, type=int)
+    runs = _optimizer.latest_runs(limit)
+    return jsonify({"ok": True, "runs": runs})
+
+@app.route("/api/adaptive/optimizer_run/<int:run_id>.json")
+def api_adaptive_optimizer_run(run_id):
+    """Détails des résultats d'une run."""
+    if not _optimizer:
+        return jsonify({"ok": False, "results": []}), 200
+    results = _optimizer.run_results(run_id)
+    return jsonify({"ok": True, "results": results})
+
+
+# ── v13.0 : API Adaptive Models + Quality Gate (CDC §14+15) ────────────
+
+@app.route("/api/adaptive/models/active.json")
+def api_adaptive_models_active():
+    """Récupère le modèle ACTIVE courant."""
+    if not _model_registry:
+        return jsonify({"ok": False, "active": None}), 200
+    active = _model_registry.get_active_model()
+    return jsonify({"ok": True, "active": active})
+
+@app.route("/api/adaptive/models/candidates.json")
+def api_adaptive_models_candidates():
+    """Liste les candidates non validées."""
+    if not _model_registry:
+        return jsonify({"ok": False, "candidates": []}), 200
+    limit = request.args.get("limit", default=10, type=int)
+    candidates = _model_registry.list_candidates(limit)
+    return jsonify({"ok": True, "candidates": candidates})
+
+@app.route("/api/adaptive/models/versions.json")
+def api_adaptive_models_versions():
+    """Liste toutes les versions de modèles."""
+    if not _model_registry:
+        return jsonify({"ok": False, "versions": []}), 200
+    limit = request.args.get("limit", default=20, type=int)
+    versions = _model_registry.list_versions(limit)
+    return jsonify({"ok": True, "versions": versions})
+
+@app.route("/api/adaptive/models/stats.json")
+def api_adaptive_models_stats():
+    """Statistiques globales des modèles."""
+    if not _model_registry:
+        return jsonify({"ok": False}), 200
+    stats = _model_registry.stats()
+    return jsonify({"ok": True, **stats})
+
+@app.route("/api/adaptive/qg/status.json")
+def api_adaptive_qg_status():
+    """État global du Quality Gate."""
+    if not _quality_gate:
+        return jsonify({"ok": False}), 200
+    status = _quality_gate.get_status()
+    return jsonify(status)
+
+@app.route("/api/adaptive/qg/validate/<int:candidate_id>.json", methods=["POST"])
+def api_adaptive_qg_validate(candidate_id):
+    """Valide et promeut une candidate."""
+    if not _quality_gate:
+        return jsonify({"ok": False, "error": "QualityGate pas disponible"}), 200
+    result = _quality_gate.validate_and_promote(candidate_id)
+    return jsonify({"ok": result["ok"], **result})
+
+@app.route("/api/adaptive/qg/auto_validate.json", methods=["POST"])
+def api_adaptive_qg_auto_validate():
+    """Auto-valide la dernière candidate."""
+    if not _quality_gate:
+        return jsonify({"ok": False}), 200
+    result = _quality_gate.auto_validate_latest()
+    if result is None:
+        return jsonify({"ok": True, "message": "No candidates to validate"}), 200
+    return jsonify({"ok": result["ok"], **result})
+
+
+# ── v13.0 : API Nightly Cycle (CDC §32) ────────────────────────────────
+
+@app.route("/api/adaptive/nightly/latest.json")
+def api_adaptive_nightly_latest():
+    """Récupère les derniers runs du cycle nocturne."""
+    if not _nightly_cycle:
+        return jsonify({"ok": False, "runs": []}), 200
+    limit = request.args.get("limit", default=10, type=int)
+    runs = _nightly_cycle.latest_runs(limit)
+    return jsonify({"ok": True, "runs": runs})
+
+@app.route("/api/adaptive/nightly/stats.json")
+def api_adaptive_nightly_stats():
+    """Statistiques du cycle nocturne."""
+    if not _nightly_cycle:
+        return jsonify({"ok": False}), 200
+    stats = _nightly_cycle.stats()
+    return jsonify({"ok": True, **stats})
+
+@app.route("/api/adaptive/nightly/run.json", methods=["POST"])
+def api_adaptive_nightly_run():
+    """Lance manuellement le cycle nocturne (normalement 3h UTC auto)."""
+    if not _nightly_cycle:
+        return jsonify({"ok": False, "error": "NightlyCycle pas disponible"}), 200
+    try:
+        result = _nightly_cycle.run()
+        return jsonify(result)
+    except Exception as e:
+        logger.warning(f"api_nightly_run: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 200
+
+
+# ── v13.0 : API Drift Monitor (CDC §25) ────────────────────────────────
+
+@app.route("/api/adaptive/drift/check.json", methods=["POST"])
+def api_adaptive_drift_check():
+    """Vérifie le drift du modèle ACTIVE."""
+    if not _drift_monitor:
+        return jsonify({"ok": False, "error": "DriftMonitor pas disponible"}), 200
+    result = _drift_monitor.check_drift()
+    return jsonify(result)
+
+@app.route("/api/adaptive/drift/latest.json")
+def api_adaptive_drift_latest():
+    """Récupère les derniers checks de drift."""
+    if not _drift_monitor:
+        return jsonify({"ok": False, "checks": []}), 200
+    limit = request.args.get("limit", default=10, type=int)
+    checks = _drift_monitor.latest_checks(limit)
+    return jsonify({"ok": True, "checks": checks})
+
+@app.route("/api/adaptive/drift/stats.json")
+def api_adaptive_drift_stats():
+    """Statistiques de drift."""
+    if not _drift_monitor:
+        return jsonify({"ok": False}), 200
+    stats = _drift_monitor.stats()
+    return jsonify({"ok": True, **stats})
+
+
+# v13.0 — Auto-Test (CDC §24) APIs
+@app.route("/api/adaptive/autotest/latest.json")
+def api_adaptive_autotest_latest():
+    """Récupérer les prédictions auto-test récentes."""
+    _at = _get_auto_test()
+    if not _at:
+        return jsonify({"ok": False, "error": "AutoTest non initialisé "
+                        f"(import {'OK' if _AUTOTEST_OK else 'ÉCHOUÉ'} — voir les logs au démarrage)"}), 200
+    band = request.args.get("band")
+    limit = request.args.get("limit", 50, type=int)
+    try:
+        preds = _at.get_recent_predictions(limit=limit, band=band)
+    except Exception as e:
+        # v13.0 fix (2026-10-02) : évite une 500 muette — on veut voir la
+        # vraie cause (ex. table/colonne manquante) dans les logs.
+        logger.warning(f"[AUTOTEST] get_recent_predictions a échoué: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 200
+    return jsonify({"ok": True, "predictions": preds})
+
+
+@app.route("/api/adaptive/autotest/stats.json")
+def api_adaptive_autotest_stats():
+    """Statistiques auto-test."""
+    _at = _get_auto_test()
+    if not _at:
+        return jsonify({"ok": False, "error": "AutoTest non initialisé "
+                        f"(import {'OK' if _AUTOTEST_OK else 'ÉCHOUÉ'} — voir les logs au démarrage)"}), 200
+    try:
+        stats = _at.stats()
+    except Exception as e:
+        logger.warning(f"[AUTOTEST] stats() a échoué: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 200
+    return jsonify({"ok": True, **stats})
+
+
+@app.route("/api/adaptive/autotest/predict.json", methods=["POST"])
+def api_adaptive_autotest_predict():
+    """Générer une prédiction pour une bande/heure donnée."""
+    _at = _get_auto_test()
+    if not _at:
+        return jsonify({"ok": False, "error": "AutoTest non initialisé"}), 200
+    
+    data = request.get_json() or {}
+    band = data.get("band", "6m")
+    mode = data.get("mode", "FT8")
+    hour_utc = int(data.get("hour_utc", 12))
+    
+    try:
+        prob = _at.predict_for_hour(band, mode, hour_utc)
+        return jsonify({"ok": True, "band": band, "mode": mode, "hour_utc": hour_utc, "probability": prob})
+    except Exception as e:
+        logger.warning(f"api_adaptive_autotest_predict: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
 @app.route("/api/weather/wspr.json")
 def api_weather_wspr():
     """Snapshot WSPR courant (débogage/transparence — source prioritaire
@@ -5509,6 +6337,126 @@ def api_weather_wspr():
         "fetched_at": wspr_cache.get("ts"),
         "age_s": int(time.time() - wspr_cache.get("ts", time.time())),
     })
+
+
+@app.route("/api/adaptive/calibration.json")
+def api_adaptive_calibration():
+    """
+    v13.0 — Adaptive Insight Engine (boucle OODA).
+    Retourne la calibration mesurée du prédicteur : courbe score→réalité,
+    Brier score et erreur de calibration (ECE) par modèle (es/hf/tropo).
+
+    C'est la restitution honnête de « est-ce que mes prédictions passées
+    étaient justes ? » — dérivée de prediction_log déjà vérifiée par
+    predictor.verify_predictions(). Aucune donnée n'est inventée : si le
+    prédicteur est trop jeune, les champs valent None avec un statut clair.
+    """
+    days = request.args.get("days", default=90, type=int)
+    days = max(7, min(365, days))  # borne raisonnable
+    try:
+        data = calibrator.summary(days=days)
+    except Exception as e:
+        logger.warning(f"api_adaptive_calibration: {e}")
+        return jsonify({"ok": False, "reason": str(e), "models": {}}), 200
+    # v12.7 : timestamps pour affichage "dernière vérification / prochaine dans…"
+    data["server_ts"] = time.time()
+    try:
+        _pdb = sqlite3.connect(str(Path("data/predictor.sqlite")))
+        _row = _pdb.execute("SELECT MAX(verified_ts) FROM prediction_log WHERE verified=1").fetchone()
+        data["last_verified_ts"] = _row[0] if _row else None
+        # v13.1 : progression de l'apprentissage — « aucune donnée » ne veut pas dire « en panne ».
+        _lg = _pdb.execute(
+            "SELECT COUNT(*), SUM(CASE WHEN verified=0 THEN 1 ELSE 0 END), "
+            "MIN(CASE WHEN verified=0 THEN target_ts_end END) FROM prediction_log").fetchone()
+        data["logged_total"] = int(_lg[0] or 0)
+        data["pending"] = int(_lg[1] or 0)
+        data["next_verification_ts"] = _lg[2]
+        _pdb.close()
+    except Exception as _ce:
+        data["last_verified_ts"] = data.get("last_verified_ts")
+        data["progress_error"] = str(_ce)
+    return jsonify(data)
+
+
+@app.route("/api/insight/diagnostic.json")
+def api_insight_diagnostic():
+    """v13.1 — État de chaque module qui alimente la page AI Insight, avec la cause probable et le
+    remède. Évite les « aucune donnée » sans explication.  curl http://<pi>:8000/api/insight/diagnostic.json"""
+    mods = {}
+    def mod(name, status, detail, hint=""):
+        mods[name] = {"status": status, "detail": detail, "hint": hint}
+
+    # Flux de spots (cluster telnet)
+    try:
+        with spot_history_lock:
+            _n = len(spot_history)
+            _last = max((e.get("ts", 0) for e in spot_history), default=0)
+        age = int(time.time() - _last) if _last else None
+        if _n == 0:
+            mod("flux_spots", "error", "aucun spot en mémoire", "cluster telnet non connecté : grep TelnetWorker radio_spot_watcher.log | tail")
+        elif age is not None and age > 900:
+            mod("flux_spots", "warn", f"{_n} spots, dernier il y a {age//60} min", "flux cluster interrompu ?")
+        else:
+            mod("flux_spots", "ok", f"{_n} spots en mémoire, dernier il y a {age} s")
+    except Exception as e:
+        mod("flux_spots", "error", str(e))
+
+    # Auto-Test
+    _at = _get_auto_test()
+    if _at is None:
+        mod("autotest", "error", f"instance absente (import {'OK' if _AUTOTEST_OK else 'ÉCHOUÉ'})",
+            "vérifier adaptive/auto_test.py puis : grep -i autotest radio_spot_watcher.log | tail")
+    else:
+        try:
+            s = _at.stats()
+            tot, val = s.get("total_predictions", 0), s.get("validated", 0)
+            mod("autotest", "ok" if tot else "warn", f"{tot} prédictions, {val} validées",
+                "" if tot else "aucune prédiction : le cycle horaire en génère 10 à HH:00 et HH:30")
+        except Exception as e:
+            mod("autotest", "error", str(e), "base data/predictor.sqlite verrouillée ou illisible")
+
+    # Calibration / prédicteur
+    try:
+        _c = sqlite3.connect("data/predictor.sqlite", timeout=10)
+        tot, ver, nxt = _c.execute("SELECT COUNT(*), SUM(verified), MIN(CASE WHEN verified=0 THEN target_ts_end END) FROM prediction_log").fetchone()
+        sp = _c.execute("SELECT COUNT(*) FROM spot_log").fetchone()[0]
+        _c.close()
+        tot, ver = int(tot or 0), int(ver or 0)
+        if tot == 0:
+            mod("calibration", "warn", f"prediction_log vide ({sp} spots dans spot_log)",
+                "se remplit automatiquement toutes les 30 min dès que le prédicteur a des spots")
+        elif ver == 0:
+            when = time.strftime("%H:%M UTC", time.gmtime(nxt)) if nxt else "bientôt"
+            mod("calibration", "warn", f"{tot} prédictions journalisées, 0 vérifiée", f"première vérification vers {when}")
+        else:
+            mod("calibration", "ok", f"{ver}/{tot} prédictions vérifiées")
+    except Exception as e:
+        mod("calibration", "error", str(e), "table prediction_log absente : redémarrer l'application")
+
+    # Analytique
+    try:
+        st = _analytics_mod.store_status() if _ANALYTICS_OK else {}
+        rows = st.get("rows", 0)
+        mod("analytics", "ok" if rows else "warn", f"{rows} lignes sur {st.get('span_hours', 0)} h",
+            "" if rows else "base analytics.sqlite vide : se remplit avec les spots reçus")
+    except Exception as e:
+        mod("analytics", "error", str(e))
+
+    # VOACAP
+    if _voacap_adapter_ok:
+        mod("voacap", "info", "prédictions HF via estimation SFI/Kp (moteur VOACAP optionnel, non installé)")
+    else:
+        mod("voacap", "info", "prédictions HF via estimation SFI/Kp (moteur VOACAP optionnel, non installé)")
+
+    # Tâche de maintenance (génération horaire, vérification, rotation)
+    if _maint_last_run:
+        a = int(time.time() - _maint_last_run)
+        mod("maintenance", "ok" if a < 3600 else "error", f"dernier passage il y a {a//60} min",
+            "" if a < 3600 else "thread HistoryWorker arrêté : redémarrer l'application")
+    else:
+        mod("maintenance", "warn", "premier passage attendu à la prochaine frontière HH:00/HH:30")
+
+    return jsonify({"version": APP_VERSION, "ts": time.time(), "modules": mods})
 
 
 @app.route("/api/weather/synthesis.json")
@@ -5535,6 +6483,13 @@ def api_weather_beacons():
         "update_status": status,
         "ts": time.time(),
     })
+
+
+@app.route("/api/weather/storm_proximity.json")
+def api_weather_storm_proximity():
+    """v13.1 — Alerte orage proximité pour la page d'accueil (sécurité opérateur).
+    Pure distance, découplée du calcul QRN (voir get_storm_proximity_alert)."""
+    return jsonify(get_storm_proximity_alert())
 
 
 @app.route("/api/weather/alerts.json")
@@ -5827,11 +6782,47 @@ def api_voacap():
     return jsonify(result)
 
 
+def _voacap_internal_prediction(rx_lat, rx_lon, rx_name, freqs, sfi, kp, month, ssn):
+    """v13.1 — Estimation interne (SFI/Kp), même format de réponse que le moteur voacap, pour que le
+    panneau « Prédictions HF » reste utilisable quand le moteur réel n'est pas installé.
+    Modèle simplifié MUF/LUF — PAS du VOACAP : la réponse porte engine='internal' et le panneau l'affiche.
+    Heure solaire évaluée au POINT MILIEU du grand cercle (un circuit Europe→Japon n'est pas de jour
+    en même temps aux deux bouts), SNR non fourni (le modèle n'en calcule pas)."""
+    import math
+    dist_km = calculate_distance(user_lat, user_lon, float(rx_lat), float(rx_lon))
+    p1, l1 = math.radians(user_lat), math.radians(user_lon)
+    p2, l2 = math.radians(float(rx_lat)), math.radians(float(rx_lon))
+    bx, by = math.cos(p2) * math.cos(l2 - l1), math.cos(p2) * math.sin(l2 - l1)
+    mid_lon = math.degrees(l1 + math.atan2(by, math.cos(p1) + bx))
+    mid_lon = (mid_lon + 180.0) % 360.0 - 180.0
+    base_muf = _voacap_muf(sfi, dist_km)
+    hours = []
+    for h in range(24):
+        local = (h + mid_lon / 15.0) % 24.0
+        muf = base_muf * (1.0 + 0.2 * math.cos(math.pi * (local - 12.0) / 12.0))
+        luf = _voacap_luf(dist_km, int(local) % 24)
+        fr, best_f, best_r = {}, None, -1.0
+        for f in freqs:
+            rel = round(_voacap_reliability(f, muf, luf, int(local) % 24, dist_km, kp), 2)
+            fr[str(f)] = {"rel": rel, "snr": None}
+            if rel > best_r:
+                best_r, best_f = rel, f
+        hours.append({"hour_utc": h, "best_freq_mhz": best_f, "rel": max(best_r, 0.0),
+                      "snr": None, "frequencies": fr})
+    return {
+        "status": "ok", "engine": "internal",
+        "engine_note": "Estimation interne SFI/Kp (modèle simplifié MUF/LUF) — le moteur VOACAP réel "
+                       "n'est pas installé sur ce Pi.",
+        "hours": hours, "circuit": f"{MY_CALL} → {rx_name}", "dist_km": round(dist_km),
+        "month": month, "ssn": ssn, "sfi": sfi, "kp": kp,
+    }
+
+
 @app.route('/api/voacap/predict', methods=['POST'])
 def api_voacap_predict():
     """
     Prédiction VOACAP point-à-point réelle (v12.6), via le skill Reid
-    (voacapl). Distincte de /api/voacap (heuristique interne par zone
+    (voacap). Distincte de /api/voacap (heuristique interne par zone
     ci-dessus) : celle-ci appelle le vrai moteur VOACAP en subprocess,
     avec cache 24h car coûteux en CPU.
 
@@ -5839,10 +6830,6 @@ def api_voacap_predict():
       {"rx_lat": 40.7, "rx_lon": -74.0, "rx_name": "New York",
        "freqs": [3.5, 7.1, 14.2, 21.2, 28.4], "ssn": 75, "month": 9}
     """
-    if not _voacap_adapter_ok:
-        return jsonify({"status": "unavailable",
-                         "reason": "module voacap_adapter non chargé"}), 200
-
     payload = request.get_json(force=True, silent=True) or {}
 
     rx_lat = payload.get('rx_lat')
@@ -5867,18 +6854,43 @@ def api_voacap_predict():
         except (TypeError, ValueError):
             ssn = 75
 
-    freqs = payload.get('freqs') or [3.5, 7.1, 14.2, 21.2, 28.4]
+    freqs = payload.get('freqs') or [3.5, 7.1, 10.1, 14.2, 18.1, 21.2, 24.9, 28.4]
     try:
         freqs = [float(f) for f in freqs][:11]  # limite raisonnable par appel
     except (TypeError, ValueError):
         return jsonify({"status": "error", "reason": "freqs invalides"}), 400
 
-    result = voacap_adapter.run_prediction(
-        tx_name=MY_CALL, tx_lat=user_lat, tx_lon=user_lon,
-        rx_name=rx_name, rx_lat=float(rx_lat), rx_lon=float(rx_lon),
-        month=int(month), ssn=int(ssn), freqs=freqs,
-    )
-    return jsonify(result)
+    result = None
+    if _voacap_adapter_ok:
+        try:
+            result = voacap_adapter.run_prediction(
+                tx_name=MY_CALL, tx_lat=user_lat, tx_lon=user_lon,
+                rx_name=rx_name, rx_lat=float(rx_lat), rx_lon=float(rx_lon),
+                month=int(month), ssn=int(ssn), freqs=freqs,
+            )
+        except Exception as _ve:
+            logger.warning(f"voacap_adapter.run_prediction a échoué : {_ve}")
+        if isinstance(result, dict) and result.get("status") == "ok" and result.get("hours"):
+            result.setdefault("engine", "voacap")
+            return jsonify(result)
+        # moteur présent mais en échec → on le dit ET on retombe sur l'estimation interne
+        _why = (result or {}).get("reason") if isinstance(result, dict) else "échec du moteur"
+    else:
+        _why = "estimation interne SFI/Kp (VOACAP optionnel)"
+
+    with solar_lock:
+        _sfi_now, _kp_now = solar_cache.get('sfi'), solar_cache.get('kp')
+    try:
+        sfi_f = float(_sfi_now)
+    except (TypeError, ValueError):
+        sfi_f = 100.0
+    try:
+        kp_f = float(_kp_now) if _kp_now is not None else None
+    except (TypeError, ValueError):
+        kp_f = None
+    est = _voacap_internal_prediction(rx_lat, rx_lon, rx_name, freqs, sfi_f, kp_f, int(month), int(ssn))
+    est["fallback_reason"] = _why
+    return jsonify(est)
 
 # ============================================================
 # INTÉGRATION LoTW (Logbook of the World)
@@ -7487,23 +8499,7 @@ def api_predictions():
     except Exception:
         sfi, kp = 120, 2
 
-    try:
-        with lotw_lock:
-            dxcc_by_band = lotw_data.get("dxcc_by_band", {})
-            confirmed    = lotw_data.get("confirmed_dxcc", set())
-        if dxcc_by_band:
-            missing = []
-            for band, confirmed_set in dxcc_by_band.items():
-                for s in list(spots_buffer)[-500:]:
-                    cty = s.get("country", "")
-                    if cty and cty != "Unknown" and cty not in confirmed_set:
-                        missing.append({"dxcc": cty, "band": band,
-                                        "mode": s.get("mode", "")})
-            if missing:
-                predictor.sync_missing_dxcc(missing)
-                predictor.invalidate_cache()
-    except Exception:
-        pass
+    _sync_missing_dxcc_from_lotw()
 
     preds = predictor.get_predictions(sfi=sfi, kp=kp)
     return jsonify({"predictions": preds, "ts": time.time()})
@@ -7587,6 +8583,44 @@ def api_ntfy_test():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ── Route manquante: /api/alerts/ntfy.json pour ntfy_alerts.py ──────────────────
+@app.route("/api/alerts/ntfy.json", methods=["GET", "POST"])
+def api_alerts_ntfy():
+    """Exécuter tous les checks d'alerte ntfy.sh"""
+    try:
+        status = alerter.get_status()
+        return jsonify({
+            "status": "ok" if status.get("enabled") else "disabled",
+            "timestamp": datetime.utcnow().isoformat(),
+            "alerts": {
+                "new_dxcc_count": status.get("new_dxcc_count", 0),
+                "watchlist_count": status.get("watchlist_count", 0),
+                "es_6m": status.get("es_6m", False)
+            },
+            "config": {
+                "enabled": status.get("enabled", False),
+                "topic": status.get("topic", "radio-dx-f1smv"),
+                "watchlist": status.get("watchlist", [])
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"api_alerts_ntfy error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ── Route pour fixer le bug JN23 sur weather.html ────────────────────────────
+@app.route("/api/weather/config.json")
+def api_weather_config():
+    """Retourne la config QTH (lat/lon) pour que weather.html se centre correctement"""
+    return jsonify({
+        "qth_call": MY_CALL,
+        "qth_qra": DEFAULT_QRA,
+        "qth_lat": user_lat,
+        "qth_lon": user_lon,
+        "timestamp": time.time()
+    })
 
 
 @app.route("/history_highlights.json")

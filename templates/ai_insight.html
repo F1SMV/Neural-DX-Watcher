@@ -1,1107 +1,553 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/static/base.css">
-    <title>📊 Neural DX Watcher — DX Analytics</title>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neural DX Watcher — Adaptive Insight</title>
 <style>
-    :root {
-        --bg-color:#050505; --panel-bg:#0e0e0e; --text-main:#a0a0a0;
-        --accent:#00f3ff; --alert:#ff003c; --success:#22c55e; --warn:#ffc800;
-        --border:1px solid #333; --dim:#666; --line:#1e1e1e;
-    }
-    body[data-theme='light']{--bg-color:#fff;--panel-bg:#fff;--text-main:#111;
-        --accent:#0066ff;--alert:#d50000;--success:#0a0;--warn:#b58900;
-        --border:1px solid #d0d0d0;--dim:#777;--line:#e4e4e4;}
-    body[data-theme='dark']{--bg-color:#1a1a1a;--panel-bg:#2a2a2a;--text-main:#f0f0f0;
-        --accent:#00ff80;--alert:#ff6347;--success:#3d3;--warn:#ffd700;
-        --border:1px solid #555;--dim:#999;--line:#3a3a3a;}
-    body[data-theme='matrix']{--bg-color:#000;--panel-bg:#031503;--text-main:#00ff41;
-        --accent:#00ff41;--alert:#ff004c;--success:#0f0;--warn:#af0;
-        --border:1px solid #050;--dim:#0a5;--line:#052905;}
+:root{
+  --bg:#04101a;--bg2:#071722;--panel:#081b29;--panel2:#0a2131;--line:#14384d;
+  --cyan:#2bbcff;--blue:#1689ff;--green:#28e87d;--amber:#ffbd32;--red:#ff5364;
+  --text:#edf8ff;--muted:#86a8bb;--soft:#0d2a3b;
+}
+*{box-sizing:border-box} html{background:var(--bg)} body{margin:0;background:
+radial-gradient(circle at 50% -20%,#0c3550 0,transparent 38%),linear-gradient(180deg,#04111c,#03101a 60%,#020b12);
+color:var(--text);font:14px Inter,Segoe UI,Arial,sans-serif;min-height:100vh}
+a{color:inherit;text-decoration:none}.shell{max-width:1600px;margin:auto;padding:0 22px 28px}
+.top{height:76px;display:flex;align-items:center;border-bottom:1px solid #113248;gap:28px}
+.brand{min-width:350px}.brand b{font-size:20px;letter-spacing:1.5px}.brand b span{color:var(--cyan)}
+.brand small{display:block;color:#8db4ca;letter-spacing:2px;margin-top:5px;font-size:10px}
+.nav{display:flex;gap:8px;flex:1;justify-content:center}.nav a{padding:12px 15px;border-radius:10px;color:#9bbbd0}
+.nav a.active{background:#07345a;color:#45c4ff;box-shadow:inset 0 0 0 1px #0b4774}
+.live{display:flex;gap:18px;align-items:center;white-space:nowrap}.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+.clock{font:700 18px ui-monospace,SFMono-Regular,Consolas,monospace}.subclock{font-size:11px;color:var(--muted);margin-top:3px}
+.hero{display:grid;grid-template-columns:1.2fr .76fr .94fr;gap:16px;margin:18px 0}
+.card{background:linear-gradient(145deg,rgba(8,31,46,.96),rgba(5,22,34,.96));border:1px solid #14506d;border-radius:13px;box-shadow:0 12px 35px rgba(0,0,0,.2)}
+.hero-card{min-height:180px;padding:18px 20px}.title{font-size:13px;font-weight:800;color:#52c8ff;letter-spacing:.3px;text-transform:uppercase}
+.kpis{display:grid;grid-template-columns:1.2fr repeat(4,1fr);height:125px;align-items:center}
+.gauge{width:104px;height:104px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) var(--rate,0%),#123143 0);position:relative;margin:auto}
+.gauge:after{content:"";position:absolute;inset:10px;border-radius:50%;background:#071826}
+.gauge-in{position:relative;z-index:2;text-align:center}.gauge-in strong{display:block;font-size:28px}.gauge-in small{font-size:9px;color:#9eb9c9}
+.kpi{text-align:center;border-left:1px solid #113246}.kpi strong{font-size:25px}.kpi span{display:block;color:#9eb9c9;font-size:10px;margin-top:8px;text-transform:uppercase}
+.window{display:flex;flex-direction:column;justify-content:center}.window .big{font:800 29px ui-monospace,Consolas,monospace;margin:12px 0}.window .big span{color:var(--amber)}
+.window p{margin:3px 0;color:#c2d6e1}.solar{display:grid;grid-template-columns:1fr 130px;gap:15px}
+.map{border-radius:10px;background:radial-gradient(ellipse at center,#113a4d,#071927 65%);position:relative;overflow:hidden;min-height:130px}
+.map:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#2a526622 1px,transparent 1px),linear-gradient(90deg,#2a526622 1px,transparent 1px);background-size:30px 30px}
+.map:after{content:"HF / VHF  PROPAGATION";position:absolute;left:14px;bottom:12px;color:#4c7c95;font:10px ui-monospace,monospace;letter-spacing:1px}
+.indices{display:flex;flex-direction:column;justify-content:center}.idx{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #153345;color:#a7c3d2}.idx b{color:white}
+.toolbar{display:flex;gap:12px;align-items:center;padding:12px 16px;margin-bottom:14px;flex-wrap:wrap}.hours{display:flex;overflow:auto;flex:1}.hour{border:1px solid #15384c;border-right:0;padding:10px 18px;background:#071a27;color:#aac5d5;cursor:pointer}
+.hour:first-child{border-radius:8px 0 0 8px}.hour:last-child{border-right:1px solid #15384c;border-radius:0 8px 8px 0}.hour.active{background:#0877df;color:white;border-color:#169aff;box-shadow:0 0 18px #0b8cff44}
+.pill{border:1px solid #17445f;background:#082031;color:#a9c7d7;border-radius:9px;padding:9px 13px;cursor:pointer}.pill.on{color:#4cf18b;background:#073222;border-color:#145f3d}
+.forecast{overflow:hidden}.forecast-head{padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #15394e}
+.forecast-head h2{font-size:17px;margin:0;color:#61caff}.badge{font-size:11px;padding:5px 10px;border-radius:99px;border:1px solid #176e45;color:#4cf18b;background:#06311f}
+.updated{margin-left:auto;color:#88aabc;font-size:11px}.table{width:100%;border-collapse:collapse}.table th{padding:11px 15px;text-align:left;color:#83abc0;font-size:11px;font-weight:600;background:#071b28}
+.table td{padding:9px 15px;border-top:1px solid #103247;vertical-align:middle}.table tr:hover td{background:#0a2535}
+.band{font-weight:800;text-align:center;border-radius:7px;padding:7px 8px;display:inline-block;min-width:72px;color:white;box-shadow:inset 0 0 0 1px #ffffff16}
+.prob{display:flex;align-items:center;gap:12px;min-width:210px}.prob b{width:38px}.track{height:8px;background:#123548;border-radius:10px;flex:1;overflow:hidden}.fill{height:100%;border-radius:10px}
+.call{font:700 13px ui-monospace,Consolas,monospace}.score{width:35px;height:35px;border-radius:50%;display:grid;place-items:center;font:700 11px ui-monospace,monospace;border:3px solid}
+.status{display:flex;align-items:center;gap:8px;font-weight:700}.dot{width:9px;height:9px;border-radius:50%}.details{color:#94b4c6;font-size:12px}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}.mini{padding:15px 18px}.mini .n{font-size:23px;font-weight:800;margin-top:7px}.mini small{color:var(--muted)}
+.empty{padding:40px;text-align:center;color:#7698aa}.error{color:#ff8893}
+@media(max-width:1000px){.hero{grid-template-columns:1fr}.brand{min-width:0}.nav{display:none}.table{min-width:1000px}.forecast{overflow:auto}.kpis{grid-template-columns:1fr 1fr}.gauge{grid-row:span 2}.kpi{border-left:0}.solar{grid-template-columns:1fr}.summary{grid-template-columns:1fr}}
 
-    body{background:var(--bg-color);color:var(--text-main);
-        font-family:var(--font-sans);margin:0;padding:20px;}
+/* ===== Mission Control additions — frontend only ===== */
+.drag-handle{display:inline-flex;align-items:center;justify-content:center;margin-right:8px;color:#557f96;font:900 15px ui-monospace,monospace;cursor:grab;user-select:none;letter-spacing:-2px;opacity:.8}
+.drag-handle:hover{color:var(--cyan);opacity:1}.dragging{opacity:.42}.drag-over{box-shadow:inset 0 0 0 2px var(--cyan),0 12px 35px rgba(0,0,0,.25)!important}
+.extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+.xpanel{padding:16px 18px;min-height:180px;overflow:auto}.xpanel.full{grid-column:1/-1}
+.xhead{display:flex;align-items:center;gap:8px;margin-bottom:14px;color:#52c8ff;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.xtag{margin-left:auto;border:1px solid #17445f;border-radius:99px;padding:4px 8px;color:#83abc0;font-size:9px}
+.barrow{display:grid;grid-template-columns:46px 1fr 48px 42px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #103247}
+.bartrack{height:8px;border-radius:8px;background:#123548;overflow:hidden}.barfill{height:100%;border-radius:8px}
+.heat-table{border-collapse:separate;border-spacing:3px;width:100%;min-width:850px}.heat-table th{font-size:9px;color:#739bb0;font-weight:600}.heat-table td{height:20px;border-radius:3px}
+.legend{display:flex;gap:14px;align-items:center;color:#789caf;font-size:10px;margin-top:8px}.legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px}
+.voa-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.voa-controls input{background:#061923;border:1px solid #17506c;border-radius:8px;color:white;padding:10px 12px;min-width:240px}.action{border:1px solid #17618b;background:#07304b;color:#63ceff;border-radius:8px;padding:9px 13px;cursor:pointer}
+.voa{border-collapse:separate;border-spacing:2px;width:100%;min-width:900px}.voa th{font-size:9px;color:#79a5bb}.voa td{height:20px}.voa-good{background:#28e87d}.voa-mid{background:#ffb52e}.voa-bad{background:#ff5364}.voa-na{background:#0b3444}
+.calgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.calbox{background:#071a27;border:1px solid #12394f;border-radius:9px;padding:12px}.calbox strong{font-size:18px}.muted{color:#789caf}.error{color:#ff7886}
+@media(max-width:1000px){.extra-grid{grid-template-columns:1fr}.xpanel.full{grid-column:auto}.calgrid{grid-template-columns:1fr}}
 
-    nav.top-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;
-        padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.06);}
-    nav.top-nav a{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;
-        border-radius:6px;border:1px solid rgba(255,255,255,.08);color:#999;
-        text-decoration:none;font-size:.78rem;font-weight:600;white-space:nowrap;
-        transition:border-color .15s,color .15s,background .15s;}
-    nav.top-nav a:hover{border-color:rgba(0,243,255,.35);color:#00f3ff;
-        background:rgba(0,243,255,.06);}
-    nav.top-nav a.active{border-color:rgba(255,107,94,.5);color:#ff6b5e;
-        background:rgba(255,107,94,.08);}
 
-    header{display:flex;justify-content:space-between;align-items:center;
-        flex-wrap:wrap;gap:10px;border-bottom:2px solid var(--accent);
-        padding-bottom:10px;margin-bottom:16px;}
-    h1{font-family:var(--font-display);font-size:1.15rem;color:var(--accent);
-        margin:0;text-transform:uppercase;letter-spacing:1px;}
-    .head-right{display:flex;align-items:center;gap:10px;font-size:.75rem;
-        color:var(--dim);}
-    select.band-select{background:var(--panel-bg);color:var(--text-main);
-        border:var(--border);border-radius:6px;padding:5px 8px;
-        font-size:.75rem;font-family:inherit;}
+/* ===== Houston polish v3 ===== */
+body{font-family:Inter,"Aptos","Segoe UI Variable","Segoe UI",system-ui,sans-serif}
+.voa th,.voa td{font-family:"Arial Rounded MT Bold","Trebuchet MS","Segoe UI Variable",system-ui,sans-serif}
+.voa td{padding:0;text-align:center;vertical-align:middle;min-width:48px;height:30px}
+.voa td span{display:flex!important;align-items:center;justify-content:center;width:100%;height:100%;font-size:11px!important;line-height:1;font-weight:900!important;letter-spacing:.15px}
+.voa th{text-align:center;vertical-align:middle;padding:5px 7px}
+.trend-pill{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:34px;font-size:13px;font-weight:900}
+.trend-up{color:#28e87d}.trend-down{color:#ff5364}.trend-stable{color:#61d0ff}
+.solar-map{display:flex!important;align-items:center;justify-content:center;flex-direction:column;gap:7px}
+.prop-orb{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;border:1px solid #1a617d;background:radial-gradient(circle at 38% 35%,#174a60 0,#0a2736 42%,#06151f 72%);box-shadow:0 0 26px rgba(43,188,255,.12)}
+.prop-orb strong{font-size:18px;color:#dff7ff}.prop-orb small{font-size:8px;color:#65bfe9;letter-spacing:1px}
+.prop-state{font-size:10px;font-weight:900;letter-spacing:.7px;text-transform:uppercase}
 
-    /* ── Bouton thème ────────────────────────────────────────── */
-    #theme-btn{background:none;border:var(--border);border-radius:6px;
-        color:var(--text-main);cursor:pointer;font-size:1rem;
-        padding:4px 10px;line-height:1;transition:border-color .15s,background .15s;
-        flex-shrink:0;}
-    #theme-btn:hover{border-color:var(--accent);background:rgba(255,255,255,.05);}
-
-    /* ── Bandeau de maturité ─────────────────────────────── */
-    .maturity{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-        padding:11px 14px;margin-bottom:18px;border:var(--border);
-        border-radius:10px;background:var(--panel-bg);font-size:.78rem;}
-    .maturity-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-    .maturity-label{font-weight:600;color:var(--text-main);}
-    .maturity-track{flex:1;min-width:120px;height:8px;border-radius:4px;
-        background:rgba(255,255,255,.07);overflow:hidden;}
-    .maturity-fill{height:100%;border-radius:4px;transition:width .8s ease;}
-    .maturity-note{color:var(--dim);font-size:.72rem;}
-
-    .dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));
-        gap:18px;}
-    .panel{background:var(--panel-bg);border:var(--border);border-radius:14px;
-        padding:15px;box-shadow:0 10px 28px rgba(0,0,0,.45);
-        display:flex;flex-direction:column;}
-    .panel.grid-full{grid-column:1/-1;}
-    .panel.locked{opacity:.55;}
-    .panel-header{font-family:var(--font-display);font-size:.8rem;color:var(--accent);
-        margin-bottom:6px;padding-bottom:8px;border-bottom:1px solid var(--line);
-        display:flex;justify-content:space-between;align-items:center;gap:8px;
-        text-transform:uppercase;letter-spacing:.05em;}
-    .panel-header .tag{font-size:.62rem;color:var(--dim);text-transform:none;
-        letter-spacing:0;font-family:'IBM Plex Mono',monospace;}
-    .panel-sub{font-size:.7rem;color:var(--dim);font-style:italic;
-        margin-bottom:12px;line-height:1.4;}
-    .sub-en{display:block;margin-top:4px;opacity:.7;font-style:italic;}
-
-    .dd-handle{font-size:1.1em;cursor:grab;margin-right:6px;color:var(--dim);
-        opacity:.5;user-select:none;vertical-align:middle;}
-    .dd-handle:hover{opacity:1;color:var(--warn);}
-    .sortable-ghost{opacity:.25;}
-
-    .no-data{padding:16px;text-align:center;color:var(--dim);font-size:.78rem;
-        line-height:1.5;border:1px dashed var(--line);border-radius:8px;}
-    .no-data b{display:block;margin-bottom:4px;color:var(--text-main);}
-
-    /* ── Activité récente ────────────────────────────────── */
-    /* Ligne de labels au-dessus des barres */
-    .spark-label-row{display:flex;gap:2px;height:18px;align-items:flex-end;
-        margin-bottom:2px;}
-    .spark-label-row span{flex:1;min-width:3px;text-align:center;
-        font-size:.58rem;font-family:'IBM Plex Mono',monospace;
-        overflow:hidden;white-space:nowrap;line-height:1;}
-
-    /* Barres */
-    .spark{display:flex;align-items:flex-end;gap:2px;height:120px;
-        border-bottom:2px solid var(--line);}
-    .spark-bar{flex:1;min-width:3px;border-radius:2px 2px 0 0;
-        transition:height .3s,opacity .2s;cursor:default;}
-    .spark-bar.now{box-shadow:0 0 8px var(--success);}
-    .spark-bar:hover{opacity:.85;filter:brightness(1.3);}
-
-    /* Axe X */
-    .spark-axis{display:flex;gap:2px;margin-top:4px;}
-    .spark-axis span{flex:1;min-width:3px;text-align:center;font-size:.6rem;
-        color:var(--dim);font-family:'IBM Plex Mono',monospace;overflow:hidden;
-        white-space:nowrap;}
-    .spark-axis span.is-now{color:var(--success);font-weight:700;}
-
-    /* Légende sous le graphe */
-    .spark-meta{display:flex;align-items:center;gap:8px;margin-top:6px;
-        font-size:.68rem;color:var(--dim);flex-wrap:wrap;}
-    .spark-meta b{font-family:'IBM Plex Mono',monospace;}
-
-    /* KPI */
-    .kpi-row{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 4px;}
-    .kpi{flex:1;min-width:90px;}
-    .kpi-value{font-size:2.1rem;font-weight:700;color:var(--accent);
-        font-family:'IBM Plex Mono',monospace;line-height:1.1;}
-    .kpi-label{font-size:.65rem;color:var(--dim);text-transform:uppercase;
-        letter-spacing:.04em;margin-top:3px;}
-
-    /* Chips bandes */
-    .band-section-title{font-size:.68rem;color:var(--dim);
-        text-transform:uppercase;letter-spacing:.05em;
-        margin:10px 0 5px;font-family:'IBM Plex Mono',monospace;}
-    .band-chips{display:flex;gap:6px;flex-wrap:wrap;}
-    .band-chip{font-family:'IBM Plex Mono',monospace;font-size:.7rem;
-        padding:4px 9px;border-radius:12px;border:1px solid var(--line);
-        background:rgba(255,255,255,.02);display:flex;align-items:center;gap:4px;}
-    .band-chip b{font-weight:700;}
-    .band-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-
-    /* ── Heatmap ─────────────────────────────────────────── */
-    .heatmap-scroll{overflow-x:auto;padding-bottom:6px;}
-    table.heatmap{border-collapse:collapse;font-size:.6rem;min-width:520px;}
-    table.heatmap th{font-weight:500;color:var(--dim);padding:2px 3px;
-        font-family:'IBM Plex Mono',monospace;}
-    table.heatmap td{width:19px;height:17px;padding:0;
-        border:1px solid rgba(0,0,0,.35);border-radius:2px;}
-    table.heatmap td.void{background:repeating-linear-gradient(45deg,
-        transparent,transparent 2px,rgba(255,255,255,.05) 2px,rgba(255,255,255,.05) 4px);}
-    .legend{display:flex;align-items:center;gap:8px;margin-top:10px;
-        font-size:.65rem;color:var(--dim);flex-wrap:wrap;}
-    .legend-scale{display:flex;gap:2px;}
-    .legend-scale span{width:15px;height:9px;border-radius:2px;}
-    .callout{margin-top:10px;padding:8px 10px;background:rgba(255,200,0,.07);
-        border-left:3px solid var(--warn);border-radius:4px;font-size:.79rem;}
-
-    /* ── Patterns ────────────────────────────────────────── */
-    .pattern-row{display:flex;align-items:center;gap:8px;padding:6px 4px;
-        border-bottom:1px solid var(--line);}
-    .pattern-row:last-of-type{border-bottom:none;}
-    .pattern-row.insufficient{opacity:.45;}
-    .pattern-band{font-family:'IBM Plex Mono',monospace;font-weight:700;
-        width:54px;flex-shrink:0;font-size:.82rem;
-        display:flex;align-items:center;gap:5px;}
-    .pattern-bar-wrap{flex:1;height:14px;background:rgba(255,255,255,.05);
-        border-radius:5px;overflow:hidden;position:relative;}
-    .pattern-bar{height:100%;border-radius:5px;transition:width .5s ease;
-        position:relative;}
-    .pattern-bar::after{content:'';position:absolute;inset:0;
-        background:linear-gradient(90deg,rgba(255,255,255,.18) 0%,transparent 100%);
-        border-radius:5px;}
-    .pattern-trend{width:72px;text-align:right;flex-shrink:0;
-        font-size:.72rem;font-family:'IBM Plex Mono',monospace;font-weight:700;}
-    .pattern-avg{width:56px;text-align:right;flex-shrink:0;
-        font-size:.66rem;color:var(--dim);font-family:'IBM Plex Mono',monospace;}
-    .trend-up{color:var(--success);} .trend-down{color:var(--alert);}
-    .trend-stable{color:var(--dim);} .trend-insufficient{color:#555;font-style:italic;}
-
-    /* ── Forecast ────────────────────────────────────────── */
-    .forecast-strip{display:flex;gap:7px;flex-wrap:wrap;}
-    .forecast-slot{flex:1;min-width:74px;padding:9px 5px;border:1px solid var(--line);
-        border-radius:8px;text-align:center;background:rgba(255,255,255,.02);}
-    .forecast-slot.best{border-color:var(--success);background:rgba(34,197,94,.08);}
-    .forecast-hour{font-size:.68rem;color:var(--dim);
-        font-family:'IBM Plex Mono',monospace;}
-    .forecast-prob{font-size:1.3rem;font-weight:700;margin:3px 0;
-        font-family:'IBM Plex Mono',monospace;}
-    .forecast-prob.unknown{font-size:.9rem;color:#4a4a4a;}
-    .forecast-conf{font-size:.57rem;color:var(--dim);}
-    .forecast-conf.low-sample{color:var(--warn);font-weight:700;}
-
-    /* ── Panneau VOACAP : grille bandes × heures ────────────────────── */
-    .vc-controls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;
-        margin-bottom:14px;}
-    .vc-field{display:flex;flex-direction:column;gap:3px;}
-    .vc-field label{font-size:.58rem;color:var(--dim);letter-spacing:.04em;}
-    .vc-field input{background:#000;color:var(--text-main);
-        border:1px solid var(--line);border-bottom:1px solid #2a2a2a;
-        border-radius:3px;padding:5px 7px;font-family:'IBM Plex Mono',monospace;
-        font-size:.72rem;font-variant-numeric:tabular-nums;}
-    .vc-field input:focus{outline:none;border-color:var(--accent);
-        box-shadow:0 0 0 1px rgba(0,243,255,.25);}
-    .vc-field input.vc-name{width:200px;}
-    .vc-field input.vc-coord{width:72px;}
-    .vc-resolve{font-size:.6rem;color:var(--dim);margin-top:2px;min-height:14px;}
-    .vc-run{background:transparent;color:var(--accent);
-        border:1px solid var(--accent);border-radius:3px;padding:6px 14px;
-        font-family:'IBM Plex Mono',monospace;font-size:.72rem;font-weight:600;
-        cursor:pointer;transition:background .15s,color .15s;}
-    .vc-run:hover{background:var(--accent);color:#000;}
-    .vc-run:disabled{opacity:.4;cursor:wait;}
-
-    .vc-presets{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px;}
-    .vc-chip{background:transparent;border:1px solid var(--line);
-        color:var(--dim);border-radius:11px;padding:3px 10px;font-size:.63rem;
-        cursor:pointer;font-family:'IBM Plex Mono',monospace;
-        transition:border-color .15s,color .15s;}
-    .vc-chip:hover{border-color:var(--accent);color:var(--accent);}
-
-    /* Hero : la réponse opérationnelle immédiate */
-    .vc-now{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
-        padding:12px 14px;margin-bottom:14px;background:#000;
-        border:1px solid var(--line);border-left:2px solid var(--accent);
-        border-radius:3px;}
-    .vc-now-band{font-family:'IBM Plex Mono',monospace;font-size:2.4rem;
-        font-weight:700;line-height:1;letter-spacing:-.02em;
-        font-variant-numeric:tabular-nums;}
-    .vc-now-meta{display:flex;flex-direction:column;gap:2px;}
-    .vc-now-hour{font-size:.62rem;color:var(--dim);letter-spacing:.08em;}
-    .vc-now-stats{font-family:'IBM Plex Mono',monospace;font-size:.74rem;
-        color:var(--text-main);font-variant-numeric:tabular-nums;}
-    .vc-now-dead{font-size:.76rem;color:var(--dim);font-style:italic;}
-
-    .vc-scroll{overflow-x:auto;padding-bottom:6px;}
-    table.vc-grid{border-collapse:collapse;font-size:.6rem;min-width:540px;
-        font-family:'IBM Plex Mono',monospace;}
-    table.vc-grid th{font-weight:500;color:var(--dim);padding:2px 3px;
-        font-variant-numeric:tabular-nums;}
-    table.vc-grid th.vc-band-label{text-align:right;padding-right:8px;
-        color:var(--text-main);}
-    table.vc-grid th.vc-hnow{color:var(--accent);font-weight:700;}
-    table.vc-grid td{width:19px;height:16px;padding:0;
-        border:1px solid #0a0a0a;}
-    table.vc-grid td.vc-cnow{box-shadow:inset 0 0 0 1px rgba(0,243,255,.55);}
-    .vc-scale{display:flex;align-items:center;gap:7px;margin-top:10px;
-        font-size:.6rem;color:var(--dim);}
-    .vc-scale-ramp{height:7px;width:120px;border-radius:2px;
-        background:linear-gradient(90deg,rgb(0,60,75),rgb(0,160,180),
-            rgb(255,200,0),rgb(255,90,40));}
-
-    .footnote{font-size:.68rem;color:var(--dim);margin-top:12px;padding-top:8px;
-        border-top:1px solid var(--line);line-height:1.45;}
-    .btn-hunt{display:block;text-align:center;text-decoration:none;
-        background:rgba(255,107,94,.1);border:1px solid #ff6b5e;color:#ff6b5e;
-        padding:8px 12px;font-size:.75rem;border-radius:6px;margin-top:12px;
-        text-transform:uppercase;letter-spacing:.04em;}
-    .btn-hunt:hover{background:rgba(255,107,94,.2);}
+/* Matrix v4 */
+.solar-map{min-height:150px!important;background:radial-gradient(circle at 50% 45%,rgba(0,255,184,.10),transparent 32%),linear-gradient(rgba(25,116,139,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(25,116,139,.10) 1px,transparent 1px)!important;background-size:auto,30px 30px,30px 30px!important}.prop-orb{width:94px!important;height:94px!important;border-color:#20cfa0!important;box-shadow:0 0 34px rgba(0,255,184,.16)!important}.prop-orb strong{font-size:26px!important}.prop-state{font-size:11px!important}.trend-pill{min-width:66px!important;height:27px!important;font-size:0!important}.trend-pill::before{font:900 25px/1 "Segoe UI Symbol",sans-serif;letter-spacing:-3px}.trend-up::before{content:"⌁⌁↗"}.trend-down::before{content:"⌁⌁↘"}.trend-stable::before{content:"⌁⌁→"}#patternsPanel .barrow{grid-template-columns:48px 1fr 42px 76px!important;min-height:34px}.matrix-wrap{position:relative;padding:14px 12px 10px;border:1px solid rgba(0,255,184,.16);border-radius:12px;background:radial-gradient(circle at 50% 0,rgba(0,255,184,.08),transparent 45%),#061721;overflow:auto}.matrix-wrap::after{content:"";pointer-events:none;position:absolute;inset:0;background:linear-gradient(transparent 50%,rgba(0,0,0,.09) 50%);background-size:100% 4px;opacity:.28}.heat-table.matrix{border-spacing:4px!important;min-width:980px!important}.heat-table.matrix th{height:24px!important;color:#57d9c1!important;font:600 10px ui-monospace,"Cascadia Code",monospace!important}.heat-table.matrix td{height:30px!important;min-width:34px!important;border-radius:5px!important;text-align:center!important;vertical-align:middle!important;transition:.12s}.heat-table.matrix td:hover{transform:scale(1.12);filter:brightness(1.25)}.heat-table.matrix td span{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font:800 10px ui-monospace,"Cascadia Code",monospace}.matrix-empty{background:#08242b!important;color:#174c4b!important}.matrix-low{background:#123a31!important;color:#36c58f!important}.matrix-mid{background:#176a49!important;color:#78ffc2!important}.matrix-hot{background:#00a86b!important;color:#d7fff0!important;box-shadow:inset 0 0 14px rgba(0,255,184,.28)}.matrix-peak{background:#00e59b!important;color:#03261b!important;box-shadow:0 0 14px rgba(0,255,184,.34)}.matrix-summary{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px}.matrix-chip{padding:7px 10px;border:1px solid #155265;border-radius:8px;background:#071d27;color:#8db9c8;font-size:10px}.matrix-chip b{color:#5fffd1}
+/* v5 traditional */.matrix-wrap{background:#061b27!important;border:1px solid #124d68!important;box-shadow:none!important}.matrix-wrap::after{display:none!important}.heat-table.matrix th{color:#72b8d8!important;text-shadow:none!important}.matrix-empty{background:#172b36!important;color:#6e8794!important}.matrix-low{background:#f0443e!important;color:#fff!important}.matrix-mid{background:#ff8a00!important;color:#101820!important}.matrix-hot{background:#efc000!important;color:#101820!important}.matrix-peak{background:#12ad62!important;color:#fff!important;box-shadow:none!important}.heat-table.matrix td{border:1px solid rgba(255,255,255,.06)!important;box-shadow:none!important}.heat-table.matrix td:hover{transform:scale(1.07)!important;filter:brightness(1.12)!important}.matrix-chip{background:#082230!important;border-color:#18516c!important}.matrix-chip b{color:#69c9f3!important}
+/* v13.1 — fond de ligne selon validation (>=90 vert, 70-89 orange) */
+.table tr.row-ok td{background:rgba(40,232,125,.17)}
+.table tr.row-watch td{background:rgba(255,160,40,.17)}
+.table tr.row-ok:hover td{background:rgba(40,232,125,.28)}
+.table tr.row-watch:hover td{background:rgba(255,160,40,.28)}
+.table tr.row-ok td:first-child{box-shadow:inset 3px 0 0 #28e87d}
+.table tr.row-watch td:first-child{box-shadow:inset 3px 0 0 #ff9e2c}
+/* v13.1 — Activité récente 24 h */
+.rc-kpis{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px;color:#8faebe;font-size:12px}
+.rc-kpis b{color:#61d0ff;font-size:15px}
+.rc-chart{display:flex;align-items:flex-end;gap:3px;height:130px;padding-top:16px}
+.rc-col{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
+.rc-col i{display:block;width:100%;border-radius:3px 3px 0 0;min-height:3px}
+.rc-col.now i{box-shadow:0 0 0 1px #28e87d,0 0 10px rgba(40,232,125,.5)}
+.rc-val{font-size:9px;font-weight:800;color:#ffbd32;height:12px;line-height:12px;white-space:nowrap}
+.rc-col.now .rc-val{color:#28e87d}
+.rc-col em{font-style:normal;font-size:9px;color:#6e8794;height:12px;line-height:12px;margin-top:3px}
+.rc-note{margin-top:6px;font-size:11px}
 </style>
 </head>
 <body>
-
-<nav class="top-nav">
-  <a href="/">🏠 ACCUEIL</a>
-  <a href="/briefing">📰 BRIEFING</a>
-  <a href="/map">🗺 MAP</a>
-  <a href="/world">🌍 WORLD</a>
-  <a href="/hunt">🎯 HUNT</a>
-  <a href="/satellites">🛰️ SATELLITES</a>
-  <a href="/weather">⛈️ MÉTÉO</a>
-  <a href="/ai-insight" class="active">📊 AI INSIGHT</a>
-</nav>
-
-<header>
-    <h1>📊 DX Analytics</h1>
-    <div class="head-right">
-        <label for="band-filter">Bande :</label>
-        <select id="band-filter" class="band-select">
-            <option value="">Toutes</option>
-            <option value="6m">6m</option><option value="10m">10m</option>
-            <option value="12m">12m</option><option value="15m">15m</option>
-            <option value="17m">17m</option><option value="20m">20m</option>
-            <option value="30m">30m</option><option value="40m">40m</option>
-            <option value="80m">80m</option><option value="160m">160m</option>
-            <option value="2m">2m</option><option value="70cm">70cm</option>
-        </select>
-        <span>MàJ <span id="last-update">--:--</span></span>
-        <button id="theme-btn" onclick="cycleTheme()" title="Changer le thème">🌙</button>
-    </div>
+<div class="shell">
+<header class="top">
+  <div class="brand"><b>NEURAL <span>DX</span> WATCHER</b><small>ADAPTIVE INSIGHT · PROPAGATION FORECAST & VALIDATION</small></div>
+  <nav class="nav"><a href="/">Live</a><a href="/map">Map</a><a href="/world">World</a><a href="/briefing">Briefing</a><a class="active" href="/ai-insight">AI Insight</a><a href="/hunt">Hunt</a><a href="/weather">Météo</a></nav>
+  <div class="live"><span class="live-dot"></span><span style="color:#4cf18b">Live</span><div><div id="clock" class="clock">--:-- UTC</div><div id="date" class="subclock"></div></div></div>
 </header>
 
-<div id="maturity-bar"></div>
+<section class="hero">
+ <div class="card hero-card draggable-panel" data-panel-id="autotest" draggable="true">
+  <div class="title"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Auto-Test · Résultat actuel</div>
+  <div class="kpis">
+   <div class="gauge" id="gauge"><div class="gauge-in"><strong id="rate">--%</strong><small>FIABILITÉ<br>MODÈLE</small></div></div>
+   <div class="kpi"><strong id="total">--</strong><span>Prédictions</span></div>
+   <div class="kpi"><strong id="valid">--</strong><span>Validées</span></div>
+   <div class="kpi"><strong id="avg">--</strong><span>Match moyen</span></div>
+   <div class="kpi"><strong id="bands">--</strong><span>Bandes actives</span></div>
+  </div>
+  <div id="atHint" class="muted" style="margin-top:10px;font-size:12px">Chargement…</div>
+ </div>
+ <div class="card hero-card window draggable-panel" data-panel-id="window" draggable="true">
+  <div class="title" style="color:var(--amber)"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Prochaine fenêtre favorable</div>
+  <div class="big"><span id="bestHour">--:00</span> UTC</div>
+  <p id="bestText">Analyse des prévisions en cours…</p>
+  <p id="bestBands" style="color:#8faebe"></p>
+ </div>
+ <div class="card hero-card solar draggable-panel" data-panel-id="solar" draggable="true">
+   <div class="map solar-map"><span class="drag-handle" title="Déplacer ce pavé" style="position:absolute;z-index:3;left:10px;top:8px">⋮⋮</span>
+<div class="prop-orb"><div><strong id="propScore">--</strong><br><small>PROP</small></div></div>
+<div id="propState" class="prop-state muted">HF / VHF PROPAGATION</div></div>
+   <div class="indices"><div class="idx"><span>SFI</span><b id="sfi">--</b></div><div class="idx"><span>A-Index</span><b id="aidx">--</b></div><div class="idx"><span>Kp</span><b id="kp">--</b></div></div>
+ </div>
+</section>
 
-<div class="dashboard-grid" id="panels-grid">
-    <div class="panel grid-full" data-panel="recent"   id="pi-recent"></div>
-    <div class="panel grid-full" data-panel="forecast" id="pi-forecast"></div>
-    <div class="panel grid-full" data-panel="heatmap"  id="pi-heatmap"></div>
-    <div class="panel grid-full" data-panel="patterns" id="pi-patterns"></div>
-    <div class="panel grid-full" data-panel="voacap"   id="pi-voacap"></div>
+<section class="card toolbar">
+ <strong style="color:#8fb5c8">Heure UTC</strong>
+ <div class="hours" id="hours"></div>
+ <button class="pill on" data-filter="all">Tous</button>
+ <button class="pill" data-filter="ok">Confirmés</button>
+ <button class="pill" data-filter="watch">À surveiller</button>
+ <button class="pill" data-filter="weak">Faibles</button>
+</section>
+
+<section class="card forecast draggable-panel" data-panel-id="forecast-table" draggable="true">
+ <div class="forecast-head"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span><h2 id="forecastTitle">PRÉVISIONS</h2><span class="badge" id="windowBadge">Adaptive Forecast</span><span class="updated" id="updated">Chargement…</span></div>
+ <div id="tableWrap"><div class="empty">Chargement des données Auto-Test…</div></div>
+</section>
+
+
+<section class="extra-grid">
+ <section class="card xpanel draggable-panel" data-panel-id="recent" draggable="true">
+  <div class="xhead"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Activité récente <span class="xtag">ANALYTICS</span></div>
+  <div id="recentPanel" class="muted">Chargement…</div>
+ </section>
+ <section class="card xpanel draggable-panel" data-panel-id="patterns" draggable="true">
+  <div class="xhead"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Tendance des bandes <span class="xtag">7 JOURS</span></div>
+  <div id="patternsPanel" class="muted">Chargement…</div>
+ </section>
+ <section class="card xpanel full draggable-panel" data-panel-id="heatmap" draggable="true">
+  <div class="xhead"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Quand ça ouvre <span class="xtag">30 JOURS</span></div>
+  <div id="heatPanel" class="muted">Chargement…</div>
+  <div class="legend"><span><i style="background:#12ad62"></i>excellent</span><span><i style="background:#efc000"></i>bon</span><span><i style="background:#ff8a00"></i>moyen</span><span><i style="background:#f0443e"></i>faible</span><span><i style="background:#172b36"></i>silence</span></div>
+ </section>
+ <section class="card xpanel full draggable-panel" data-panel-id="voacap" draggable="true">
+  <div class="xhead"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Prédictions HF · VOACAP <span class="xtag">CIRCUIT DX</span></div>
+  <div class="voa-controls">
+   <input id="voaCall" type="text" maxlength="20" placeholder="Indicatif DX — ex. JA1ABC" autocomplete="off" spellcheck="false">
+   <button class="action" id="voaRun">Prévoir</button>
+  </div>
+  <div id="voaPanel" class="muted">Saisir un indicatif : Neural DX le résout via cty.dat puis calcule le circuit F1SMV → DX.</div>
+ </section>
+ <section class="card xpanel full draggable-panel" data-panel-id="calibration" draggable="true">
+  <div class="xhead" style="color:var(--amber)"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Précision & calibration <span class="xtag">OODA</span></div>
+  <div style="font-size:14px;color:#b8d0de;margin-bottom:14px;line-height:1.6;border-left:3px solid var(--amber);padding-left:12px">
+   <b style="color:#ffd27a">FR</b> — Le modèle émet des prédictions toutes les 30 min. Chaque prédiction est ensuite vérifiée contre les spots réellement reçus. Le <b>Brier score</b> (0 = parfait, 1 = mauvais) mesure l'écart entre la probabilité annoncée et ce qui s'est passé. Plus il y a de vérifications, plus la calibration est fiable.<br>
+   <b style="color:#ffd27a">EN</b> — The model emits predictions every 30 min. Each one is later verified against actual received spots. The <b>Brier score</b> (0 = perfect, 1 = worst) measures the gap between predicted probability and reality. More verifications = more reliable calibration.
+  </div>
+  <div id="calPanel" class="muted">Chargement…</div>
+ </section>
+</section>
+
+<section class="card" id="diagStrip" style="margin-bottom:14px">
+ <div class="title" style="margin-bottom:8px">État des modules <span class="xtag">DIAGNOSTIC</span></div>
+ <div id="diagList" class="muted">Chargement…</div>
+</section>
+
+<section class="summary">
+ <div class="card mini"><div class="title" style="color:var(--amber)">Boucle adaptative</div><div class="n" style="font-size:20px">Prédiction → Réalité → Apprentissage</div><small style="font-size:14px;line-height:1.5;color:#a0bfcf">Le modèle émet des prédictions par bande/heure. Quand un spot réel arrive, il compare et ajuste ses scores. C'est un cycle OODA automatique.<br><em style="color:#789caf">The model predicts band openings, then validates against real spots to self-improve.</em></small></div>
+ <div class="card mini"><div class="title" style="color:var(--amber)">Calibration locale</div><div class="n" id="calState" style="font-size:20px">EN COURS</div><small style="font-size:14px;line-height:1.5;color:#a0bfcf">Le Brier score mesure la justesse des probabilités annoncées. Plus la station fonctionne, plus le modèle se calibre à ton QTH.<br><em style="color:#789caf">Brier score tracks how accurate the predicted probabilities are for your specific QTH.</em></small></div>
+ <div class="card mini"><div class="title" style="color:var(--amber)">Rafraîchissement</div><div class="n" style="font-size:20px">10 s</div><small style="font-size:14px;line-height:1.5;color:#a0bfcf">L'interface se met à jour toutes les 10 secondes. Aucune action requise : les données arrivent en continu.<br><em style="color:#789caf">Dashboard auto-refreshes every 10 seconds — fully autonomous.</em></small></div>
+</section>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════════════
-// Neural DX Watcher — DX Analytics v12.5
-// Panneau analytique : activité récente, prévisions, heatmap, tendances.
-// ═══════════════════════════════════════════════════════════════════════
+const COLORS={'160m':'#3139a5','80m':'#0876df','40m':'#098fca','30m':'#0aa1bd','20m':'#0ba55a','17m':'#d6b100','15m':'#ed8e0c','12m':'#f06a10','10m':'#f04431','6m':'#a8184d','2m':'#b71677','70cm':'#7d2cba'};
+const ORDER=['160m','80m','60m','40m','30m','20m','17m','15m','12m','10m','6m','4m','2m','70cm','23cm'];
+let predictions=[], stats={}, selectedHour=null, filter='all';
 
-// ── Couleurs et ordre des bandes ───────────────────────────────────────
-const BAND_COLORS = {
-    '160m':'#ef4444','80m':'#f97316','60m':'#f59e0b',
-    '40m':'#eab308','30m':'#84cc16','20m':'#22c55e',
-    '17m':'#10b981','15m':'#06b6d4','12m':'#3b82f6',
-    '10m':'#6366f1','6m':'#a855f7','4m':'#d946ef',
-    '2m':'#ec4899','70cm':'#f43f5e','23cm':'#fb923c'
-};
-// Ordre radio logique OHF → UHF
-const BAND_ORDER = ['160m','80m','60m','40m','30m','20m','17m','15m',
-                    '12m','10m','6m','4m','2m','70cm','23cm'];
-function bandColor(b) { return BAND_COLORS[b] || '#888'; }
-function bandSortKey(b) {
-    const i = BAND_ORDER.indexOf(b);
-    return i === -1 ? 999 : i;
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function utcClock(){
+ try{
+  const d=new Date(),c=document.getElementById('clock'),dt=document.getElementById('date');
+  if(c)c.textContent=d.toLocaleTimeString('fr-FR',{timeZone:'UTC',hour:'2-digit',minute:'2-digit',second:'2-digit'})+' UTC';
+  if(dt)dt.textContent=d.toLocaleDateString('fr-FR',{timeZone:'UTC',day:'2-digit',month:'short',year:'numeric'});
+ }catch(e){console.error('Clock:',e)}
+}
+utcClock();setInterval(utcClock,1000);
+
+/* v13.1 — validation par score : >=90 vert, 70-89 orange (fond de ligne), <70 faible */
+function scorePct(p){return p.match_score!=null?Math.round(p.match_score*100):null}
+function scoreClass(p){
+ const sc=scorePct(p);
+ if(p.actual_call&&sc!=null&&sc>=90)return'ok';
+ if(p.actual_call&&sc!=null&&sc>=70)return'watch';
+ if(p.actual_call)return'weak';
+ if((p.pred_probability||0)>=.5)return'watch';
+ return'weak';
+}
+function rowTint(p){
+ const sc=scorePct(p);
+ if(!p.actual_call||sc==null)return'';
+ return sc>=90?'row-ok':sc>=70?'row-watch':'';
+}
+function stateInfo(p){
+ const c=scoreClass(p);
+ if(c==='ok')return{txt:'Confirmé',col:'#28e87d'};
+ if(c==='watch')return{txt:p.actual_call?'Validé':'Probable',col:'#ffbd32'};
+ return{txt:p.actual_call?'Faible':'En attente',col:'#7e9cad'};
+}
+function renderHours(){
+ const hs=[...new Set(predictions.map(p=>Number(p.hour_utc)))].sort((a,b)=>a-b);
+ if(selectedHour===null || !hs.includes(selectedHour)) selectedHour=hs[hs.length-1] ?? new Date().getUTCHours();
+ document.getElementById('hours').innerHTML=hs.slice(-10).map(h=>`<button class="hour ${h===selectedHour?'active':''}" onclick="selectHour(${h})">${String(h).padStart(2,'0')}h</button>`).join('');
+}
+function selectHour(h){selectedHour=h;renderHours();renderTable()}
+function renderTable(){
+ let rows=predictions.filter(p=>Number(p.hour_utc)===selectedHour);
+ rows.sort((a,b)=>ORDER.indexOf(a.band)-ORDER.indexOf(b.band));
+ if(filter!=='all')rows=rows.filter(p=>scoreClass(p)===filter);
+ document.getElementById('forecastTitle').textContent=`PRÉVISIONS POUR ${String(selectedHour??'--').padStart(2,'0')}:00 UTC`;
+ if(!rows.length){document.getElementById('tableWrap').innerHTML='<div class="empty">Aucune prévision pour ce filtre.</div>';return}
+ const body=rows.map(p=>{
+   const prob=Math.round((p.pred_probability||0)*100), sc=p.match_score!=null?Math.round(p.match_score*100):null;
+   const st=stateInfo(p), fill=prob>=65?'#28e87d':prob>=35?'#ffb52e':'#ff4e5e';
+   const bc=COLORS[p.band]||'#275c78';
+   return `<tr class="${rowTint(p)}" data-state="${scoreClass(p)}">
+    <td><span class="band" style="background:${bc}">${esc(p.band)}</span></td>
+    <td><div class="prob"><b>${prob}%</b><div class="track"><div class="fill" style="width:${prob}%;background:${fill}"></div></div></div></td>
+    <td>${esc(p.mode||'—')}</td>
+    <td class="call">${esc(p.actual_call||'—')}</td>
+    <td>${sc==null?'—':`<span class="score" style="color:${st.col};border-color:${st.col}">${sc}</span>`}</td>
+    <td><span class="status" style="color:${st.col}"><i class="dot" style="background:${st.col}"></i>${st.txt}</span></td>
+    <td class="details">${p.actual_call?'Spot réel détecté':'En attente de confirmation'}</td>
+   </tr>`
+ }).join('');
+ document.getElementById('tableWrap').innerHTML=`<table class="table"><thead><tr><th>Bande</th><th>Probabilité</th><th>Mode</th><th>Indicatif DX</th><th>Score validation</th><th>Statut</th><th>Détails</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+function fmtUTC(ts){try{return new Date(ts*1000).toLocaleTimeString('fr-FR',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'})+' UTC'}catch(e){return ''}}
+function updateHero(){
+ const total=stats.total_predictions||0, valid=stats.validated||0, rate=total?Math.round(valid/total*100):0, avg=stats.avg_match_score||0;
+ document.getElementById('total').textContent=total;document.getElementById('valid').textContent=valid;
+ document.getElementById('avg').textContent=avg?avg.toFixed(2):'—';
+ /* v13.1 : « 0 % de fiabilité » alors qu'AUCUNE validation n'a eu lieu serait trompeur → tiret + explication */
+ document.getElementById('rate').textContent=valid>0?rate+'%':'—';
+ document.getElementById('gauge').style.setProperty('--rate',(valid>0?rate:0)+'%');
+ document.getElementById('bands').textContent=Object.keys(stats.per_band||{}).length||'—';
+ const hint=document.getElementById('atHint');
+ if(hint)hint.textContent=total===0
+   ?'Aucune prédiction encore : le serveur en génère 10 (une par bande) à chaque demi-heure.'
+   :valid===0
+   ?total+' prédictions en attente : chacune est validée dès qu’un spot réel arrive sur sa bande (±1 h).'
+   :'Fiabilité = prédictions confirmées par un spot réel / prédictions émises. Les non-confirmées après 24 h sont purgées.';
+ updateWindow();
+}
+/* v13.1 — « Prochaine fenêtre favorable » : l'historique réel (/api/analytics → forecast, 30 j) est la
+   source principale ; l'Auto-Test sert de repli. Avant, seul l'Auto-Test l'alimentait → « aucune donnée »
+   dès qu'il était vide, alors que 30 jours d'historique existaient. */
+function updateWindow(){
+ const set=(h,t,b)=>{document.getElementById('bestHour').textContent=h;document.getElementById('bestText').textContent=t;document.getElementById('bestBands').textContent=b||''};
+ const f=analyticsData&&analyticsData.forecast,bs=f&&f.available!==false&&f.best_slot;
+ const topBands=h=>{const ps=predictions.filter(p=>Number(p.hour_utc)===Number(h)).sort((a,b)=>(b.pred_probability||0)-(a.pred_probability||0)).slice(0,3);
+   if(ps.length)return 'Bandes dominantes (Auto-Test) : '+ps.map(p=>`${p.band} ${Math.round((p.pred_probability||0)*100)}%`).join(' · ');
+   const pb=(analyticsData&&analyticsData.patterns&&Array.isArray(analyticsData.patterns.bands))?analyticsData.patterns.bands.slice(0,3):[];
+   return pb.length?'Bandes les plus actives (7 j) : '+pb.map(x=>x.band).join(' · '):''};
+ if(bs&&Number.isFinite(Number(bs.hour_utc))){
+   const off=Number(bs.offset_h)||0,when=off===0?'En cours':off===1?'Dans 1 h':'Dans '+off+' h';
+   const day=bs.weekday_label?(' · '+bs.weekday_label):'';
+   set(String(bs.hour_utc).padStart(2,'0')+':00',
+       `${when}${day} · ouvert ${Math.round(bs.probability)} % du temps sur ${bs.observations} observation${bs.observations>1?'s':''} · ~${Math.round(bs.avg_spots)} spots/h`,
+       topBands(bs.hour_utc));
+   return;
+ }
+ const groups={};predictions.forEach(p=>(groups[p.hour_utc]??=[]).push(p));
+ let best=null,bscore=-1;
+ Object.entries(groups).forEach(([h,ps])=>{const s=ps.reduce((a,p)=>a+(p.pred_probability||0),0)/ps.length;if(s>bscore){bscore=s;best={h:Number(h)}}});
+ if(best){set(String(best.h).padStart(2,'0')+':00',bscore>=.6?'Conditions globalement favorables (Auto-Test).':'Fenêtre la plus favorable disponible (Auto-Test).',topBands(best.h));return}
+ const mat=f&&f.maturity&&f.maturity.label;
+ set('--:00',(f&&f.reason)?f.reason:'Pas encore assez d’historique pour calculer une fenêtre'+(mat?' ('+mat+')':'')+'.','');
+}
+async function loadSolar(){
+ const put=(sfi,a,kp)=>{const ns=Number(sfi),na=Number(a),nk=Number(kp),ok=Number.isFinite(ns)||Number.isFinite(na)||Number.isFinite(nk);document.getElementById('sfi').textContent=Number.isFinite(ns)?Math.round(ns):'--';document.getElementById('aidx').textContent=Number.isFinite(na)?Math.round(na):'--';document.getElementById('kp').textContent=Number.isFinite(nk)?nk.toFixed(1):'--';let score=null;if(ok){score=50;if(Number.isFinite(ns))score+=Math.max(-20,Math.min(25,(ns-100)*.35));if(Number.isFinite(nk))score+=nk<=2?15:nk<=4?0:-20;if(Number.isFinite(na))score+=na<=10?10:na<=20?0:-10;score=Math.max(0,Math.min(100,Math.round(score)))}const ps=document.getElementById('propScore'),st=document.getElementById('propState');if(ps)ps.textContent=score==null?'--':score;if(st){st.textContent=score==null?'INDICES SOLAIRES INDISPONIBLES':score>=70?'PROPAGATION FAVORABLE':score>=45?'PROPAGATION VARIABLE':'PROPAGATION DÉGRADÉE';st.style.color=score==null?'#ff5364':score>=70?'#28e87d':score>=45?'#ffb52e':'#ff5364'}return ok};
+ const json=async u=>{const r=await fetch(u+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();return put(d.sfi,d.a,d.kp??d.k)};
+ try{if(await json('/api/solar.json'))return}catch(e){} try{if(await json('/solar.json'))return}catch(e){}
+ try{const r=await fetch('/solar.xml?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const x=new DOMParser().parseFromString(await r.text(),'application/xml'),v=n=>x.querySelector(n)?.textContent?.trim();if(put(v('sfi'),v('a'),v('kp')||v('k')))return}catch(e){} put(null,null,null);
+}
+async function refresh(){
+ try{
+  const [sr,pr]=await Promise.all([fetch('/api/adaptive/autotest/stats.json'),fetch('/api/adaptive/autotest/latest.json?limit=100')]);
+  if(!sr.ok||!pr.ok)throw new Error('API Auto-Test indisponible (HTTP '+(sr.ok?pr.status:sr.status)+')');
+  const sd=await sr.json(),pd=await pr.json();
+  /* v13.1 : le serveur répond 200 + ok:false quand le module Auto-Test n'est pas chargé —
+     on l'affiche au lieu de montrer des compteurs à zéro sans explication. */
+  if(sd.ok===false||pd.ok===false)throw new Error(sd.error||pd.error||'Auto-Test non initialisé côté serveur (voir les logs au démarrage)');
+  stats=sd;predictions=Array.isArray(pd.predictions)?pd.predictions:[];
+  renderHours();renderTable();updateHero();
+  document.getElementById('updated').textContent='Dernière mise à jour : '+new Date().toLocaleTimeString('fr-FR',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'})+' UTC';
+ }catch(e){document.getElementById('tableWrap').innerHTML='<div class="empty error">Auto-Test indisponible : '+esc(e.message)+'</div>'}
 }
 
-// ── Thème jour/nuit ────────────────────────────────────────────────────
-const THEMES = ['', 'dark', 'light', 'matrix'];
-const THEME_ICONS = { '':'🌙', dark:'☀️', light:'🌙', matrix:'💚' };
-
-function cycleTheme() {
-    const cur = document.body.getAttribute('data-theme') || '';
-    const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
-    if (next) {
-        document.body.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
-    } else {
-        document.body.removeAttribute('data-theme');
-        localStorage.removeItem('theme');
-    }
-    const btn = document.getElementById('theme-btn');
-    if (btn) btn.textContent = THEME_ICONS[next] || '🌙';
+let analyticsData=null;
+function heatColor(v,peak){
+ if(v==null)return'#0b2634';
+ const p=peak>0?Number(v)/Number(peak):0;
+ if(p>=.65)return'#28e87d';
+ if(p>=.35)return'#ffb52e';
+ return'#ff5364';
+}
+/* v13.1 — Activité récente : 24 h persistées (analytics.sqlite), barres calées sur le 90e percentile.
+   Les jours de forte propagation, les skimmers RBN re-spottent chaque station des dizaines de fois/h :
+   une heure peut peser 15-25x la normale et aplatir toutes les autres si l'échelle suit le pic. */
+function renderRecent24(r){
+ const s=Array.isArray(r&&r.series)?r.series:[];
+ if(!s.length||!(Number(r.total)>0))return false;
+ const counts=s.map(p=>Number(p.count)||0);
+ const nz=counts.filter(c=>c>0).sort((a,b)=>a-b);
+ let ref=Math.max(...counts,1);
+ if(nz.length>=5)ref=Math.max(nz[Math.min(Math.floor(nz.length*.9),nz.length-1)],1);
+ const peak=Math.max(...counts),total=counts.reduce((a,b)=>a+b,0),avg=Math.round(total/s.length);
+ const bars=s.map((p,i)=>{
+  const c=counts[i],h=Math.max(3,Math.round(Math.min(1,c/ref)*100)),hh=String(p.hour_utc??'').padStart(2,'0');
+  const cur=p.hours_ago===0,isPeak=peak>0&&c===peak;
+  const col=cur?'#28e87d':isPeak?'#ff9e2c':heatColor(c,ref);
+  const lab=(i%4===0||cur)?hh:'';
+  return `<div class="rc-col${cur?' now':''}" title="${hh}h UTC · ${c} spots${cur?' (heure en cours)':''}"><span class="rc-val">${isPeak||cur?c:''}</span><i style="height:${h}%;background:${col}"></i><em>${lab}</em></div>`;
+ }).join('');
+ recentPanel.innerHTML=`<div class="rc-kpis"><span><b>${total}</b> spots / 24 h</span><span><b>${avg}</b> moy. / h</span><span><b>${peak}</b> pic / h</span></div>
+  <div class="rc-chart">${bars}</div>
+  <div class="muted rc-note">Heures UTC · échelle sur le 90ᵉ percentile : un pic exceptionnel ne masque plus les heures normales (valeurs réelles en infobulle).</div>`;
+ return true;
+}
+async function loadRecentActivity(){
+ try{
+  if(analyticsData&&renderRecent24(analyticsData.recent))return;
+  const r=await fetch('/history_highlights.json',{cache:'no-store'}),d=await r.json();
+  /* l'analytique 24 h a pu arriver pendant cette requête : elle reste prioritaire */
+  if(analyticsData&&analyticsData.recent&&Number(analyticsData.recent.total)>0)return;
+  const rows=Array.isArray(d.hours)?d.hours:[];
+  const mx=Math.max(1,...rows.map(x=>Number(x.total_spots||0)));
+  recentPanel.innerHTML=rows.length?rows.map(x=>{
+    const n=Number(x.total_spots||0),pct=Math.round(n/mx*100),band=x.dominant_band||'—';
+    return `<div class="barrow"><b>${esc(x.hour_label||'')}</b><div class="bartrack"><div class="barfill" style="width:${pct}%;background:${pct>=65?'#28e87d':pct>=35?'#ffb52e':'#ff5364'}"></div></div><b>${n}</b><small style="color:#61d0ff;font-weight:800">${esc(band)}</small></div>`;
+  }).join(''):'<div class="muted">Aucune activité récente.</div>';
+ }catch(e){recentPanel.innerHTML='<span class="error">Activité récente indisponible</span>'}
 }
 
-// Applique le thème sauvegardé au chargement
-(function () {
-    const t = localStorage.getItem('theme');
-    if (t) {
-        document.body.setAttribute('data-theme', t);
-        const btn = document.getElementById('theme-btn');
-        if (btn) btn.textContent = THEME_ICONS[t] || '🌙';
-    }
-})();
-
-// ── Cache ──────────────────────────────────────────────────────────────
-class DXCache {
-    static TTL_MS = 5 * 60 * 1000; // 5 min — cohérent avec le refresh
-
-    static set(key, data) {
-        try {
-            localStorage.setItem('dxa_' + key,
-                JSON.stringify({ data, exp: Date.now() + this.TTL_MS }));
-        } catch (e) {}
-    }
-    static get(key) {
-        try {
-            const raw = localStorage.getItem('dxa_' + key);
-            if (!raw) return null;
-            const { data, exp } = JSON.parse(raw);
-            if (Date.now() > exp) { localStorage.removeItem('dxa_' + key); return null; }
-            return data;
-        } catch (e) { return null; }
-    }
+function renderVHF(d){
+ const target=document.getElementById('vhfPanel')||document.getElementById('vhfPropagation')||document.getElementById('vhfData');
+ if(!target)return;
+ const bands=Array.isArray(d?.recent?.bands)?d.recent.bands:[], wanted=['6m','4m','2m','70cm','23cm'];
+ const map=new Map(bands.map(x=>[String(x.band),Number(x.count||0)]));
+ const rows=wanted.map(b=>({band:b,count:map.get(b)||0})),max=Math.max(1,...rows.map(x=>x.count));
+ target.innerHTML=rows.map(x=>{const pct=Math.round(x.count/max*100),col=COLORS[x.band]||'#61d0ff';return `<div class="barrow"><b>${x.band}</b><div class="bartrack"><div class="barfill" style="width:${pct}%;background:${col}"></div></div><b>${x.count}</b></div>`}).join('')+'<div class="muted" style="margin-top:8px">Activité VHF/UHF observée sur les 24 dernières heures</div>';
 }
 
-// ── Panneau ────────────────────────────────────────────────────────────
-class DXPanel {
-    constructor(key, renderer) { this.key = key; this.renderer = renderer; }
-    render(data) {
-        const el = document.querySelector(`[data-panel="${this.key}"]`);
-        if (!el) return;
-        try {
-            const out = this.renderer(data) || '';
-            el.innerHTML = out.html !== undefined ? out.html : out;
-            el.classList.toggle('locked', Boolean(out.locked));
-        } catch (err) {
-            console.error(`panel ${this.key}:`, err);
-            el.innerHTML = `<div class="panel-header">${this.key}</div>
-                <div class="no-data"><b>Erreur d'affichage</b>Voir la console.</div>`;
-        }
-    }
+async function loadMissionAnalytics(){
+ try{
+  const r=await fetch('/api/analytics',{cache:'no-store'}); if(!r.ok)throw new Error('HTTP '+r.status);
+  const d=await r.json(); analyticsData=d; try{updateWindow()}catch(e){console.error('window',e)} try{renderVHF(d)}catch(e){console.error('VHF',e)} try{if(!renderRecent24(d.recent))loadRecentActivity()}catch(e){console.error('recent',e)}
+
+  const pat=d.patterns||{};
+  if(pat.available!==false && Array.isArray(pat.bands) && pat.bands.length){
+    const mx=Math.max(1,...pat.bands.map(x=>Number(x.recent_count??x.count??x.recent??x.total??0)));
+    patternsPanel.innerHTML=pat.bands.map(x=>{const n=Number(x.recent_count??x.count??x.recent??x.total??0),pct=Math.round(n/mx*100);return`<div class="barrow"><b>${esc(x.band)}</b><div class="bartrack"><div class="barfill" style="width:${pct}%;background:${pct>=65?'#28e87d':pct>=35?'#ffb52e':'#ff5364'}"></div></div><b>${n}</b><span class="trend-pill ${String(x.trend||'').toLowerCase()==='up'?'trend-up':String(x.trend||'').toLowerCase()==='down'?'trend-down':'trend-stable'}" title="${esc(x.trend||'stable')}">${String(x.trend||'').toLowerCase()==='up'?'⌁↗':String(x.trend||'').toLowerCase()==='down'?'⌁↘':'⌁→'}</span></div>`}).join('');
+  }else patternsPanel.innerHTML=`<div class="muted">${esc(pat.reason||'Données insuffisantes.')}</div>`;
+
+  const h=d.heatmap||{};
+  if(h.available!==false && Array.isArray(h.grid)){
+    const labs=h.weekday_labels||['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    const vals=h.grid.flat().map(Number).filter(Number.isFinite),peak=Number(h.peak_value)||Math.max(1,...vals),active=vals.filter(v=>v>0).length;let best={v:-1,day:'—',hour:'—'};h.grid.forEach((row,di)=>row.forEach((v,hr)=>{v=Number(v)||0;if(v>best.v)best={v,day:labs[di]||'',hour:String(hr).padStart(2,'0')+'h'}}));const cls=v=>{const p=peak>0?Number(v)/peak:0;return Number(v)<=0?'matrix-empty':p>=.85?'matrix-peak':p>=.60?'matrix-hot':p>=.30?'matrix-mid':'matrix-low'};heatPanel.innerHTML=`<div class="matrix-summary"><span class="matrix-chip">Pic <b>${esc(best.day)} ${best.hour}</b></span><span class="matrix-chip">Intensité max <b>${best.v}</b></span><span class="matrix-chip">Créneaux actifs <b>${active}</b></span></div><div class="matrix-wrap"><table class="heat-table matrix"><tr><th>UTC</th>${[...Array(24).keys()].map(x=>`<th>${String(x).padStart(2,'0')}</th>`).join('')}</tr>${h.grid.map((row,i)=>`<tr><th>${esc(labs[i]||'')}</th>${row.map((v,hr)=>{const n=Number(v)||0;return`<td class="${cls(n)}" title="${esc(labs[i]||'')} ${String(hr).padStart(2,'0')}h · ${n}"><span>${n||'·'}</span></td>`}).join('')}</tr>`).join('')}</table></div>`;
+  }else heatPanel.innerHTML=`<div class="muted">${esc(h.reason||'Données insuffisantes.')}</div>`;
+ }catch(e){
+  patternsPanel.innerHTML=heatPanel.innerHTML='<span class="error">Analytics indisponible</span>';loadRecentActivity();
+ }
 }
+async function runVOA(){
+ const call=(voaCall.value||'').trim().toUpperCase();
+ if(!/^[A-Z0-9/]{3,20}$/.test(call)){voaPanel.innerHTML='<span class="error">Indicatif invalide.</span>';return}
+ voaPanel.textContent='Résolution de '+call+' puis calcul VOACAP…';
+ try{
+  const rr=await fetch('/api/callsign/resolve?call='+encodeURIComponent(call),{cache:'no-store'});
+  const loc=await rr.json();
+  if(!rr.ok||!loc.ok)throw new Error(loc.error||'Indicatif non résolu');
 
-// ── Utilitaires ────────────────────────────────────────────────────────
-function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g,
-        c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+  const r=await fetch('/api/voacap/predict',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rx_name:call,rx_lat:loc.lat,rx_lon:loc.lon})
+  });
+  const d=await r.json();
+  if(!r.ok||d.status==='error'||d.status==='unavailable')
+    throw new Error((d.status==='unavailable'?'Moteur VOACAP non chargé : ':'')+(d.reason||d.error||'VOACAP indisponible'));
 
-function fmtDuration(hours) {
-    if (hours == null) return '';
-    if (hours < 1) return Math.round(hours * 60) + ' min';
-    if (hours < 48) return Math.round(hours) + ' h';
-    return Math.round(hours / 24) + ' j';
-}
+  /* Format réel v13.1 :
+     hours:[{hour_utc,best_freq_mhz,rel,snr,frequencies:{"7.1":{rel,snr},...}}, ...] */
+  const hs=Array.isArray(d.hours)?d.hours:[];
+  if(!hs.length)throw new Error('VOACAP ne renvoie aucun créneau horaire');
 
-// Échelle continue teal → ambre
-function heatColor(ratio) {
-    if (ratio <= 0) return 'rgba(255,255,255,.04)';
-    const stops = [[0,[0,60,75]],[.35,[0,160,180]],[.65,[255,200,0]],[1,[255,90,40]]];
-    let lo = stops[0], hi = stops[stops.length - 1];
-    for (let i = 0; i < stops.length - 1; i++) {
-        if (ratio >= stops[i][0] && ratio <= stops[i+1][0]) { lo = stops[i]; hi = stops[i+1]; break; }
-    }
-    const span = hi[0] - lo[0];
-    const t = span === 0 ? 0 : (ratio - lo[0]) / span;
-    const c = lo[1].map((v,i) => Math.round(v + (hi[1][i] - v) * t));
-    return `rgb(${c[0]},${c[1]},${c[2]})`;
-}
+  const freqSet=new Set();
+  hs.forEach(h=>Object.keys(h.frequencies||{}).forEach(f=>freqSet.add(f)));
+  const freqs=[...freqSet].sort((a,b)=>Number(a)-Number(b));
 
-// Assemble une explication FR + traduction EN discrète, pour tous les panneaux.
-function bisub(fr, en) {
-    return `${fr}<span class="sub-en">🇬🇧 ${en}</span>`;
-}
-
-const ddHandle = () => `<span class="dd-handle" title="Déplacer / Drag">⋮⋮</span>`;
-
-function lockedPanel(title, sub, maturity, needLabel) {
-    // needLabel accepte soit une chaîne (rétro-compat), soit {fr, en}.
-    const need = typeof needLabel === 'string' ? { fr: needLabel, en: needLabel } : needLabel;
-    const remaining = maturity && maturity.hours_remaining != null
-        ? { fr: `Disponible dans environ ${fmtDuration(maturity.hours_remaining)} de collecte.`,
-            en: `Available in about ${fmtDuration(maturity.hours_remaining)} of collection.` }
-        : { fr: '', en: '' };
-    return {
-        locked: true,
-        html: `<div class="panel-header">${title}
-                <span class="tag">en attente</span></div>
-            <div class="panel-sub">${sub}</div>
-            <div class="no-data"><b>${esc(need.fr)}</b>${esc(remaining.fr)}
-                <div class="sub-en">🇬🇧 ${esc(need.en)} ${esc(remaining.en)}</div></div>`,
-    };
-}
-
-// ── Bandeau de maturité (avec décalage temporel lissé) ─────────────────
-// _lastData / _lastFetchMs permettent un tick chaque minute sans appel API.
-let _lastData = null, _lastFetchMs = 0;
-
-function renderMaturity(data, extraH = 0) {
-    const el = document.getElementById('maturity-bar');
-    if (!el || !data) return;
-    const m = data.maturity;
-    if (!m) { el.innerHTML = ''; return; }
-
-    const colors = { collecting:'var(--warn)', basic:'var(--accent)',
-                     daily:'var(--accent)', weekly:'var(--success)' };
-    const color = colors[m.level] || 'var(--dim)';
-
-    const spanH   = (m.span_hours || 0) + extraH;
-    const hoursLeft = Math.max(0, (m.hours_remaining || 0) - extraH);
-
-    let pct = 100, note = 'Historique complet — toutes les analyses sont actives.';
-    if (m.next_at_hours) {
-        const levelStarts = { collecting:0, basic:6, daily:48, weekly:336 };
-        const from = levelStarts[m.level] || 0;
-        const span = m.next_at_hours - from;
-        pct = span > 0 ? Math.max(2, Math.min(99, (spanH - from) / span * 100)) : 0;
-        note = `${fmtDuration(spanH)} d'historique · `
-             + `${esc(m.next_level)} dans ~${fmtDuration(hoursLeft)}`;
-    }
-
-    el.innerHTML = `<div class="maturity">
-        <span class="maturity-dot" style="background:${color}"></span>
-        <span class="maturity-label">${esc(m.label)}</span>
-        <span class="maturity-track">
-            <span class="maturity-fill" style="width:${pct.toFixed(1)}%;background:${color}"></span>
-        </span>
-        <span class="maturity-note">${note}</span>
-    </div>`;
-}
-
-// ── Renderers ──────────────────────────────────────────────────────────
-
-// ── Activité récente ───────────────────────────────────────────────────
-const recentRenderer = (data) => {
-    const r = data.recent || {};
-    const head = `<div class="panel-header">${ddHandle()}⚡ Activité récente
-        <span class="tag">${r.hours || 24} dernières heures</span></div>
-        <div class="panel-sub">${bisub(
-            "Spots reçus heure par heure — toutes bandes confondues. Barres colorées du froid (peu actif) au chaud (très actif). Le pic est libellé en orange, l'heure courante en vert.",
-            "Spots received hour by hour — all bands combined. Bars run from cool (quiet) to hot (very active). The peak is labeled in orange, the current hour in green."
-        )}</div>`;
-
-    if (!r.available || !r.series || !r.series.length) {
-        return head + `<div class="no-data"><b>Aucun spot reçu</b>
-            Vérifie la connexion aux clusters DX.</div>`;
-    }
-
-    const peak = Math.max(r.peak || 0, 1);
-    const avg  = Math.round(r.total / r.series.length);
-
-    // Ligne de labels au-dessus des barres (pic + heure courante)
-    const labelRow = r.series.map((p) => {
-        const isNow  = p.hours_ago === 0;
-        const isPeak = p.count === r.peak && p.count > 0;
-        if (!isNow && !isPeak) return `<span></span>`;
-        const color = isNow ? 'var(--success)' : 'var(--warn)';
-        return `<span style="color:${color};font-weight:700">${p.count}</span>`;
+  function relPct(v){
+    let n=Number(v);
+    if(!Number.isFinite(n))return null;
+    if(n<=1)n*=100;
+    return Math.max(0,Math.min(100,n));
+  }
+  function cellClass(p){
+    if(p==null)return'voa-na';
+    if(p>=65)return'voa-good';
+    if(p>=35)return'voa-mid';
+    return'voa-bad';
+  }
+  const head=hs.map(h=>`<th>${String(h.hour_utc??'').padStart(2,'0')}h</th>`).join('');
+  const rows=freqs.map(f=>{
+    const cells=hs.map(h=>{
+      const q=(h.frequencies||{})[f]||{};
+      const pct=relPct(q.rel);
+      const snr=Number.isFinite(Number(q.snr))?Number(q.snr):null;
+      const title=`${f} MHz · ${pct==null?'—':Math.round(pct)+'%'}${snr==null?'':' · SNR '+snr+' dB'}`;
+      return `<td class="${cellClass(pct)}" title="${esc(title)}"><span style="font-size:9px;color:#03131c;font-weight:900">${pct==null?'':Math.round(pct)}</span></td>`;
     }).join('');
+    return `<tr><th>${esc(f)} MHz</th>${cells}</tr>`;
+  }).join('');
 
-    // Barres colorées par intensité
-    const bars = r.series.map((p) => {
-        const ratio = p.count / peak;
-        const h     = Math.max(3, Math.round(ratio * 100));
-        const isNow = p.hours_ago === 0;
-        const color = isNow ? 'var(--success)' : heatColor(ratio);
-        const glow  = isNow ? 'box-shadow:0 0 8px var(--success);' : '';
-        const hour  = String(p.hour_utc).padStart(2, '0');
-        return `<span class="spark-bar${isNow ? ' now' : ''}"
-            style="height:${h}%;background:${color};${glow}"
-            title="${hour}z — ${p.count} spots/h"></span>`;
-    }).join('');
+  const internal=d.engine==='internal';
+   const note=internal
+     ?`<div style="margin-bottom:10px;padding:8px 10px;border:1px solid #1a4a6b;background:#081d2e;border-radius:8px;color:#7ec8e3;font-size:12px"><b>Estimation interne SFI/Kp</b> — modèle simplifié MUF/LUF. Les probabilités sont indicatives, calculées à partir des indices solaires en temps réel. Suffisant pour identifier les créneaux favorables.</div>`
+     :`<div style="margin-bottom:10px;color:#6fe3a0;font-size:12px">Moteur VOACAP réel</div>`;
+  const best=hs.reduce((a,h)=>{
+    const p=relPct(h.rel); return (!a||((p??-1)>(a.p??-1)))?{h:h.hour_utc,f:h.best_freq_mhz,p:p,s:h.snr}:a;
+  },null);
 
-    // Axe X : heure toutes les 4 tranches + marqueur "maintenant"
-    const axis = r.series.map((p, idx) => {
-        const isNow    = p.hours_ago === 0;
-        const showHour = idx % 4 === 0 && !isNow;
-        const label    = isNow ? '▲' : showHour ? String(p.hour_utc).padStart(2,'0') : '';
-        return `<span${isNow ? ' class="is-now"' : ''}>${label}</span>`;
-    }).join('');
-
-    // Chips de bandes avec couleur
-    const chips = (r.bands || []).slice(0, 8).map(b => {
-        const c = bandColor(b.band);
-        return `<span class="band-chip" style="border-color:${c}55;background:${c}18">
-            <span class="band-dot" style="background:${c}"></span>
-            ${esc(b.band)} <b style="color:${c}">${b.count}</b></span>`;
-    }).join('');
-
-    // Section modes (si l'API renvoie r.modes)
-    const modeChips = (r.modes || []).slice(0, 5).map(m =>
-        `<span class="band-chip"><b>${esc(m.mode)}</b> ${m.count}</span>`).join('');
-    const modeSection = modeChips
-        ? `<div class="band-section-title">Mode</div>
-           <div class="band-chips">${modeChips}</div>` : '';
-
-    return head
-        + `<div class="spark-label-row">${labelRow}</div>`
-        + `<div class="spark">${bars}</div>`
-        + `<div class="spark-axis">${axis}</div>`
-        + `<div class="spark-meta">
-            <span>UTC →</span>
-            <span style="margin-left:auto">
-                Pic : <b style="color:var(--warn)">${r.peak} spots/h</b>
-                &nbsp;·&nbsp; Moyenne : <b>${avg}/h</b>
-            </span>
-           </div>`
-        + `<div class="kpi-row">
-            <div class="kpi">
-                <div class="kpi-value">${r.total.toLocaleString('fr-FR')}</div>
-                <div class="kpi-label">spots ${r.hours}h</div>
-            </div>
-            <div class="kpi">
-                <div class="kpi-value">${avg}</div>
-                <div class="kpi-label">moy. / heure</div>
-            </div>
-            <div class="kpi">
-                <div class="kpi-value">${r.peak}</div>
-                <div class="kpi-label">pic horaire</div>
-            </div>
-            <div class="kpi">
-                <div class="kpi-value">${(r.bands||[]).length}</div>
-                <div class="kpi-label">bandes actives</div>
-            </div>
-           </div>`
-        + `<div class="band-section-title">Répartition par bande</div>`
-        + `<div class="band-chips">${chips}</div>`
-        + modeSection;
-};
-
-// ── Prochaines heures ──────────────────────────────────────────────────
-const forecastRenderer = (data) => {
-    const f = data.forecast || {};
-    const basisLabel = f.basis === 'weekday'
-        ? 'même jour de semaine et même heure / same weekday & hour'
-        : 'même heure, tous jours confondus / same hour, any day';
-    const head = `<div class="panel-header">${ddHandle()}🔮 Prochaines heures
-        <span class="tag">${f.available ? esc(basisLabel) : ''}</span></div>
-        <div class="panel-sub">${bisub(
-            "Le % indique la fréquence à laquelle <b>au moins un spot</b> a été reçu sur ce créneau dans le passé — ce n'est pas la force d'une ouverture ni une prévision de propagation. Avec peu de jours d'historique (regarde le nombre d'« obs »), les spots arrivant presque en continu, il est normal que la plupart des créneaux affichent 100 %.",
-            "The % shows how often <b>at least one spot</b> was received in this slot in the past — not opening strength, and not a propagation forecast. With only a few days of history (check the \u201cobs\u201d count), spots arrive almost continuously, so most slots naturally read 100%."
-        )}</div>`;
-
-    if (!f.available || !f.slots.length) {
-        return lockedPanel('🔮 Prochaines heures',
-            bisub("Fréquence d'activité observée sur les créneaux à venir.",
-                  "How often activity has been observed on upcoming slots."),
-            data.maturity,
-            { fr: "Pas encore assez de créneaux observés",
-              en: "Not enough time slots observed yet" });
-    }
-
-    const bestOffset = f.best_slot ? f.best_slot.offset_h : -1;
-    const slots = f.slots.map(s => {
-        const isBest = s.offset_h === bestOffset && s.probability !== null;
-        const label = s.offset_h === 0 ? 'maintenant / now' : `+${s.offset_h}h`;
-        const prob = s.probability === null
-            ? `<div class="forecast-prob unknown">—</div>`
-            : `<div class="forecast-prob" style="color:${heatColor(s.probability/100)}">${s.probability}%</div>`;
-        // Échantillon faible (< 5 observations) : peu fiable, on le signale en orange
-        // plutôt que de laisser un 100 % nu et non qualifié.
-        const lowSample = s.probability !== null && s.observations < 5;
-        const conf = s.probability === null
-            ? `${s.observations} obs.`
-            : `${s.observations} obs · ${s.avg_spots}/h`;
-        return `<div class="forecast-slot ${isBest ? 'best' : ''}">
-            <div class="forecast-hour">${esc(label)}</div>
-            <div class="forecast-hour">${String(s.hour_utc).padStart(2,'0')}z</div>
-            ${prob}<div class="forecast-conf${lowSample ? ' low-sample' : ''}"
-                title="${lowSample ? 'Échantillon faible — estimation à prendre avec prudence / Small sample — take this estimate with caution' : ''}">${esc(conf)}</div></div>`;
-    }).join('');
-
-    let verdict = '';
-    if (f.best_slot && f.best_slot.probability !== null) {
-        const b = f.best_slot;
-        const when = b.offset_h === 0 ? 'maintenant' : `dans ${b.offset_h}h`;
-        const whenEn = b.offset_h === 0 ? 'now' : `in ${b.offset_h}h`;
-        verdict = `<div class="callout">
-            <div>Meilleur créneau : <b>${when}</b>
-            (${String(b.hour_utc).padStart(2,'0')}z) — activité observée
-            ${b.probability}% du temps${f.band ? ' sur ' + esc(f.band) : ''}
-            (n=${b.observations} obs.).</div>
-            <div class="sub-en">🇬🇧 Best slot: <b>${whenEn}</b>
-            (${String(b.hour_utc).padStart(2,'0')}z) — activity observed
-            ${b.probability}% of the time${f.band ? ' on ' + esc(f.band) : ''}
-            (n=${b.observations} obs.).</div></div>`;
-    }
-
-    return head + `<div class="forecast-strip">${slots}</div>` + verdict +
-        `<a href="/hunt" class="btn-hunt">🎯 Ouvrir le mode chasse / Open hunt mode</a>`;
-};
-
-// ── Heatmap ────────────────────────────────────────────────────────────
-const heatmapRenderer = (data) => {
-    const h = data.heatmap || {};
-    if (!h.available || !h.grid || !(h.peak_value > 0)) {
-        return lockedPanel('🗓 Quand ça ouvre',
-            bisub("Activité moyenne par jour de semaine et heure UTC.",
-                  "Average activity by weekday and UTC hour."),
-            data.maturity,
-            { fr: "Il faut au moins 2 jours d'historique",
-              en: "At least 2 days of history needed" });
-    }
-
-    const head = `<div class="panel-header">${ddHandle()}🗓 Quand ça ouvre
-        <span class="tag">${h.total_spots.toLocaleString('fr-FR')} spots · ${h.days} j</span></div>
-        <div class="panel-sub">${bisub(
-            "Moyenne par occurrence du créneau, et non cumul : sinon les jours les mieux représentés dans la fenêtre ressortiraient artificiellement.",
-            "Average per occurrence of the slot, not a running total — otherwise days better represented in the window would stand out artificially."
-        )}</div>`;
-
-    const peak = h.peak_value;
-    const hours = Array.from({length:24}, (_,i) => i);
-    const headerRow = `<tr><th></th>${hours.map(i =>
-        `<th>${i % 3 === 0 ? String(i).padStart(2,'0') : ''}</th>`).join('')}</tr>`;
-
-    const rows = h.grid.map((row, wd) => {
-        const cells = row.map((v, hr) => {
-            const when = `${h.weekday_labels[wd]} ${String(hr).padStart(2,'0')}z`;
-            if (v === null) return `<td class="void" title="${when} — pas d'observation"></td>`;
-            return `<td style="background:${heatColor(v/peak)}" title="${when} — ${v} spots/h"></td>`;
-        }).join('');
-        return `<tr><th>${esc(h.weekday_labels[wd])}</th>${cells}</tr>`;
-    }).join('');
-
-    const legend = `<div class="legend"><span>calme</span>
-        <span class="legend-scale">${[0,.2,.4,.6,.8,1].map(r =>
-            `<span style="background:${heatColor(r)}"></span>`).join('')}</span>
-        <span>actif</span><span style="margin-left:12px;">hachuré = aucune observation</span></div>`;
-
-    let best = '';
-    if (h.best_slot) {
-        const b = h.best_slot;
-        best = `<div class="callout">
-            <div>Créneau le plus actif :
-            <b>${esc(b.weekday_label)} ${String(b.hour).padStart(2,'0')}z</b>
-            — ${b.value} spots/h en moyenne${h.band ? ' sur ' + esc(h.band) : ''}.</div>
-            <div class="sub-en">🇬🇧 Busiest slot:
-            <b>${esc(b.weekday_label)} ${String(b.hour).padStart(2,'0')}z</b>
-            — ${b.value} spots/h on average${h.band ? ' on ' + esc(h.band) : ''}.</div></div>`;
-    }
-
-    return head + `<div class="heatmap-scroll"><table class="heatmap">${headerRow}${rows}</table></div>`
-        + legend + best;
-};
-
-// ── Tendances par bande ────────────────────────────────────────────────
-const patternsRenderer = (data) => {
-    const p = data.patterns || {};
-    if (!p.available || !p.bands.length) {
-        return lockedPanel('📈 Tendances par bande',
-            bisub("Comparaison d'une période récente avec la précédente.",
-                  "Comparison of a recent period with the previous one."),
-            data.maturity,
-            { fr: "Il faut deux périodes comparables (~12 h)",
-              en: "Two comparable periods needed (~12 h)" });
-    }
-
-    const win = p.window_days >= 1
-        ? `${p.window_days} j` : `${p.window_hours} h`;
-    const head = `<div class="panel-header">${ddHandle()}📈 Tendances par bande
-        <span class="tag">${win} vs ${win} précédents</span></div>
-        <div class="panel-sub">${bisub(
-            "Barres en couleur par bande, ordre 160 m → 23 cm. Une bande sous 10 spots n'est pas qualifiée (grisée).",
-            "Color bars by band, ordered 160 m → 23 cm. A band under 10 spots is not qualified (greyed out)."
-        )}</div>`;
-
-    // Tri : ordre radio logique, Unknown à la fin
-    const sorted = [...p.bands].sort((a, b) => {
-        if (a.band === 'Unknown') return 1;
-        if (b.band === 'Unknown') return -1;
-        return bandSortKey(a.band) - bandSortKey(b.band);
-    });
-
-    const maxCount = Math.max(...sorted.map(b => b.recent_count), 1);
-
-    const rows = sorted.map(b => {
-        const bc    = bandColor(b.band);
-        const width = Math.round(b.recent_count / maxCount * 100);
-        const insufficient = b.trend === 'insufficient' || b.trend == null;
-
-        let trendCls, trendLabel;
-        switch (b.trend) {
-            case 'up':
-                trendCls = 'trend-up';
-                trendLabel = b.change_pct === null ? '▲ nouveau' : `▲ +${b.change_pct}%`;
-                break;
-            case 'down':
-                trendCls = 'trend-down';
-                trendLabel = `▼ ${b.change_pct}%`;
-                break;
-            case 'stable':
-                trendCls = 'trend-stable';
-                trendLabel = '● stable';
-                break;
-            default:
-                trendCls = 'trend-insufficient';
-                trendLabel = 'trop peu';
-        }
-
-        // La barre utilise la couleur de bande ; le fond montre la capacité max
-        return `<div class="pattern-row${insufficient ? ' insufficient' : ''}">
-            <span class="pattern-band" style="color:${bc}">
-                <span class="band-dot" style="background:${bc}"></span>${esc(b.band)}
-            </span>
-            <span class="pattern-bar-wrap" title="${b.recent_count} spots">
-                <span class="pattern-bar"
-                    style="width:${width}%;background:${bc}"></span>
-            </span>
-            <span class="pattern-trend ${trendCls}">${trendLabel}</span>
-            <span class="pattern-avg">${b.daily_avg}/j</span>
-        </div>`;
-    }).join('');
-
-    const delta = p.total_previous > 0
-        ? Math.round((p.total_recent - p.total_previous) / p.total_previous * 100) : null;
-    const summary = delta === null ? '' :
-        `<div class="footnote">Activité globale :
-        ${p.total_recent.toLocaleString('fr-FR')} spots sur la période récente contre
-        ${p.total_previous.toLocaleString('fr-FR')} sur la précédente
-        (${delta >= 0 ? '+' : ''}${delta}%).</div>`;
-
-    return head + rows + summary;
-};
-
-let voacapResult = null;
-let voacapBusy = false;
-
-const VC_BANDS = [
-    { mhz: 28.4, label: '10m' },
-    { mhz: 24.9, label: '12m' },
-    { mhz: 21.2, label: '15m' },
-    { mhz: 18.1, label: '17m' },
-    { mhz: 14.2, label: '20m' },
-    { mhz: 10.1, label: '30m' },
-    { mhz: 7.1,  label: '40m' },
-    { mhz: 3.5,  label: '80m' },
-];
-
-const VC_DXCC = {
-    'w':{lat:38.9,lon:-77.0,name:'USA'},'k':{lat:38.9,lon:-77.0,name:'USA'},
-    'n':{lat:38.9,lon:-77.0,name:'USA'},'aa':{lat:38.9,lon:-77.0,name:'USA'},
-    've':{lat:45.4,lon:-75.7,name:'Canada'},
-    'ce':{lat:-33.5,lon:-70.6,name:'Chili'},'xq':{lat:-33.5,lon:-70.6,name:'Chili'},
-    'py':{lat:-23.5,lon:-46.6,name:'Brésil'},'lu':{lat:-34.6,lon:-58.4,name:'Argentine'},
-    'hk':{lat:4.7,lon:-74.1,name:'Colombie'},'hp':{lat:8.9,lon:-79.5,name:'Panama'},
-    'vp9':{lat:32.3,lon:-64.8,name:'Bermudes'},
-    'vk':{lat:-35.3,lon:149.1,name:'Australie'},'vh':{lat:-35.3,lon:149.1,name:'Australie'},
-    'zl':{lat:-36.9,lon:174.8,name:'Nouvelle-Zélande'},
-    'ja':{lat:35.7,lon:139.7,name:'Japon'},'jh':{lat:35.7,lon:139.7,name:'Japon'},
-    'jf':{lat:35.7,lon:139.7,name:'Japon'},'jg':{lat:35.7,lon:139.7,name:'Japon'},
-    'hl':{lat:37.6,lon:127.0,name:'Corée'},'ds':{lat:37.6,lon:127.0,name:'Corée'},
-    'by':{lat:39.9,lon:116.4,name:'Chine'},'bg':{lat:39.9,lon:116.4,name:'Chine'},
-    'bd':{lat:39.9,lon:116.4,name:'Chine'},
-    'vu':{lat:28.6,lon:77.2,name:'Inde'},'vt':{lat:28.6,lon:77.2,name:'Inde'},
-    'ap':{lat:33.7,lon:73.1,name:'Pakistan'},
-    '4s':{lat:6.9,lon:79.8,name:'Sri Lanka'},
-    'vr':{lat:22.3,lon:114.2,name:'Hong Kong'},'vs6':{lat:22.3,lon:114.2,name:'Hong Kong'},
-    'bv':{lat:25.0,lon:121.5,name:'Taïwan'},'bu':{lat:25.0,lon:121.5,name:'Taïwan'},
-    'yb':{lat:-6.2,lon:106.8,name:'Indonésie'},'pk':{lat:-6.2,lon:106.8,name:'Indonésie'},
-    'zs':{lat:-26.2,lon:28.0,name:'Afrique du Sud'},'zr':{lat:-26.2,lon:28.0,name:'Afrique du Sud'},
-    'zt':{lat:-26.2,lon:28.0,name:'Afrique du Sud'},
-    'ea8':{lat:28.1,lon:-15.4,name:'Canaries'},
-    '5b':{lat:34.7,lon:33.0,name:'Chypre'},'5n':{lat:9.1,lon:7.5,name:'Nigeria'},
-    '5h':{lat:-6.8,lon:39.3,name:'Tanzanie'},'9j':{lat:-15.4,lon:28.3,name:'Zambie'},
-    'su':{lat:30.1,lon:31.2,name:'Égypte'},'4x':{lat:31.8,lon:35.2,name:'Israël'},
-    '4z':{lat:31.8,lon:35.2,name:'Israël'},'a4':{lat:23.6,lon:58.6,name:'Oman'},
-    'a6':{lat:24.5,lon:54.4,name:'Émirats'},'a7':{lat:25.3,lon:51.5,name:'Qatar'},
-    '9k':{lat:29.4,lon:47.9,name:'Koweït'},'ta':{lat:39.9,lon:32.8,name:'Turquie'},
-    'ep':{lat:35.7,lon:51.4,name:'Iran'},
-    'ua':{lat:55.7,lon:37.6,name:'Russie'},'r':{lat:55.7,lon:37.6,name:'Russie'},
-    'sp':{lat:52.2,lon:21.0,name:'Pologne'},'i':{lat:41.9,lon:12.5,name:'Italie'},
-    'dl':{lat:52.5,lon:13.4,name:'Allemagne'},'g':{lat:51.5,lon:-0.1,name:'Royaume-Uni'},
-    'm':{lat:51.5,lon:-0.1,name:'Royaume-Uni'},'sm':{lat:59.3,lon:18.1,name:'Suède'},
-    'oh':{lat:60.2,lon:24.9,name:'Finlande'},'la':{lat:59.9,lon:10.7,name:'Norvège'},
-    'oz':{lat:55.7,lon:12.6,name:'Danemark'},'pa':{lat:52.4,lon:4.9,name:'Pays-Bas'},
-    'on':{lat:50.8,lon:4.4,name:'Belgique'},'lx':{lat:49.6,lon:6.1,name:'Luxembourg'},
-    'hb':{lat:46.9,lon:7.4,name:'Suisse'},'oe':{lat:48.2,lon:16.4,name:'Autriche'},
-    'ok':{lat:50.1,lon:14.4,name:'Tchéquie'},'ha':{lat:47.5,lon:19.0,name:'Hongrie'},
-    'yo':{lat:44.4,lon:26.1,name:'Roumanie'},'lz':{lat:42.7,lon:23.3,name:'Bulgarie'},
-    'sv':{lat:37.9,lon:23.7,name:'Grèce'},'ct':{lat:38.7,lon:-9.1,name:'Portugal'},
-    'ea':{lat:40.4,lon:-3.7,name:'Espagne'},
-};
-
-const VC_COUNTRY_INDEX = (() => {
-    const idx = [], seen = new Set();
-    for (const [pfx,d] of Object.entries(VC_DXCC)) {
-        if (!seen.has(d.name)) { seen.add(d.name); idx.push({name:d.name.toLowerCase(),pfx,d}); }
-    }
-    return idx;
-})();
-
-const VC_PRESETS = [
-    {name:'USA', pfx:'w'},{name:'Japon', pfx:'ja'},{name:'Australie', pfx:'vk'},
-    {name:'Brésil', pfx:'py'},{name:'Afr. du Sud', pfx:'zs'},
-];
-
-function vcBandLabel(mhz) {
-    const b = VC_BANDS.find(x => Math.abs(x.mhz - mhz) < 0.35);
-    return b ? b.label : `${mhz} MHz`;
+  voaPanel.innerHTML=`
+   ${note}
+   <div style="margin-bottom:10px">
+    <b>F1SMV → ${esc(call)}</b> · ${esc(loc.country||'')} · ${Number(loc.lat).toFixed(2)}, ${Number(loc.lon).toFixed(2)}
+    ${loc.precise?' · zone affinée':' · centroïde DXCC'}
+   </div>
+   ${best?`<div style="margin-bottom:12px;color:#9bc1d4">Meilleur créneau : <b style="color:#63ceff">${String(best.h).padStart(2,'0')}h UTC</b> · ${esc(best.f)} MHz · fiabilité ${best.p==null?'—':Math.round(best.p)+'%'}${best.s==null?'':' · SNR '+best.s+' dB'}</div>`:''}
+   <div style="overflow:auto"><table class="voa">
+    <tr><th>Bande</th>${head}</tr>${rows}
+   </table></div>
+   <div class="legend"><span><i style="background:#28e87d"></i>≥65%</span><span><i style="background:#ffb52e"></i>35–64%</span><span><i style="background:#ff5364"></i>&lt;35%</span></div>`;
+ }catch(e){voaPanel.innerHTML='<span class="error">'+esc(e.message)+'</span>'}
+}
+async function loadCalibrationMC(){
+ try{
+  const r=await fetch('/api/adaptive/calibration.json',{cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const d=await r.json();
+  /* v13.1 : le serveur répond 200 + ok:false avec la raison — on l'affiche au lieu de dessiner des cases vides */
+  if(d.ok===false)throw new Error(d.reason||'calibration indisponible côté serveur');
+  const models=d.models||{};
+  const names={es:'Sporadic-E · 6 m',hf:'HF',tropo:'Tropo · VHF'},keys=['es','hf','tropo'];
+  const boxes=keys.map(k=>{
+    const m=models[k]||{},n=Number(m.n??m.samples??0);
+    const b=(m.brier&&m.brier.brier!=null)?Number(m.brier.brier):(m.brier_score!=null?Number(m.brier_score):null);
+    const status=n>0?(n+' prévision'+(n>1?'s':'')+' vérifiée'+(n>1?'s':'')):'Aucune prévision vérifiée pour ce modèle';
+    const interp=(n>0&&m.brier&&m.brier.interpretation)?'<br><span style="color:#8faebe">'+esc(m.brier.interpretation)+'</span>':'';
+    return `<div class="calbox"><div class="title">${names[k]}</div><strong>${b!=null&&Number.isFinite(b)?b.toFixed(3):'—'}</strong><div class="muted">Brier score</div><small>${status}${interp}<br>Fiabilité ${m.reliability_pct!=null?Math.round(Number(m.reliability_pct))+'%':'—'} · ECE ${m.ece!=null?Math.round(Number(m.ece)*100)+'%':'—'}</small></div>`;
+  }).join('');
+  /* progression : « aucune donnée » ≠ « en panne » */
+  const lg=Number(d.logged_total),pe=Number(d.pending);
+  let prog;
+  if(!Number.isFinite(lg))prog='Progression indisponible.';
+  else if(lg===0)prog='Aucune prédiction journalisée pour l’instant : le serveur en soumet automatiquement toutes les 30 min dès que des spots sont reçus (échantillon d’auto-calibration si aucun DXCC manquant LoTW).';
+  else{
+   prog=`${lg} prédiction${lg>1?'s':''} journalisée${lg>1?'s':''} · ${lg-pe} vérifiée${lg-pe>1?'s':''} · ${pe} en attente`;
+   if(pe>0&&d.next_verification_ts)prog+=` · prochaine échéance ${fmtUTC(d.next_verification_ts)}`;
+   if(d.last_verified_ts)prog+=` · dernière vérification ${fmtUTC(d.last_verified_ts)}`;
+  }
+  calPanel.innerHTML='<div class="calgrid">'+boxes+'</div><div class="muted" style="margin-top:10px;font-size:12px">'+esc(prog)+'</div>';
+  const total=keys.reduce((s,k)=>s+Number(models[k]?.n||0),0),cs=document.getElementById('calState');
+  if(cs)cs.textContent=total>0?'ACTIVE':'EN APPRENTISSAGE';
+ }catch(e){calPanel.innerHTML='<span class="error">Calibration indisponible · '+esc(e.message)+'</span>'}
 }
 
-function vcResolveLocal(raw) {
-    const q = raw.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-    if (!q) return null;
-    const hits = Object.entries(VC_DXCC).filter(([k]) => q.startsWith(k))
-                       .sort((a,b) => b[0].length - a[0].length);
-    if (hits.length) return hits[0][1];
-    const nameHit = VC_COUNTRY_INDEX.find(x => x.name.includes(q));
-    return nameHit ? nameHit.d : null;
+/* v13.1 — État des modules : dit POURQUOI un pavé est vide (et quoi faire) au lieu de « aucune donnée ». */
+async function loadDiagnostic(){
+ const el=document.getElementById('diagList');if(!el)return;
+ try{
+  const r=await fetch('/api/insight/diagnostic.json',{cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status+' — serveur à mettre à jour (webapp.py v13.1)');
+  const d=await r.json(),mods=d.modules||{};
+  const label={flux_spots:'Flux de spots',autotest:'Auto-Test',calibration:'Calibration',analytics:'Analytique',voacap:'VOACAP',maintenance:'Maintenance'};
+  const col={ok:'#28e87d',warn:'#ffbd32',error:'#ff5364',info:'#2bbcff'};
+  const icon={ok:'✓',warn:'⚠',error:'✗',info:'ℹ'};
+  const chips=Object.entries(mods).map(([k,m])=>`<span class="pill" style="cursor:default;border-color:${col[m.status]||'#456'};color:${col[m.status]||'#9ab'}" title="${esc(m.detail+(m.hint?' → '+m.hint:''))}">${icon[m.status]||'●'} ${esc(label[k]||k)}</span>`).join(' ');
+  const lines=Object.entries(mods).filter(([k,m])=>m.status!=='ok').map(([k,m])=>`<div style="margin-top:6px;font-size:13px"><b style="color:${col[m.status]}">${icon[m.status]||'●'} ${esc(label[k]||k)}</b> — ${esc(m.detail)}${m.hint?' <span style="color:#8faebe">→ '+esc(m.hint)+'</span>':''}</div>`).join('');
+  el.innerHTML=chips+(lines||'<div style="margin-top:6px;font-size:13px;color:#6fe3a0">✓ Tous les modules fonctionnent.</div>');
+ }catch(e){el.innerHTML='<span class="error">Diagnostic indisponible · '+esc(e.message)+'</span>'}
 }
-
-async function vcGeocode(raw) {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(raw)}&format=json&limit=1`;
-    try {
-        const res = await fetch(url, {headers:{'Accept-Language':'fr,en'}});
-        const arr = await res.json();
-        if (!arr.length) return null;
-        return {lat:parseFloat(arr[0].lat), lon:parseFloat(arr[0].lon), name:raw.trim()};
-    } catch { return null; }
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function initDrag(){
+ document.querySelectorAll('.draggable-panel').forEach(p=>{
+  p.addEventListener('dragstart',e=>{window._drag=p;p.classList.add('dragging');e.dataTransfer.effectAllowed='move'});
+  p.addEventListener('dragend',()=>{p.classList.remove('dragging');document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));window._drag=null;saveOrder()});
+  p.addEventListener('dragover',e=>{if(window._drag&&window._drag!==p&&window._drag.parentElement===p.parentElement){e.preventDefault();p.classList.add('drag-over')}});
+  p.addEventListener('dragleave',()=>p.classList.remove('drag-over'));
+  p.addEventListener('drop',e=>{e.preventDefault();p.classList.remove('drag-over');const d=window._drag;if(!d||d===p||d.parentElement!==p.parentElement)return;p.parentElement.insertBefore(d,p)});
+ });
+ restoreOrder();
 }
-
-const voacapRenderer = (data) => {
-    const head = `<div class="panel-header">${ddHandle()}🌐 Prédictions HF
-        <span class="tag">VOACAP</span></div>
-        <div class="panel-sub">${bisub(
-            "Fiabilité prévue du circuit vers une cible, bande par bande et heure par heure. Modèle statistique mensuel : c'est le comportement typique du mois, pas la météo du jour.",
-            "Predicted circuit reliability to a target, band by band and hour by hour. Monthly statistical model: this is the month's typical behaviour, not today's conditions."
-        )}</div>`;
-
-    const r = voacapResult;
-    const chips = VC_PRESETS.map(p =>
-        `<button class="vc-chip" onclick="vcRunPreset('${esc(p.pfx)}')">${esc(p.name)}</button>`
-    ).join('');
-
-    const controls = `<div class="vc-presets">${chips}</div>
-        <div class="vc-controls">
-            <div class="vc-field">
-                <label for="vc-query">Indicatif, préfixe DXCC ou pays</label>
-                <input type="text" id="vc-query" class="vc-name"
-                    placeholder="JA1ABC · ZS · Brésil · Australie…"
-                    onkeydown="if(event.key==='Enter') runVoacapPrediction()">
-                <div class="vc-resolve" id="vc-resolve"></div>
-            </div>
-            <button class="vc-run" id="vc-run" onclick="runVoacapPrediction()"
-                ${voacapBusy ? 'disabled' : ''}>${voacapBusy ? 'Calcul…' : 'Calculer'}</button>
-        </div>`;
-
-    if (!r) {
-        return head + controls + `<div class="no-data">
-            <b>Saisis un indicatif, un préfixe ou un nom de pays — puis Entrée.</b>
-            <div class="sub-en">🇬🇧 Enter a callsign, DXCC prefix or country name — then hit Enter.</div>
-        </div>`;
-    }
-    if (r.status === 'unavailable') {
-        return head + controls + `<div class="no-data">
-            <b>Moteur VOACAP injoignable — ${esc(r.reason||'raison inconnue')}</b>
-            <div class="sub-en">🇬🇧 VOACAP engine unreachable — ${esc(r.reason||'unknown reason')}</div>
-        </div>`;
-    }
-    if (r.status === 'error') {
-        return head + controls + `<div class="no-data"><b>${esc(r.reason||'Requête invalide')}</b></div>`;
-    }
-
-    const hours = r.hours || [];
-    const byHour = new Map(hours.map(h => [h.hour_utc, h]));
-    const nowH = new Date().getUTCHours();
-    const now = byHour.get(nowH);
-
-    let hero;
-    if (now && now.rel > 0) {
-        hero = `<div class="vc-now">
-            <div class="vc-now-band" style="color:${heatColor(now.rel)}">${esc(vcBandLabel(now.best_freq_mhz))}</div>
-            <div class="vc-now-meta">
-                <div class="vc-now-hour">maintenant · ${String(nowH).padStart(2,'0')}z · ${esc(r.circuit||'')}</div>
-                <div class="vc-now-stats">fiabilité ${Math.round(now.rel*100)}% · ${now.snr} dB · ${now.best_freq_mhz} MHz</div>
-            </div></div>`;
-    } else {
-        hero = `<div class="vc-now"><div class="vc-now-meta">
-            <div class="vc-now-hour">maintenant · ${String(nowH).padStart(2,'0')}z · ${esc(r.circuit||'')}</div>
-            <div class="vc-now-dead">Aucune bande exploitable à cette heure. Regarde la grille.</div>
-            </div></div>`;
-    }
-
-    const headerCells = Array.from({length:24},(_,h) =>
-        `<th class="${h===nowH?'vc-hnow':''}">${h%2===0?String(h).padStart(2,'0'):''}</th>`
-    ).join('');
-
-    const rows = VC_BANDS.map(band => {
-        const cells = Array.from({length:24},(_,h) => {
-            const entry = byHour.get(h);
-            const f = entry && entry.frequencies ? entry.frequencies[band.mhz] : null;
-            const rel = f ? f.rel : 0;
-            const tip = f
-                ? `${band.label} ${String(h).padStart(2,'0')}z — ${Math.round(rel*100)}% / ${f.snr} dB`
-                : `${band.label} ${String(h).padStart(2,'0')}z — pas de donnée`;
-            return `<td class="${h===nowH?'vc-cnow':''}" style="background:${heatColor(rel)}" title="${esc(tip)}"></td>`;
-        }).join('');
-        return `<tr><th class="vc-band-label">${band.label}</th>${cells}</tr>`;
-    }).join('');
-
-    const origin = r.from_cache
-        ? bisub('en cache (< 24 h)','cached (< 24 h)')
-        : bisub("calcul à l'instant",'computed just now');
-
-    return head + controls + hero +
-        `<div class="vc-scroll"><table class="vc-grid">
-            <tr><th></th>${headerCells}</tr>${rows}
-        </table></div>
-        <div class="vc-scale">
-            <span>peu fiable</span><div class="vc-scale-ramp"></div><span>très fiable</span>
-            <span style="margin-left:auto">mois ${r.month} · SSN ${r.ssn} · ${origin}</span>
-        </div>`;
-};
-
-function vcRunPreset(pfx) {
-    const el = document.getElementById('vc-query');
-    if (el) el.value = pfx;
-    runVoacapPrediction();
+function saveOrder(){
+ ['.hero','.extra-grid'].forEach(sel=>{const b=document.querySelector(sel);if(b)lsSet('ndxw-'+sel,[...b.children].map(x=>x.dataset.panelId||'').filter(Boolean).join(','))});
 }
-
-function vcPaint() {
-    const p = panels.find(x => x.key === 'voacap');
-    if (p) p.render({});
+function restoreOrder(){
+ /* v13.1 : lecture défensive (stockage bloqué ou valeur corrompue ne doit jamais bloquer la page)
+    et recherche par comparaison directe, sans interpoler l'id dans un sélecteur CSS. */
+ ['.hero','.extra-grid'].forEach(sel=>{try{
+  const b=document.querySelector(sel),s=lsGet('ndxw-'+sel);
+  if(!b||!s)return;
+  s.split(',').forEach(id=>{const x=[...b.children].find(c=>c.dataset&&c.dataset.panelId===id);if(x)b.appendChild(x)});
+ }catch(e){console.error('restoreOrder',e)}});
 }
-
-async function runVoacapPrediction() {
-    const raw = (document.getElementById('vc-query')?.value || '').trim();
-    if (!raw) {
-        voacapResult = {status:'error', reason:'Saisis un indicatif ou un nom de pays.'};
-        vcPaint(); return;
-    }
-    voacapBusy = true; vcPaint();
-
-    let resolved = vcResolveLocal(raw);
-    const resolveEl = document.getElementById('vc-resolve');
-    if (!resolved) {
-        if (resolveEl) resolveEl.textContent = 'Géocodage…';
-        resolved = await vcGeocode(raw);
-    }
-    if (!resolved) {
-        voacapBusy = false;
-        voacapResult = {status:'error',
-            reason:`"${raw}" non reconnu. Essaie un préfixe DXCC (JA, ZS, VK…) ou un nom de pays.`};
-        vcPaint(); return;
-    }
-    if (resolveEl) resolveEl.textContent = `→ ${resolved.name} (${resolved.lat.toFixed(1)}, ${resolved.lon.toFixed(1)})`;
-
-    try {
-        const res = await fetch('/api/voacap/predict', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({rx_name:resolved.name, rx_lat:resolved.lat, rx_lon:resolved.lon})
-        });
-        voacapResult = await res.json();
-    } catch(err) {
-        voacapResult = {status:'unavailable', reason:String(err)};
-    }
-    voacapBusy = false; vcPaint();
-    const qEl = document.getElementById('vc-query');
-    if (qEl) qEl.value = raw;
-    const rEl = document.getElementById('vc-resolve');
-    if (rEl) rEl.textContent = `→ ${resolved.name} (${resolved.lat.toFixed(1)}, ${resolved.lon.toFixed(1)})`;
-}
-
-// ── Drag & Drop des pavés (SortableJS, persistance localStorage) ──
-function initPanelSorting() {
-    if (typeof Sortable === 'undefined') return;
-    const grid = document.getElementById('panels-grid');
-    if (!grid) return;
-
-    // Restaurer l'ordre sauvegardé
-    const STORAGE_KEY = 'ai_insight_panel_order';
-    const savedOrder = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (savedOrder && Array.isArray(savedOrder)) {
-        savedOrder.forEach(id => {
-            const node = document.getElementById(id);
-            if (node) grid.appendChild(node);
-        });
-    }
-
-    Sortable.create(grid, {
-        handle: '.dd-handle',
-        animation: 150,
-        onEnd: () => {
-            const order = Array.from(grid.children).map(c => c.id).filter(Boolean);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
-        }
-    });
-}
-
-// ── Boucle principale ──────────────────────────────────────────────────
-const panels = [
-    new DXPanel('recent',   recentRenderer),
-    new DXPanel('forecast', forecastRenderer),
-    new DXPanel('heatmap',  heatmapRenderer),
-    new DXPanel('patterns', patternsRenderer),
-    new DXPanel('voacap',   voacapRenderer),
-];
-
-let currentBand = '';
-
-async function updateDashboard({ useCache = true } = {}) {
-    const cacheKey = 'analytics_' + (currentBand || 'all');
-    let data = useCache ? DXCache.get(cacheKey) : null;
-    let fromCache = Boolean(data);
-
-    if (!data) {
-        try {
-            const url = '/api/analytics' + (currentBand ? '?band=' + encodeURIComponent(currentBand) : '');
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            data = await res.json();
-            DXCache.set(cacheKey, data);
-        } catch (err) {
-            console.error('analytics:', err);
-            data = DXCache.get(cacheKey);
-            if (!data) {
-                for (const p of panels) p.render({});
-                document.getElementById('last-update').textContent = 'hors ligne';
-                return;
-            }
-            fromCache = true;
-        }
-    }
-
-    // Mémoriser pour le tick de maturité
-    _lastData = data;
-    _lastFetchMs = Date.now();
-
-    renderMaturity(data);
-    for (const p of panels) p.render(data);
-
-    document.getElementById('last-update').textContent =
-        new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})
-        + (fromCache ? ' (cache)' : '');
-}
-
-document.getElementById('band-filter').addEventListener('change', (e) => {
-    currentBand = e.target.value;
-    updateDashboard({ useCache: false });
-});
-
-// Tick chaque minute pour faire avancer la barre de maturité sans appel API
-setInterval(() => {
-    if (_lastData && _lastFetchMs) {
-        renderMaturity(_lastData, (Date.now() - _lastFetchMs) / 3600000);
-    }
-}, 60000);
-
-// Drag & Drop — initialiser après que le DOM est prêt
-document.addEventListener('DOMContentLoaded', initPanelSorting);
-
-// Refresh des données toutes les 5 minutes
-updateDashboard();
-setInterval(() => updateDashboard({ useCache: false }), 300000);
+/* v13.1 : démarrage isolé. Chaque étape est protégée : une erreur d'interface (drag & drop,
+   stockage local...) ne peut plus empêcher le chargement des DONNÉES. Données d'abord. */
+const safe=f=>{try{const r=f();if(r&&typeof r.catch==='function')r.catch(e=>console.error(e))}catch(e){console.error(e)}};
+safe(refresh);safe(loadSolar);safe(loadMissionAnalytics);safe(loadCalibrationMC);safe(loadRecentActivity);safe(loadDiagnostic);
+setInterval(()=>safe(refresh),10000);setInterval(()=>safe(loadSolar),300000);
+setInterval(()=>safe(loadRecentActivity),60000);setInterval(()=>safe(loadMissionAnalytics),300000);setInterval(()=>safe(loadCalibrationMC),1800000);setInterval(()=>safe(loadDiagnostic),60000);
+safe(()=>{voaRun.onclick=runVOA});
+safe(()=>{voaCall.addEventListener('keydown',e=>{if(e.key==='Enter')runVOA()})});
+safe(()=>document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('on'));b.classList.add('on');filter=b.dataset.filter;renderTable()}));
+safe(initDrag);
 </script>
-
-</body>
-</html>
+</body></html>
