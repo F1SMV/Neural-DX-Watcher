@@ -448,4 +448,5 @@ cd Neural-DX-Watcher
 
 *Neural DX Watcher v13.1 — F1SMV — JN23 — La Seyne-sur-Mer, France*
 * vous pouvez me contacter via X 
+* design F1SMV programmé par Claude Ai
 *Historique initial rédigé pour les versions antérieures ; mise à jour documentaire : octobre 2026.*
