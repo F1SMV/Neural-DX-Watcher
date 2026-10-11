@@ -1,4 +1,4 @@
-# 🛰️ Neural DX Watcher
+# 🛰️ Neural DX Watcher 13.1
 
 > Plateforme de monitoring DX en temps réel pour radioamateurs — F1SMV / JN23
 > Raspberry Pi 5 · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
@@ -447,4 +447,5 @@ cd Neural-DX-Watcher
 ---
 
 *Neural DX Watcher v13.1 — F1SMV — JN23 — La Seyne-sur-Mer, France*
+* vous pouvez me contacter via X 
 *Historique initial rédigé pour les versions antérieures ; mise à jour documentaire : octobre 2026.*
