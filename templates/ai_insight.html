@@ -182,6 +182,15 @@ body{font-family:Inter,"Aptos","Segoe UI Variable","Segoe UI",system-ui,sans-ser
   </div>
   <div id="calPanel" class="muted">Chargement…</div>
  </section>
+ <section class="card xpanel full draggable-panel" data-panel-id="trend" draggable="true">
+  <div class="xhead" style="color:var(--amber)"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Tendance HF par bande <span class="xtag">DÉRIVE</span></div>
+  <div style="font-size:14px;color:#b8d0de;margin-bottom:14px;line-height:1.6;border-left:3px solid var(--amber);padding-left:12px">
+   <b style="color:#ffd27a">FR</b> — Pour chaque bande HF, on mesure la part des préfixes entendus par fenêtre de 3 h, sur les <b>14 derniers jours</b> comparés aux <b>60 jours précédents</b>. Une bande n'est signalée en <b>hausse</b> ou <b>baisse</b> que si l'écart est statistiquement net (|z| ≥ 3) et d'au moins 2 points. Ce n'est pas une prévision : c'est l'état réel de la propagation récente.<br>
+   <b style="color:#ffd27a">Conditions pour des chiffres corrects</b> — il faut au moins <b>20 fenêtres de 3 h d'écoute</b> (≈ 60 h) dans <b>chaque</b> période. Avec un Pi qui écoute en continu, le minimum est atteint après <b>environ 2,5 semaines</b> de fonctionnement ; la référence complète de 60 jours demande <b>environ 10 semaines</b>. Une coupure du Pi allonge ce délai d'autant. Tant que le compteur n'est pas atteint, l'état reste « insuffisant » : cela ne signifie pas qu'il n'y a pas de propagation.<br>
+   <b style="color:#ffd27a">EN</b> — For each HF band, the share of callsign prefixes heard per 3-hour window is compared over the last <b>14 days</b> vs the previous <b>60 days</b>. A band is flagged <b>up</b> or <b>down</b> only when the shift is statistically clear (|z| ≥ 3) and at least 2 points. Reliable figures need at least <b>20 listening windows of 3 h (≈ 60 h)</b> in each period: about <b>2.5 weeks</b> of continuous operation for the minimum, <b>about 10 weeks</b> for the full 60-day baseline. Until then the state stays « insuffisant ».
+  </div>
+  <div id="trendPanel" class="muted">Chargement…</div>
+ </section>
 </section>
 
 <section class="card" id="diagStrip" style="margin-bottom:14px;padding:16px 18px">
@@ -249,7 +258,7 @@ function renderTable(){
    const st=stateInfo(p), fill=prob>=65?'#28e87d':prob>=35?'#ffb52e':'#ff4e5e';
    const bc=COLORS[p.band]||'#275c78';
    return `<tr class="${rowTint(p)}" data-state="${scoreClass(p)}">
-    <td><span class="band" style="background:${bc}">${esc(p.band)}</span></td>
+    <td><span class="band" style="background:${bc}">${esc(p.band)}</span>${modelOfBand(p.band)==='hf'&&driftByBand[p.band]?' '+driftBadge(driftByBand[p.band]):''}</td>
     <td><div class="prob" title="${op.obs?'score brut '+op.raw+'% · tranche observée n='+op.n:'score brut '+op.raw+'%'}"><b>${prob}%</b><div class="track"><div class="fill" style="width:${prob}%;background:${fill}"></div></div></div></td>
     <td>${esc(p.mode||'—')}</td>
     <td class="call">${esc(p.actual_call||'—')}</td>
@@ -542,6 +551,43 @@ async function loadDiagnostic(){
   el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">'+chips+'</div>'+(lines||'<div style="margin-top:6px;font-size:13px;color:#6fe3a0">✓ Tous les modules fonctionnent.</div>');
  }catch(e){el.innerHTML='<span class="error">Diagnostic indisponible · '+esc(e.message)+'</span>'}
 }
+/* v13.2 — Tendance HF par bande (dérive 14 j vs 60 j), source : /api/insight/trend.json */
+let driftByBand={};
+const DRIFT_STYLE={hausse:['▲ hausse','#28e87d'],baisse:['▼ baisse','#ff5364'],stable:['● stable','#2bbcff'],insuffisant:['… insuffisant','#8faebe']};
+function driftBadge(s){const x=DRIFT_STYLE[s];return x?`<span class="pill" style="cursor:default;padding:2px 7px;font-size:11px;border-color:${x[1]};color:${x[1]}" title="Tendance HF de la bande : 14 derniers jours vs 60 jours précédents">${x[0]}</span>`:''}
+function pctTxt(v){return v==null||!Number.isFinite(Number(v))?'—':(Number(v)*100).toFixed(1)+' %'}
+async function loadTrend(){
+ const el=document.getElementById('trendPanel');if(!el)return;
+ try{
+  const r=await fetch('/api/insight/trend.json',{cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status+' — serveur à mettre à jour (webapp.py v13.2)');
+  const d=await r.json();
+  if(d.ok===false)throw new Error(d.reason||'tendance indisponible côté serveur');
+  const bands=Object.entries(d.bands||{});
+  driftByBand=Object.fromEntries(bands.map(([b,x])=>[b,x.status]));
+  const win=d.drift_window_days||{recent:14,past:60};
+  const nR=bands.length?bands[0][1].n_recent:null, nP=bands.length?bands[0][1].n_past:null, need=20;
+  const ok=v=>v!=null&&v>=need;
+  const cnt=(v,lab)=>`<span style="color:${ok(v)?'#6fe3a0':'#ffb52e'}">${lab} ${v??'—'}/${need}</span>`;
+  const ready=ok(nR)&&ok(nP);
+  const head=`<div class="muted" style="margin-bottom:10px;font-size:13px">Fenêtres de 3 h d'écoute : ${cnt(nR,'récentes ('+win.recent+' j)')} · ${cnt(nP,'référence ('+win.past+' j)')} · taux de base HF : ${d.base!=null?Math.round(d.base*100)+' %':'—'}${ready?'':' · <span style="color:#ffb52e">conditions non remplies : chiffres provisoires</span>'}${d.fallback?' · <span style="color:#ffb52e">présence non enregistrée : repli sur les fenêtres avec spots</span>':''}</div>`;
+  if(!bands.length){el.innerHTML=head+'<div class="empty">Pas encore de préfixe avec au moins 20 spots sur la période : aucune tendance calculable.</div>';return}
+  const sum={hausse:0,baisse:0,stable:0,insuffisant:0};
+  bands.forEach(([b,x])=>{sum[x.status]=(sum[x.status]||0)+1});
+  const verdict=sum.hausse||sum.baisse
+    ?`<b style="color:#ffd27a">${sum.hausse} bande(s) en hausse · ${sum.baisse} en baisse</b>`
+    :`<span style="color:#6fe3a0">Aucune dérive significative à ce jour</span>`;
+  const rows=bands.map(([b,x])=>{
+    const dl=x.delta==null?'—':((x.delta>=0?'+':'')+(x.delta*100).toFixed(1)+' pts');
+    const z=x.z==null?'—':(x.z>=0?'+':'')+Number(x.z).toFixed(1);
+    const bc=COLORS[b]||'#275c78';
+    return `<tr><td><span class="band" style="background:${bc}">${esc(b)}</span></td><td>${driftBadge(x.status)||esc(x.status)}</td><td>${pctTxt(x.recent)}</td><td>${pctTxt(x.past)}</td><td>${dl}</td><td>${z}</td></tr>`;
+  }).join('');
+  el.innerHTML=head+`<div style="margin-bottom:10px;font-size:14px">${verdict}</div>`+
+   `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;color:#8faebe"><th>Bande</th><th>État</th><th>Récent</th><th>Référence</th><th>Écart</th><th>z</th></tr></thead><tbody>${rows}</tbody></table></div>`+
+   `<div style="margin-top:8px;font-size:12px;color:#8faebe">« Récent » et « Référence » = part moyenne des préfixes entendus par fenêtre de 3 h. Un état « hausse » ou « baisse » doit être confirmé par les jours suivants avant d'être exploité.</div>`;
+ }catch(e){el.innerHTML='<span class="error">Tendance indisponible · '+esc(e.message)+'</span>'}
+}
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function initDrag(){
@@ -569,9 +615,9 @@ function restoreOrder(){
 /* v13.1 : démarrage isolé. Chaque étape est protégée : une erreur d'interface (drag & drop,
    stockage local...) ne peut plus empêcher le chargement des DONNÉES. Données d'abord. */
 const safe=f=>{try{const r=f();if(r&&typeof r.catch==='function')r.catch(e=>console.error(e))}catch(e){console.error(e)}};
-safe(refresh);safe(loadSolar);safe(loadMissionAnalytics);safe(loadCalibrationMC);safe(loadRecentActivity);safe(loadDiagnostic);
+safe(refresh);safe(loadSolar);safe(loadMissionAnalytics);safe(loadCalibrationMC);safe(loadRecentActivity);safe(loadDiagnostic);safe(loadTrend);
 setInterval(()=>safe(refresh),10000);setInterval(()=>safe(loadSolar),300000);
-setInterval(()=>safe(loadRecentActivity),60000);setInterval(()=>safe(loadMissionAnalytics),300000);setInterval(()=>safe(loadCalibrationMC),1800000);setInterval(()=>safe(loadDiagnostic),60000);
+setInterval(()=>safe(loadRecentActivity),60000);setInterval(()=>safe(loadMissionAnalytics),300000);setInterval(()=>safe(loadCalibrationMC),1800000);setInterval(()=>safe(loadDiagnostic),60000);setInterval(()=>safe(loadTrend),120000);
 safe(()=>{voaRun.onclick=runVOA});
 safe(()=>{voaCall.addEventListener('keydown',e=>{if(e.key==='Enter')runVOA()})});
 safe(()=>document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('on'));b.classList.add('on');filter=b.dataset.filter;renderTable()}));
