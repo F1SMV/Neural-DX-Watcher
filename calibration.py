@@ -56,7 +56,7 @@ _LAPLACE_ALPHA = 1.0
 MODELS = ("es", "hf", "tropo")
 
 
-HF_V2_SINCE_TS = 1792126745  # mise en service du scoring HF solaire
+HF_V2_SINCE_TS = 1792126745  # mise en service du modèle HF de tendance (v13.2)
 
 class Calibrator:
     """Lit prediction_log (rempli par predictor.verify_predictions) et en dérive
