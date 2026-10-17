@@ -56,6 +56,8 @@ _LAPLACE_ALPHA = 1.0
 MODELS = ("es", "hf", "tropo")
 
 
+HF_V2_SINCE_TS = 1792126745  # mise en service du scoring HF solaire
+
 class Calibrator:
     """Lit prediction_log (rempli par predictor.verify_predictions) et en dérive
     des probabilités calibrées + le Brier score. Lecture seule, thread-safe."""
@@ -88,6 +90,8 @@ class Calibrator:
         if conn is None:
             return []
         cutoff = time.time() - days * 86400
+        if model == 'hf':  # HF v2 : seules les prévisions du scoring solaire
+            cutoff = max(cutoff, HF_V2_SINCE_TS)
         try:
             if model:
                 rows = conn.execute(

@@ -82,7 +82,7 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 |------|--------|------------------|-----------------|
 | Carte HF (encadré probabilité) | [EXPÉRIMENTAL] | Taux de base réalisé par bande, sans score | Mention « Modèle HF non démontré » |
 | Tendance HF par bande | [EXPÉRIMENTAL] | Hausse / baisse / stable / insuffisant, avec valeurs récentes, de référence, écart et z | État « insuffisant » tant que le seuil de 20 fenêtres par période n'est pas atteint |
-| Précision & calibration | [EXPÉRIMENTAL] | Brier, ECE, gain et courbe score → réalité pour ES, tropo et HF | HF : anciennes prédictions comptées tant que la bascule `HF_V2_SINCE_TS` n'est pas appliquée |
+| Précision & calibration | [EXPÉRIMENTAL] | Brier, ECE, gain et courbe score → réalité pour ES, tropo et HF | HF : ne compte que les prévisions postérieures à la bascule `HF_V2_SINCE_TS` ; échantillon encore faible |
 | Auto-Test | [EXPÉRIMENTAL] | Prédictions émises, confirmées, score de fraîcheur | Échelle du score à confirmer |
 | État des modules | Exploitable | État de chaque module, cause probable et remède | — |
 
@@ -95,7 +95,7 @@ Les pavés sont déplaçables (glisser-déposer) ; l'ordre est mémorisé dans l
 
 #### Limites connues
 
-- **Calibration HF :** les anciennes prédictions HF restent comptées tant que la bascule `HF_V2_SINCE_TS` (calibration.py) n'est pas appliquée.
+- **Calibration HF :** seules les prévisions HF postérieures à la bascule `HF_V2_SINCE_TS` (calibration.py) sont comptées ; les anciennes sont exclues. L'échantillon reste faible au départ.
 - **Élévation solaire au point milieu :** testée hors échantillon (gain de 0,01 à 0,02 AUC au-delà du taux bande × préfixe et de l'heure). Non intégrée au scoring : statut NON VALIDÉ.
 - **SFI et Kp historiques :** non enregistrés (`solar_log` vide). Le modèle HF n'utilise pas l'indice d'ionisation.
 - **Généralisation :** les mesures de v13.2 reposent sur une seule station et un historique de 120 jours. Elles ne sont pas généralisables à d'autres QTH sans nouvelle validation.
@@ -105,6 +105,7 @@ Les pavés sont déplaçables (glisser-déposer) ; l'ordre est mémorisé dans l
 - `webapp.py` : nouvelle route `GET /api/insight/trend.json`, insérée avant la route de diagnostic.
 - `predictor.py` : modèle de tendance HF, détection de dérive, compteurs de fenêtres par période, exclusion de « Unknown ».
 - `templates/ai_insight.html` : pavé « Tendance HF par bande », badges de dérive sur les lignes HF, explication des conditions.
+- `calibration.py` : bascule HF (`HF_V2_SINCE_TS`) ; la calibration HF ignore les prévisions antérieures.
 
 ---
 

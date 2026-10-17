@@ -82,7 +82,7 @@ Since v12.5, the application has included an experimental **adaptive AI Insight 
 |-------|--------|---------------|---------------|
 | HF card (probability box) | [EXPERIMENTAL] | Measured base rate per band, no score | "HF model not demonstrated" notice |
 | HF trend by band | [EXPERIMENTAL] | Rising / falling / stable / insufficient, with recent and reference values, delta and z | "insufficient" until each period reaches 20 windows |
-| Accuracy & calibration | [EXPERIMENTAL] | Brier, ECE, gain and score → reality curve for ES, tropo and HF | HF: old predictions still counted until the `HF_V2_SINCE_TS` cutover is applied |
+| Accuracy & calibration | [EXPERIMENTAL] | Brier, ECE, gain and score → reality curve for ES, tropo and HF | HF: counts only predictions made after the `HF_V2_SINCE_TS` cutover; sample still small |
 | Auto-Test | [EXPERIMENTAL] | Predictions issued, confirmed, freshness score | Score scale still to be confirmed |
 | Module status | Usable | State of each module, probable cause and remedy | — |
 
@@ -95,7 +95,7 @@ Panels can be dragged and rearranged; the order is stored in the browser.
 
 #### Known limitations
 
-- **HF calibration:** old HF predictions remain counted until the `HF_V2_SINCE_TS` cutover (calibration.py) is applied.
+- **HF calibration:** only HF predictions made after the `HF_V2_SINCE_TS` cutover (calibration.py) are counted; older ones are excluded. The sample is small at first.
 - **Solar elevation at path midpoint:** tested out of sample (gain of 0.01 to 0.02 AUC beyond the band × prefix rate and hour). Not integrated into scoring: status NOT VALIDATED.
 - **Historical SFI and Kp:** not recorded (`solar_log` empty). The HF model does not use ionisation indices.
 - **Generalisation:** v13.2 measurements come from a single station and 120 days of history. They do not generalise to other QTHs without new validation.
@@ -105,6 +105,7 @@ Panels can be dragged and rearranged; the order is stored in the browser.
 - `webapp.py`: new route `GET /api/insight/trend.json`, inserted before the diagnostic route.
 - `predictor.py`: HF trend model, drift detection, per-period window counts, exclusion of "Unknown".
 - `templates/ai_insight.html`: "HF trend by band" panel, drift badges on HF rows, explanation of conditions.
+- `calibration.py`: HF cutover (`HF_V2_SINCE_TS`); HF calibration ignores earlier predictions.
 
 ---
 
