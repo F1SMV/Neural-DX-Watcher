@@ -9671,6 +9671,9 @@ function toggleMySignalOnMap(which) {
   });
 })();
 
+// Affichage automatique du lobe HF : activé au chargement, sans clic
+setTimeout(() => { if (!_mysig.hf.on) toggleMySignalOnMap('hf'); }, 2500);
+
 // Interpolation grand-cercle (slerp sphérique) — Leaflet ne fournit pas
 // de géodésique nativement. Découpe la ligne si elle traverse
 // l'antiméridien (saut de longitude > 180°) pour un rendu propre.
@@ -9798,6 +9801,25 @@ async function loadMySignalOnMap(which) {
       (a, b) => _bearingFromQTH(a.lat, a.lon) - _bearingFromQTH(b.lat, b.lon)
     );
 
+    if (which === 'hf' && typeof buildLobePolygon === 'function') {
+      // Lobe de rayonnement centré sur le QTH, mis à jour à chaque rafraîchissement
+      const _qth = { lat: userLatLng[0], lon: userLatLng[1] };
+      const _lobe = buildLobePolygon(_qth, withCoords);
+      if (_lobe.polygon.length > 2) {
+        s.layer.addLayer(L.polygon(_lobe.polygon, {
+          color: '#ff2222', weight: 2.4, opacity: 0.9,
+          fillColor: '#ff2222', fillOpacity: 0.22, interactive: false
+        }));
+      }
+      // Rayons discrets QTH → station (grand cercle)
+      withCoords.forEach(e => {
+        _greatCirclePoints(_qth.lat, _qth.lon, e.lat, e.lon, 24).forEach(seg => {
+          s.layer.addLayer(L.polyline(seg, {
+            color: '#ff2222', weight: 1, opacity: 0.35, interactive: false
+          }));
+        });
+      });
+    } else
     for (let i = 0; i < byBearing.length; i++) {
       const a = byBearing[i];
       const b = byBearing[(i + 1) % byBearing.length];  // boucle : dernier → premier
@@ -10660,6 +10682,7 @@ fetch('/api/check_update')
 <script src="/static/version-check.js"></script>
 
 <!-- v13.1: Storm proximity alert — bandeau + bip si foudre < 30km / 20min -->
+<script src="/static/lobe-diagram.js"></script>
 <script src="/static/storm-alert.js"></script>
 
 </body>
