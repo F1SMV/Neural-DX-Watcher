@@ -16,6 +16,7 @@
 - [Overview](#-overview)
 - [Technology stack](#-technology-stack)
 - [Version history](#-version-history)
+  - [v13.2 — Experimental AI Insight panels](#v132--experimental-ai-insight-panels)
   - [v13.1 — Consolidation and release preparation](#v131--consolidation-and-release-preparation)
   - [v13.0 — Adaptive Insight Engine](#v130--adaptive-insight-engine)
   - [v12.7 — Fixes and polish](#v127--fixes-and-polish)
@@ -63,7 +64,51 @@ Since v12.5, the application has included an experimental **adaptive AI Insight 
 
 ## 📜 Version history
 
-### v13.1 — Consolidation and release preparation ← CURRENT
+### v13.2 — Experimental AI Insight panels ← CURRENT
+
+**Period:** October 2026  
+**Status:** version under validation on Raspberry Pi. Panels marked **[EXPERIMENTAL]** are measurements still being validated: they are not validated forecasts and must not guide operating decisions.
+
+#### Changes since v13.1
+
+- **Honest HF card:** for HF bands, the displayed probability is now the **measured base rate** (share of 3-hour windows in which at least one spot was received), shown with the notice "HF model not demonstrated". The previous HF score had no out-of-sample discriminating power (AUC ≈ 0.51, negative Brier gain) and is no longer displayed.
+- **HF trend model (backend):** HF predictions use a prefix × band × UTC 3-hour bucket model, computed over 120 days of history, with a prior weighted toward the base rate. Out-of-sample validation over 4 time blocks: AUC between 0.73 and 0.78. The Brier gain over the base rate is not constant across splits, which is why the card shows the base rate rather than the score.
+- **Drift detection:** for each HF band, the share of prefixes heard per 3-hour window is compared over the last 14 days and the previous 60 days (Welch test, z statistic). A **rising** or **falling** state is flagged only when |z| ≥ 3 and the change is at least 2 points.
+- **Band "Unknown"** excluded from trend calculations.
+
+#### Experimental panels
+
+| Panel | Status | What it shows | Current limit |
+|-------|--------|---------------|---------------|
+| HF card (probability box) | [EXPERIMENTAL] | Measured base rate per band, no score | "HF model not demonstrated" notice |
+| HF trend by band | [EXPERIMENTAL] | Rising / falling / stable / insufficient, with recent and reference values, delta and z | "insufficient" until each period reaches 20 windows |
+| Accuracy & calibration | [EXPERIMENTAL] | Brier, ECE, gain and score → reality curve for ES, tropo and HF | HF: old predictions still counted until the `HF_V2_SINCE_TS` cutover is applied |
+| Auto-Test | [EXPERIMENTAL] | Predictions issued, confirmed, freshness score | Score scale still to be confirmed |
+| Module status | Usable | State of each module, probable cause and remedy | — |
+
+Panels can be dragged and rearranged; the order is stored in the browser.
+
+#### Conditions for reliable figures
+
+- **HF trend:** at least **20 listening windows of 3 hours** (≈ 60 h) in the recent period (14 days) **and** in the reference period (60 days). With a Raspberry Pi listening continuously, the minimum is reached after **about 2.5 weeks** of operation; the full 60-day reference needs **about 10 weeks**. A Pi outage extends this delay accordingly.
+- **Observation at writing (17 Oct 2026):** 56 windows over 120 days of history, roughly 168 h of recorded listening. All bands remain "insufficient". This must be re-checked against the deployed version.
+
+#### Known limitations
+
+- **HF calibration:** old HF predictions remain counted until the `HF_V2_SINCE_TS` cutover (calibration.py) is applied.
+- **Solar elevation at path midpoint:** tested out of sample (gain of 0.01 to 0.02 AUC beyond the band × prefix rate and hour). Not integrated into scoring: status NOT VALIDATED.
+- **Historical SFI and Kp:** not recorded (`solar_log` empty). The HF model does not use ionisation indices.
+- **Generalisation:** v13.2 measurements come from a single station and 120 days of history. They do not generalise to other QTHs without new validation.
+
+#### Modified files
+
+- `webapp.py`: new route `GET /api/insight/trend.json`, inserted before the diagnostic route.
+- `predictor.py`: HF trend model, drift detection, per-period window counts, exclusion of "Unknown".
+- `templates/ai_insight.html`: "HF trend by band" panel, drift badges on HF rows, explanation of conditions.
+
+---
+
+### v13.1 — Consolidation and release preparation
 
 **Period:** October 2026  
 **Status:** Local development version; publication and functional verification remain to be confirmed.
@@ -286,6 +331,13 @@ Each tested configuration is recorded in SQLite (`model_versions`). The lifecycl
 
 `calculate_spd_score()` reads the active configuration via `ModelRegistry.get_active_model()` on each call. This completes the conceptual feedback loop: observations → evaluation → model selection → live scoring → new observations.
 
+### Experimental panels (v13.2)
+
+See the v13.2 section for conditions and limits. Summary:
+
+- **[EXPERIMENTAL]** HF card (base rate, "HF model not demonstrated"), HF trend by band, Accuracy & calibration, Auto-Test.
+- **Usable:** Module status.
+
 ### AI Insight panels
 
 | Panel | Data | Documented refresh interval |
@@ -377,6 +429,13 @@ cd Neural-DX-Watcher
 | `GET /api/voacap.json` | VOACAP forecasts by band/region |
 | `GET /api/briefing.json?lang=en` | Narrative DX briefing |
 
+### Diagnostics and trend (v13.2)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/insight/trend.json` | **[EXPERIMENTAL]** HF trend by band: state, recent and reference values, delta, z, window counts per period |
+| `GET /api/insight/diagnostic.json` | State of each AI Insight module, with probable cause and remedy |
+
 ### Adaptive Insight Engine (introduced in v13.0)
 
 | Endpoint | Description |
@@ -430,5 +489,5 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v13.1 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
+*Neural DX Watcher v13.2 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
 *Historical release notes retained from the earlier French README; documentation updated October 2026.*

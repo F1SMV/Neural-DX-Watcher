@@ -35,6 +35,8 @@ Usage (API publique inchangée vis-à-vis de webapp.py, sauf ajouts) :
     p.get_reliability_stats()       # NOUVEAU — pour affichage frontend
 """
 
+import bisect
+from collections import defaultdict
 import sqlite3
 import time
 import math
@@ -183,6 +185,187 @@ CREATE INDEX IF NOT EXISTS idx_es_events_month   ON es_events(month, hour_utc);
 CREATE INDEX IF NOT EXISTS idx_pred_log_target   ON prediction_log(target_ts_end);
 CREATE INDEX IF NOT EXISTS idx_pred_log_verified ON prediction_log(verified);
 """
+
+
+# ──────────────────────────────────────────────────────────────
+# HF v2 : probabilité = taux observé par palier d'élévation solaire au point
+# milieu du chemin QTH -> cible (validé hors échantillon : AUC 0,613, gain +0,04).
+# ──────────────────────────────────────────────────────────────
+QTH_LAT, QTH_LON = 43.075703, 5.873444   # F1SMV, JN23
+SOLAR_EDGES = list(range(-90, 91, 15))   # paliers de 15°
+HF_SOLAR_MIN_N = 8                       # sous ce nombre, on prend le taux de base
+HF_SOLAR_TTL = 3600                      # recalcul de la table toutes les heures
+
+
+def solar_elevation(lat: float, lon: float, ts: float) -> float:
+    """Élévation du soleil (degrés), formule approchée (précision ~1°)."""
+    d = datetime.fromtimestamp(ts, tz=timezone.utc)
+    doy = d.timetuple().tm_yday
+    utc_h = d.hour + d.minute / 60 + d.second / 3600
+    B = math.radians(360 / 365 * (doy - 81))
+    eot = 9.87 * math.sin(2 * B) - 7.53 * math.cos(B) - 1.5 * math.sin(B)
+    decl = math.radians(-23.44 * math.cos(math.radians(360 / 365 * (doy + 10))))
+    H = math.radians(15 * (utc_h + lon / 15 + eot / 60 - 12))
+    la = math.radians(lat)
+    s = math.sin(la) * math.sin(decl) + math.cos(la) * math.cos(decl) * math.cos(H)
+    return math.degrees(math.asin(max(-1.0, min(1.0, s))))
+
+
+def path_midpoint(lat1: float, lon1: float, lat2: float, lon2: float) -> tuple[float, float]:
+    """Point milieu du grand cercle entre deux positions."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    l1 = math.radians(lon1)
+    dl = math.radians(lon2 - lon1)
+    bx = math.cos(p2) * math.cos(dl)
+    by = math.cos(p2) * math.sin(dl)
+    lat = math.atan2(math.sin(p1) + math.sin(p2),
+                     math.sqrt((math.cos(p1) + bx) ** 2 + by ** 2))
+    lon = l1 + math.atan2(by, math.cos(p1) + bx)
+    return math.degrees(lat), (math.degrees(lon) + 540) % 360 - 180
+
+
+def solar_bin(elev: float) -> int:
+    return max(0, min(len(SOLAR_EDGES) - 2, bisect.bisect_right(SOLAR_EDGES, elev) - 1))
+
+
+# ──────────────────────────────────────────────────────────────
+# HF : tendance historique par couple (bande, préfixe) × tranche horaire UTC.
+# Validée hors échantillon sur toutes les fenêtres (AUC 0,73-0,78 sur 4 blocs).
+# Le calcul de propagation (élévation solaire) n'est pas retenu : apport < 0,02.
+# La présence du cluster vient de la table sessions (indépendante des spots).
+# ──────────────────────────────────────────────────────────────
+HF_TREND_DAYS = 120
+HF_TREND_MIN_SPOTS = 20
+HF_TREND_PRIOR_M = 20.0
+HF_TREND_TTL = 1800
+DRIFT_RECENT_DAYS = 14
+DRIFT_PAST_DAYS = 60
+DRIFT_Z = 3.0
+DRIFT_MIN_DELTA = 0.02
+WIN_S = 3 * 3600
+
+
+def _logit(p):
+    p = min(max(p, 1e-6), 1 - 1e-6)
+    return math.log(p / (1 - p))
+
+
+def _sigmoid(z):
+    if z < -30:
+        return 1e-13
+    if z > 30:
+        return 1 - 1e-13
+    return 1 / (1 + math.exp(-z))
+
+
+def active_windows(sessions, lo_ts, hi_ts):
+    """Fenêtres 3 h couvertes par une session du cluster (ts_start .. ts_last)."""
+    out = set()
+    for ts_start, ts_last in sessions:
+        a, b = max(ts_start, lo_ts), min(ts_last, hi_ts)
+        if b < a:
+            continue
+        out.update(range(int(a // WIN_S), int(b // WIN_S) + 1))
+    return out
+
+
+def build_hf_trend(spot_rows, sessions, now):
+    """spot_rows : (ts, bande, préfixe). Retourne les tendances, ou None si données insuffisantes."""
+    lo = now - HF_TREND_DAYS * 86400
+    spots = [(t, b, p) for t, b, p in spot_rows if t >= lo]
+    cnt = defaultdict(int)
+    for _, b, p in spots:
+        cnt[(b, p)] += 1
+    pairs = [k for k, c in cnt.items() if c >= HF_TREND_MIN_SPOTS]
+    if not pairs:
+        return None
+    aw = active_windows(sessions, lo, now)
+    fallback = not aw
+    if fallback:  # pas de présence enregistrée : repli sur les fenêtres ayant des spots
+        aw = {int(t // WIN_S) for t, _, _ in spots}
+    pairset = set(pairs)
+    pos = {(b, p, int(t // WIN_S)) for t, b, p in spots
+           if int(t // WIN_S) in aw and (b, p) in pairset}
+    n_w = len(aw)
+    if n_w == 0:
+        return None
+    base = len(pos) / (len(pairs) * n_w)
+    if not (0 < base < 1):
+        return None
+    m = HF_TREND_PRIOR_M
+    k_pair = defaultdict(int)
+    hour_pos = defaultdict(int)
+    for b, p, w in pos:
+        k_pair[(b, p)] += 1
+        hour_pos[(w * 3) % 24 // 3 * 3] += 1
+    hour_cells = defaultdict(int)
+    for w in aw:
+        hour_cells[(w * 3) % 24 // 3 * 3] += len(pairs)
+    pair_logit = {k: _logit((k_pair[k] + m * base) / (n_w + m)) for k in pairs}
+    hour_log = {hb: _logit((hour_pos[hb] + m * base) / (cells + m)) - _logit(base)
+                for hb, cells in hour_cells.items()}
+    return {"pairs": pair_logit, "hours": hour_log, "base": base,
+            "windows": n_w, "fallback": fallback}
+
+
+def score_hf_trend(trend, band, prefix, hour_utc):
+    z = trend["pairs"].get((band, prefix), _logit(trend["base"]))
+    z += trend["hours"].get((hour_utc // 3) * 3, 0.0)
+    return _sigmoid(z)
+
+
+def _welch(a, b):
+    na, nb = len(a), len(b)
+    if na < 20 or nb < 20:
+        return None
+    ma, mb = sum(a) / na, sum(b) / nb
+    va = sum((x - ma) ** 2 for x in a) / (na - 1)
+    vb = sum((x - mb) ** 2 for x in b) / (nb - 1)
+    se = math.sqrt(va / na + vb / nb)
+    return ma, mb, ((ma - mb) / se if se > 0 else 0.0)
+
+
+def hf_drift(spot_rows, sessions, now):
+    """Dérive par bande : part de couples actifs par fenêtre, récent (14 j) vs passé (60 j)."""
+    lo = now - (DRIFT_PAST_DAYS + DRIFT_RECENT_DAYS) * 86400
+    split = now - DRIFT_RECENT_DAYS * 86400
+    spots = [(t, b, p) for t, b, p in spot_rows if t >= lo]
+    cnt = defaultdict(int)
+    for _, b, p in spots:
+        cnt[(b, p)] += 1
+    pairs = [k for k, c in cnt.items() if c >= HF_TREND_MIN_SPOTS]
+    if not pairs:
+        return {}
+    pairset = set(pairs)
+    aw = active_windows(sessions, lo, now) or {int(t // WIN_S) for t, _, _ in spots}
+    npairs = defaultdict(int)
+    for b, _ in pairs:
+        npairs[b] += 1
+    act = defaultdict(set)
+    for t, b, p in spots:
+        w = int(t // WIN_S)
+        if w in aw and (b, p) in pairset:
+            act[(b, w)].add(p)
+    out = {}
+    for band in npairs:
+        recent, past = [], []
+        for w in aw:
+            frac = len(act.get((band, w), ())) / npairs[band]
+            (recent if w * WIN_S >= split else past).append(frac)
+        res = _welch(recent, past)
+        if res is None:
+            out[band] = {"status": "insuffisant", "recent": None, "past": None, "delta": None, "z": None,
+                         "n_recent": len(recent), "n_past": len(past), "min_windows": 20}
+            continue
+        mr, mp, z = res
+        delta = mr - mp
+        if abs(z) >= DRIFT_Z and abs(delta) >= DRIFT_MIN_DELTA:
+            status = "hausse" if delta > 0 else "baisse"
+        else:
+            status = "stable"
+        out[band] = {"status": status, "recent": mr, "past": mp, "delta": delta, "z": z,
+                     "n_recent": len(recent), "n_past": len(past), "min_windows": 20}
+    return out
 
 
 class Predictor:
@@ -373,6 +556,13 @@ class Predictor:
                        prefix: str, sfi: float, kp: float) -> tuple[float, str]:
         """Retourne (score 0..1, nom du modèle utilisé)."""
         model = self._band_model(band)
+
+        # HF : tendance historique (couple bande/préfixe × heure), sans lissage
+        # empirique ni boost TEP, non validés hors échantillon
+        if model == "hf":
+            trend = self._get_hf_trend()
+            if trend is not None:
+                return score_hf_trend(trend, band, prefix, hour_utc), "hf"
         if model == "es":
             heuristic = self._score_es(month, hour_utc, band, prefix, sfi, kp)
         elif model == "tropo":
@@ -396,6 +586,34 @@ class Predictor:
             final = heuristic
 
         return min(1.0, max(0.0, final)), model
+
+    def _refresh_hf_trend(self):
+        now = time.time()
+        self._hf_trend_ts = now
+        self._hf_trend = None
+        self._hf_drift = {}
+        horizon = now - (HF_TREND_DAYS + DRIFT_PAST_DAYS) * 86400
+        try:
+            with self._conn() as conn:
+                spot_rows = [(float(r["ts"]), r["band"], r["prefix"]) for r in conn.execute(
+                    "SELECT ts, band, prefix FROM spot_log WHERE prefix IS NOT NULL "
+                    "AND band IS NOT NULL AND band != 'Unknown' AND ts >= ?",
+                    (horizon,)).fetchall()]
+                sessions = [(float(r["ts_start"]), float(r["ts_last"])) for r in conn.execute(
+                    "SELECT ts_start, ts_last FROM sessions WHERE ts_last >= ?", (horizon,)).fetchall()]
+            self._hf_trend = build_hf_trend(spot_rows, sessions, now)
+            self._hf_drift = hf_drift(spot_rows, sessions, now)
+            for band, d in self._hf_drift.items():
+                if d["status"] in ("hausse", "baisse"):
+                    logger.warning(f"Dérive HF bande {band} : {d['status']} "
+                                   f"(récent {d['recent']:.3f} vs passé {d['past']:.3f}, z={d['z']:.1f})")
+        except Exception as e:
+            logger.debug(f"Predictor._refresh_hf_trend: {e}")
+
+    def _get_hf_trend(self):
+        if time.time() - getattr(self, "_hf_trend_ts", 0) > HF_TREND_TTL:
+            self._refresh_hf_trend()
+        return getattr(self, "_hf_trend", None)
 
     def _score_es(self, month, hour_utc, band, prefix, sfi, kp) -> float:
         es_base = ES_SEASONAL_HOURLY.get(month, {}).get(hour_utc, 0.04)
@@ -571,6 +789,12 @@ class Predictor:
             if len(top) >= TOP_N_PRED:
                 break
 
+        # Statut de dérive de la bande (hausse / baisse / stable) sur chaque prévision
+        for c in top:
+            d = (getattr(self, "_hf_drift", None) or {}).get(c["band"])
+            if d and c["model"] == "hf":
+                c["drift"] = d["status"]
+
         # Ajouter le contexte de fiabilité mesurée à chaque prédiction
         reliability = self.get_reliability_stats()
         for c in top:
@@ -630,6 +854,20 @@ class Predictor:
                 ).fetchall()
 
                 for row in pending:
+                    # Absence de donnée ≠ absence de condition : si le collecteur n'a reçu
+                    # AUCUN spot (toutes bandes) pendant la fenêtre, la prédiction n'est pas
+                    # vérifiable. Elle est marquée realized=NULL et exclue des statistiques,
+                    # au lieu de compter comme « non réalisée » et de fausser la calibration.
+                    alive = conn.execute(
+                        "SELECT COUNT(*) as c FROM spot_log WHERE ts BETWEEN ? AND ?",
+                        (row["target_ts_start"], row["target_ts_end"])
+                    ).fetchone()
+                    if not alive or alive["c"] == 0:
+                        conn.execute(
+                            "UPDATE prediction_log SET verified=1, realized=NULL, "
+                            "observed_spots=0, verified_ts=? WHERE id=?",
+                            (now, row["id"]))
+                        continue
                     count_row = conn.execute(
                         "SELECT COUNT(*) as c FROM spot_log "
                         "WHERE band=? AND prefix=? AND ts BETWEEN ? AND ?",
@@ -659,7 +897,7 @@ class Predictor:
             with self._conn() as conn:
                 overall = conn.execute(
                     "SELECT COUNT(*) as n, SUM(realized) as hits FROM prediction_log "
-                    "WHERE verified=1 AND created_ts > ?", (cutoff,)
+                    "WHERE verified=1 AND realized IS NOT NULL AND created_ts > ?", (cutoff,)
                 ).fetchone()
                 n_total = overall["n"] or 0
                 hits_total = overall["hits"] or 0
@@ -668,7 +906,7 @@ class Predictor:
                 for model in ("es", "hf", "tropo"):
                     row = conn.execute(
                         "SELECT COUNT(*) as n, SUM(realized) as hits FROM prediction_log "
-                        "WHERE verified=1 AND created_ts > ? AND model=?",
+                        "WHERE verified=1 AND realized IS NOT NULL AND created_ts > ? AND model=?",
                         (cutoff, model)
                     ).fetchone()
                     n_m = row["n"] or 0

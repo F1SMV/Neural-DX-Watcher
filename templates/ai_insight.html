@@ -184,8 +184,8 @@ body{font-family:Inter,"Aptos","Segoe UI Variable","Segoe UI",system-ui,sans-ser
  </section>
 </section>
 
-<section class="card" id="diagStrip" style="margin-bottom:14px">
- <div class="title" style="margin-bottom:8px">État des modules <span class="xtag">DIAGNOSTIC</span></div>
+<section class="card" id="diagStrip" style="margin-bottom:14px;padding:16px 18px">
+ <div class="title" style="margin-bottom:8px;display:flex;align-items:center;gap:10px">État des modules <span class="xtag">DIAGNOSTIC</span></div>
  <div id="diagList" class="muted">Chargement…</div>
 </section>
 
@@ -245,12 +245,12 @@ function renderTable(){
  document.getElementById('forecastTitle').textContent=`PRÉVISIONS POUR ${String(selectedHour??'--').padStart(2,'0')}:00 UTC`;
  if(!rows.length){document.getElementById('tableWrap').innerHTML='<div class="empty">Aucune prévision pour ce filtre.</div>';return}
  const body=rows.map(p=>{
-   const prob=Math.round((p.pred_probability||0)*100), sc=p.match_score!=null?Math.round(p.match_score*100):null;
+   const op=obsProb(p), prob=op.pct, sc=p.match_score!=null?Math.round(p.match_score*100):null;
    const st=stateInfo(p), fill=prob>=65?'#28e87d':prob>=35?'#ffb52e':'#ff4e5e';
    const bc=COLORS[p.band]||'#275c78';
    return `<tr class="${rowTint(p)}" data-state="${scoreClass(p)}">
     <td><span class="band" style="background:${bc}">${esc(p.band)}</span></td>
-    <td><div class="prob"><b>${prob}%</b><div class="track"><div class="fill" style="width:${prob}%;background:${fill}"></div></div></div></td>
+    <td><div class="prob" title="${op.obs?'score brut '+op.raw+'% · tranche observée n='+op.n:'score brut '+op.raw+'%'}"><b>${prob}%</b><div class="track"><div class="fill" style="width:${prob}%;background:${fill}"></div></div></div></td>
     <td>${esc(p.mode||'—')}</td>
     <td class="call">${esc(p.actual_call||'—')}</td>
     <td>${sc==null?'—':`<span class="score" style="color:${st.col};border-color:${st.col}">${sc}</span>`}</td>
@@ -258,7 +258,7 @@ function renderTable(){
     <td class="details">${p.actual_call?'Spot réel détecté':'En attente de confirmation'}</td>
    </tr>`
  }).join('');
- document.getElementById('tableWrap').innerHTML=`<table class="table"><thead><tr><th>Bande</th><th>Probabilité</th><th>Mode</th><th>Indicatif DX</th><th>Score validation</th><th>Statut</th><th>Détails</th></tr></thead><tbody>${body}</tbody></table>`;
+ document.getElementById('tableWrap').innerHTML=`<table class="table"><thead><tr><th>Bande</th><th>Probabilité observée</th><th>Mode</th><th>Indicatif DX</th><th>Score validation</th><th>Statut</th><th>Détails</th></tr></thead><tbody>${body}</tbody></table>`;
 }
 function fmtUTC(ts){try{return new Date(ts*1000).toLocaleTimeString('fr-FR',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'})+' UTC'}catch(e){return ''}}
 function updateHero(){
@@ -284,7 +284,7 @@ function updateWindow(){
  const set=(h,t,b)=>{document.getElementById('bestHour').textContent=h;document.getElementById('bestText').textContent=t;document.getElementById('bestBands').textContent=b||''};
  const f=analyticsData&&analyticsData.forecast,bs=f&&f.available!==false&&f.best_slot;
  const topBands=h=>{const ps=predictions.filter(p=>Number(p.hour_utc)===Number(h)).sort((a,b)=>(b.pred_probability||0)-(a.pred_probability||0)).slice(0,3);
-   if(ps.length)return 'Bandes dominantes (Auto-Test) : '+ps.map(p=>`${p.band} ${Math.round((p.pred_probability||0)*100)}%`).join(' · ');
+   if(ps.length)return 'Bandes dominantes (Auto-Test) : '+ps.map(p=>`${p.band} ${obsProb(p).pct}%`).join(' · ');
    const pb=(analyticsData&&analyticsData.patterns&&Array.isArray(analyticsData.patterns.bands))?analyticsData.patterns.bands.slice(0,3):[];
    return pb.length?'Bandes les plus actives (7 j) : '+pb.map(x=>x.band).join(' · '):''};
  if(bs&&Number.isFinite(Number(bs.hour_utc))){
@@ -323,6 +323,8 @@ async function refresh(){
 }
 
 let analyticsData=null;
+let calCurves={};
+let hfBase=null; /* taux de réalisation HF (taux de base) : affiché à la place des scores, le modèle HF n'étant pas démontré */
 function heatColor(v,peak){
  if(v==null)return'#0b2634';
  const p=peak>0?Number(v)/Number(peak):0;
@@ -391,7 +393,9 @@ async function loadMissionAnalytics(){
   const h=d.heatmap||{};
   if(h.available!==false && Array.isArray(h.grid)){
     const labs=h.weekday_labels||['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-    const vals=h.grid.flat().map(Number).filter(Number.isFinite),peak=Number(h.peak_value)||Math.max(1,...vals),active=vals.filter(v=>v>0).length;let best={v:-1,day:'—',hour:'—'};h.grid.forEach((row,di)=>row.forEach((v,hr)=>{v=Number(v)||0;if(v>best.v)best={v,day:labs[di]||'',hour:String(hr).padStart(2,'0')+'h'}}));const cls=v=>{const p=peak>0?Number(v)/peak:0;return Number(v)<=0?'matrix-empty':p>=.85?'matrix-peak':p>=.60?'matrix-hot':p>=.30?'matrix-mid':'matrix-low'};heatPanel.innerHTML=`<div class="matrix-summary"><span class="matrix-chip">Pic <b>${esc(best.day)} ${best.hour}</b></span><span class="matrix-chip">Intensité max <b>${best.v}</b></span><span class="matrix-chip">Créneaux actifs <b>${active}</b></span></div><div class="matrix-wrap"><table class="heat-table matrix"><tr><th>UTC</th>${[...Array(24).keys()].map(x=>`<th>${String(x).padStart(2,'0')}</th>`).join('')}</tr>${h.grid.map((row,i)=>`<tr><th>${esc(labs[i]||'')}</th>${row.map((v,hr)=>{const n=Number(v)||0;return`<td class="${cls(n)}" title="${esc(labs[i]||'')} ${String(hr).padStart(2,'0')}h · ${n}"><span>${n||'·'}</span></td>`}).join('')}</tr>`).join('')}</table></div>`;
+    const vals=h.grid.flat().map(Number).filter(Number.isFinite),active=vals.filter(v=>v>0).length;
+const nzv=vals.filter(v=>v>0).sort((a,b)=>a-b);
+const peak=nzv.length>=5?Math.max(1,nzv[Math.min(Math.floor(nzv.length*.9),nzv.length-1)]):(Number(h.peak_value)||Math.max(1,...vals));let best={v:-1,day:'—',hour:'—'};h.grid.forEach((row,di)=>row.forEach((v,hr)=>{v=Number(v)||0;if(v>best.v)best={v,day:labs[di]||'',hour:String(hr).padStart(2,'0')+'h'}}));const cls=v=>{const p=peak>0?Number(v)/peak:0;return Number(v)<=0?'matrix-empty':p>=.85?'matrix-peak':p>=.60?'matrix-hot':p>=.30?'matrix-mid':'matrix-low'};heatPanel.innerHTML=`<div class="matrix-summary"><span class="matrix-chip">Pic <b>${esc(best.day)} ${best.hour}</b></span><span class="matrix-chip">Intensité max <b>${best.v}</b></span><span class="matrix-chip">Créneaux actifs <b>${active}</b></span><span class="matrix-chip" title="Couleurs relatives au 90e percentile des créneaux actifs : une rafale de spots ne rend plus le reste rouge. Valeurs réelles dans l'infobulle.">Échelle p90 <b>${Math.round(peak)}</b></span></div><div class="matrix-wrap"><table class="heat-table matrix"><tr><th>UTC</th>${[...Array(24).keys()].map(x=>`<th>${String(x).padStart(2,'0')}</th>`).join('')}</tr>${h.grid.map((row,i)=>`<tr><th>${esc(labs[i]||'')}</th>${row.map((v,hr)=>{const n=Number(v)||0;return`<td class="${cls(n)}" title="${esc(labs[i]||'')} ${String(hr).padStart(2,'0')}h · ${n}"><span>${n||'·'}</span></td>`}).join('')}</tr>`).join('')}</table></div>`;
   }else heatPanel.innerHTML=`<div class="muted">${esc(h.reason||'Données insuffisantes.')}</div>`;
  }catch(e){
   patternsPanel.innerHTML=heatPanel.innerHTML='<span class="error">Analytics indisponible</span>';loadRecentActivity();
@@ -468,6 +472,26 @@ async function runVOA(){
    <div class="legend"><span><i style="background:#28e87d"></i>≥65%</span><span><i style="background:#ffb52e"></i>35–64%</span><span><i style="background:#ff5364"></i>&lt;35%</span></div>`;
  }catch(e){voaPanel.innerHTML='<span class="error">'+esc(e.message)+'</span>'}
 }
+/* Option 1 : probabilité affichée = taux observé de la tranche de score (courbe de calibration du modèle) */
+function modelOfBand(b){return b==='6m'?'es':['4m','2m','70cm','23cm'].includes(b)?'tropo':'hf'}
+function obsProb(p){
+  const s=Number(p.pred_probability), raw=Math.round((Number.isFinite(s)?s:0)*100);
+  if(modelOfBand(p.band)==='hf')return{pct:hfBase!=null&&Number.isFinite(hfBase)?Math.round(hfBase):raw,obs:false,raw,hf:true};
+  const c=(calCurves&&calCurves[modelOfBand(p.band)])||[];
+  if(!c.length||!Number.isFinite(s))return{pct:raw,obs:false,raw};
+  const b=c.find(x=>s>=Number(x.score_lo)&&(s<Number(x.score_hi)||(Number(x.score_hi)>=1&&s>=1)));
+  if(!b||b.low_sample)return{pct:raw,obs:false,raw};
+  return{pct:Math.round(Number(b.observed)*100),obs:true,raw,n:b.n};
+}
+function curveHtml(k){
+  if(k==='hf')return'';
+  const c=(calCurves&&calCurves[k])||[];
+  if(!c.length)return'';
+  return '<div style="margin-top:8px">'+c.map(b=>{
+    const o=Math.round(Number(b.observed)*100),col=b.low_sample?'#4a5f6e':o>=60?'#28e87d':o>=30?'#ffb52e':'#ff5364';
+    return `<div title="score ${b.score_lo}–${b.score_hi} · ${b.n} prévisions${b.low_sample?' (échantillon faible)':''}" style="display:flex;align-items:center;gap:6px;font-size:10px;color:#8faebe;margin:2px 0"><span style="width:58px">${Number(b.score_lo).toFixed(1)}–${Number(b.score_hi).toFixed(1)}</span><div style="flex:1;height:6px;background:#123548;border-radius:4px;overflow:hidden"><div style="width:${Math.max(2,o)}%;height:100%;background:${col}"></div></div><span style="width:78px;text-align:right">${o}% · n=${b.n}</span></div>`;
+  }).join('')+'</div>';
+}
 async function loadCalibrationMC(){
  try{
   const r=await fetch('/api/adaptive/calibration.json',{cache:'no-store'});
@@ -476,13 +500,16 @@ async function loadCalibrationMC(){
   /* v13.1 : le serveur répond 200 + ok:false avec la raison — on l'affiche au lieu de dessiner des cases vides */
   if(d.ok===false)throw new Error(d.reason||'calibration indisponible côté serveur');
   const models=d.models||{};
+  calCurves=Object.fromEntries(Object.entries(models).map(([k,m])=>[k,m.curve||[]]));
+  hfBase=(models.hf&&models.hf.reliability_pct!=null)?Number(models.hf.reliability_pct):null;
   const names={es:'Sporadic-E · 6 m',hf:'HF',tropo:'Tropo · VHF'},keys=['es','hf','tropo'];
   const boxes=keys.map(k=>{
     const m=models[k]||{},n=Number(m.n??m.samples??0);
     const b=(m.brier&&m.brier.brier!=null)?Number(m.brier.brier):(m.brier_score!=null?Number(m.brier_score):null);
     const status=n>0?(n+' prévision'+(n>1?'s':'')+' vérifiée'+(n>1?'s':'')):'Aucune prévision vérifiée pour ce modèle';
-    const interp=(n>0&&m.brier&&m.brier.interpretation)?'<br><span style="color:#8faebe">'+esc(m.brier.interpretation)+'</span>':'';
-    return `<div class="calbox"><div class="title">${names[k]}</div><strong>${b!=null&&Number.isFinite(b)?b.toFixed(3):'—'}</strong><div class="muted">Brier score</div><small>${status}${interp}<br>Fiabilité ${m.reliability_pct!=null?Math.round(Number(m.reliability_pct))+'%':'—'} · ECE ${m.ece!=null?Math.round(Number(m.ece)*100)+'%':'—'}</small></div>`;
+    const interp=k==='hf'?'<br><span style="color:#ffb52e">Modèle HF non démontré : hors échantillon, aucun pouvoir discriminant. Taux de base affiché.</span>':(n>0&&m.brier&&m.brier.interpretation)?'<br><span style="color:#8faebe">'+esc(m.brier.interpretation)+'</span>':'';
+    const sk=(m.brier&&m.brier.skill!=null)?Number(m.brier.skill):null,skTxt=sk==null?'—':(sk>=0?'+':'')+sk.toFixed(2),skCol=sk==null?'#789caf':sk>0?'#28e87d':'#ff5364';
+    return `<div class="calbox"><div class="title">${names[k]}</div><strong>${b!=null&&Number.isFinite(b)?b.toFixed(3):'—'}</strong><div class="muted">Brier score</div><small>${status}${interp}<br>Taux réalisé ${m.reliability_pct!=null?Math.round(Number(m.reliability_pct))+'%':'—'} · <span title="Gain vs prédiction constante au taux de base : positif = mieux que le hasard calé sur la fréquence réelle, négatif = pire">Gain <b style="color:${skCol}">${skTxt}</b></span> · ECE ${m.ece!=null?Math.round(Number(m.ece)*100)+'%':'—'}</small>${curveHtml(k)}</div>`;
   }).join('');
   /* progression : « aucune donnée » ≠ « en panne » */
   const lg=Number(d.logged_total),pe=Number(d.pending);
@@ -494,7 +521,7 @@ async function loadCalibrationMC(){
    if(pe>0&&d.next_verification_ts)prog+=` · prochaine échéance ${fmtUTC(d.next_verification_ts)}`;
    if(d.last_verified_ts)prog+=` · dernière vérification ${fmtUTC(d.last_verified_ts)}`;
   }
-  calPanel.innerHTML='<div class="calgrid">'+boxes+'</div><div class="muted" style="margin-top:10px;font-size:12px">'+esc(prog)+'</div>';
+  calPanel.innerHTML='<div class="calgrid">'+boxes+'</div><div class="muted" style="margin-top:10px;font-size:12px">'+esc(prog)+'</div><div class="muted" style="margin-top:6px;font-size:12px">Sur l’Auto-Test, la probabilité affichée est le taux observé de la tranche de score (courbe ci-dessus) ; pour HF, c’est le taux de base, car le score HF n’est pas démontré. La valeur brute reste en infobulle.</div>';
   const total=keys.reduce((s,k)=>s+Number(models[k]?.n||0),0),cs=document.getElementById('calState');
   if(cs)cs.textContent=total>0?'ACTIVE':'EN APPRENTISSAGE';
  }catch(e){calPanel.innerHTML='<span class="error">Calibration indisponible · '+esc(e.message)+'</span>'}
@@ -512,7 +539,7 @@ async function loadDiagnostic(){
   const icon={ok:'✓',warn:'⚠',error:'✗',info:'ℹ'};
   const chips=Object.entries(mods).map(([k,m])=>`<span class="pill" style="cursor:default;border-color:${col[m.status]||'#456'};color:${col[m.status]||'#9ab'}" title="${esc(m.detail+(m.hint?' → '+m.hint:''))}">${icon[m.status]||'●'} ${esc(label[k]||k)}</span>`).join(' ');
   const lines=Object.entries(mods).filter(([k,m])=>m.status!=='ok').map(([k,m])=>`<div style="margin-top:6px;font-size:13px"><b style="color:${col[m.status]}">${icon[m.status]||'●'} ${esc(label[k]||k)}</b> — ${esc(m.detail)}${m.hint?' <span style="color:#8faebe">→ '+esc(m.hint)+'</span>':''}</div>`).join('');
-  el.innerHTML=chips+(lines||'<div style="margin-top:6px;font-size:13px;color:#6fe3a0">✓ Tous les modules fonctionnent.</div>');
+  el.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">'+chips+'</div>'+(lines||'<div style="margin-top:6px;font-size:13px;color:#6fe3a0">✓ Tous les modules fonctionnent.</div>');
  }catch(e){el.innerHTML='<span class="error">Diagnostic indisponible · '+esc(e.message)+'</span>'}
 }
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}

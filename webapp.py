@@ -152,7 +152,7 @@ try:
     try:
         from adaptive.auto_test import AutoTest
     except ModuleNotFoundError:
-        # v13.1 : tolère l'ancien nom de fichier adaptive/adaptive_auto_test.py (cas d'une
+        # v13.2 : tolère l'ancien nom de fichier adaptive/adaptive_auto_test.py (cas d'une
         # restauration/sauvegarde où le renommage en auto_test.py n'a pas été conservé).
         # Sans ce repli, tout §24 (Auto-Test) est désactivé et la page AI Insight reste vide.
         from adaptive.adaptive_auto_test import AutoTest
@@ -222,7 +222,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '13.1'
+APP_VERSION = '13.2'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -1105,7 +1105,7 @@ def get_ambient_activity():
 
     return {"source": "none", "band": None, "value_now": None, "value_1h_ago": None}
 
-# ── v13.1 §homepage — Alerte orage proximité (sécurité, indépendante du QRN) ──
+# ── v13.2 §homepage — Alerte orage proximité (sécurité, indépendante du QRN) ──
 # Volontairement DÉCOUPLÉE de compute_noise_correlation() : l'opérateur veut
 # savoir "y a-t-il de la foudre proche de moi maintenant", pas un indice de
 # bruit radio composite. Un seul impact < 30km doit suffire à alerter —
@@ -1900,7 +1900,7 @@ watchlist    = set()
 # pour la résolution DXCC (corrige l'ancien bug _extract_prefix()).
 predictor = Predictor(db_path="data/predictor.sqlite", my_call=MY_CALL, cty_path=CTY_FILE)
 alerter   = NtfyAlerter(db_path="data/ntfy_alerts.sqlite")
-calibrator = Calibrator(db_path="data/predictor.sqlite")  # v13.1 — lit prediction_log, lecture seule
+calibrator = Calibrator(db_path="data/predictor.sqlite")  # v13.2 — lit prediction_log, lecture seule
 wl_activity  = {}        # {call_upper: timestamp_float} — dernier spot vu
 wl_activity_lock = threading.Lock()
 surge_bands = []
@@ -2129,7 +2129,7 @@ user_lon = initial_lon if initial_lon is not None else DEFAULT_LON_JN23
 # Après: user_lat/lon sont recalculés dès le démarrage
 load_user_config()
 
-# v13.1 — Propagation Events FSM (CDC §8) — init APRÈS config chargée
+# v13.2 — Propagation Events FSM (CDC §8) — init APRÈS config chargée
 if _FSM_OK:
     try:
         _prop_fsm = PropagationFSM(
@@ -2140,7 +2140,7 @@ if _FSM_OK:
         logger.warning(f"PropagationFSM init: {_fe}")
         _prop_fsm = None
 
-# v13.1 — Backtester + Optimizer (CDC §12+13)
+# v13.2 — Backtester + Optimizer (CDC §12+13)
 _optimizer = None
 if _BACKTEST_OK:
     try:
@@ -2154,7 +2154,7 @@ if _BACKTEST_OK:
         logger.debug(traceback.format_exc())
         _optimizer = None
 
-# v13.1 — Adaptive Models + Quality Gate (CDC §14+15) — init APRÈS config
+# v13.2 — Adaptive Models + Quality Gate (CDC §14+15) — init APRÈS config
 _model_registry = None
 _quality_gate = None
 if _MODELS_OK:
@@ -2166,7 +2166,7 @@ if _MODELS_OK:
         logger.warning(f"Models/QG init échoué: {_me}")
         _model_registry = _quality_gate = None
 
-# v13.1 — Nightly Cycle (CDC §32) — init APRÈS optimizer
+# v13.2 — Nightly Cycle (CDC §32) — init APRÈS optimizer
 _nightly_cycle = None
 if _NIGHTLY_OK and _optimizer:
     try:
@@ -2179,7 +2179,7 @@ if _NIGHTLY_OK and _optimizer:
         logger.warning(f"NightlyCycle init échoué: {_ne}")
         _nightly_cycle = None
 
-# v13.1 — Drift Monitor (CDC §25)
+# v13.2 — Drift Monitor (CDC §25)
 _drift_monitor = None
 if _DRIFT_OK:
     try:
@@ -2189,7 +2189,7 @@ if _DRIFT_OK:
         logger.warning(f"DriftMonitor init échoué: {_de}")
         _drift_monitor = None
 
-# v13.1 — Auto-Test (CDC §24)
+# v13.2 — Auto-Test (CDC §24)
 _auto_test = None
 if _AUTOTEST_OK:
     try:
@@ -2202,7 +2202,7 @@ if _AUTOTEST_OK:
 logger.info(f"[BOOT] _BACKTEST_OK={_BACKTEST_OK}, _optimizer={'OK' if _optimizer else 'FAILED'}, "
            f"_MODELS_OK={_MODELS_OK}, _NIGHTLY_OK={_NIGHTLY_OK}, _DRIFT_OK={_DRIFT_OK}, _AUTOTEST_OK={_AUTOTEST_OK}")
 
-# v13.1 §24 — Génération horaire des prédictions Auto-Test.
+# v13.2 §24 — Génération horaire des prédictions Auto-Test.
 # Sans ça, aucune prédiction live n'existe → rien à valider → widget vide.
 # Idempotent : ne recrée pas une prédiction déjà présente pour la même (bande, heure).
 def _autotest_generate_hourly(hour_utc):
@@ -2265,7 +2265,7 @@ if _auto_test:
     except Exception as _ate:
         logger.warning(f"[AUTOTEST] Génération initiale échouée: {_ate}")
 
-# v13.1 — L'instance Auto-Test peut échouer au boot (base verrouillée, disque occupé...) puis devenir
+# v13.2 — L'instance Auto-Test peut échouer au boot (base verrouillée, disque occupé...) puis devenir
 # disponible. Avant : _auto_test restait None jusqu'au prochain redémarrage → pavés Auto-Test vides.
 _auto_test_last_retry = 0.0
 def _get_auto_test():
@@ -3032,7 +3032,7 @@ def _sync_missing_dxcc_from_lotw():
 
 
 def _predictor_calibration_sample(sfi, kp, max_targets=40, horizon_h=6):
-    """v13.1 — Échantillon d'AUTO-CALIBRATION, utilisé quand aucune liste LoTW de DXCC manquants n'existe
+    """v13.2 — Échantillon d'AUTO-CALIBRATION, utilisé quand aucune liste LoTW de DXCC manquants n'existe
     (cache LoTW perdu, jamais synchronisé...). Le prédicteur ne journalise que des prédictions « DXCC
     manquants » : sans LoTW il n'en émet aucune, donc rien n'est jamais vérifié et le panneau
     « Précision & calibration » reste vide indéfiniment.
@@ -3072,7 +3072,7 @@ def _predictor_calibration_sample(sfi, kp, max_targets=40, horizon_h=6):
 
 
 def _predictor_autolog():
-    """v13.1 — prediction_log (source de la calibration) n'était alimentée QUE par la route
+    """v13.2 — prediction_log (source de la calibration) n'était alimentée QUE par la route
     /api/predictions, appelée par la page d'accueil, et seulement pour les DXCC manquants issus de LoTW.
     Sans onglet ouvert sur la page d'accueil, ou sans cache LoTW, aucune prédiction n'était journalisée
     → jamais rien à vérifier → panneau « Précision & calibration » vide à vie.
@@ -3101,7 +3101,7 @@ def history_maintenance_worker():
     global _maint_last_run
     _predictor_autolog()      # prédictions de calibration dès le démarrage (sans attendre HH:30)
     while True:
-        # v13.1 fix : attendre la PROCHAINE frontière HH:00 / HH:30 puis ne passer qu'UNE fois.
+        # v13.2 fix : attendre la PROCHAINE frontière HH:00 / HH:30 puis ne passer qu'UNE fois.
         # Avant : à HH:00:05 le calcul d'attente retombait à 0 s (minute % 30 == 0) → le corps de boucle
         # se rejouait toutes les ~6 s pendant une minute (≈10 passages/slot : rotation de l'historique
         # 30 min décalée ×10, cycle nocturne relancé en rafale, vérifications dupliquées).
@@ -3119,7 +3119,7 @@ def history_maintenance_worker():
             except Exception as _ce: logger.debug(f"analytics.cleanup_store: {_ce}")
         try: predictor.cleanup_old_data(90)
         except Exception: pass
-        _predictor_autolog()   # v13.1 : alimente prediction_log sans navigateur ouvert
+        _predictor_autolog()   # v13.2 : alimente prediction_log sans navigateur ouvert
         # v11 : vérifier les prédictions échues contre les spots réels reçus
         # — alimente la fiabilité mesurée affichée dans le panel cockpit.
         # v12.7 : WARNING et non DEBUG — un échec récurrent (ex. base corrompue)
@@ -3367,7 +3367,7 @@ def telnet_worker():
                             try:
                                 _analytics_mod.record_spot(spot_obj)
                             except Exception as _ae:
-                                # v13.1 fix : était en logger.debug() → invisible
+                                # v13.2 fix : était en logger.debug() → invisible
                                 # (logger configuré en INFO, cf. bug AutoTest identique).
                                 # Un échec systématique de record_spot() produisait un
                                 # "Activité récente" quasi plat pendant des heures sans
@@ -6364,7 +6364,7 @@ def api_adaptive_calibration():
         _pdb = sqlite3.connect(str(Path("data/predictor.sqlite")))
         _row = _pdb.execute("SELECT MAX(verified_ts) FROM prediction_log WHERE verified=1").fetchone()
         data["last_verified_ts"] = _row[0] if _row else None
-        # v13.1 : progression de l'apprentissage — « aucune donnée » ne veut pas dire « en panne ».
+        # v13.2 : progression de l'apprentissage — « aucune donnée » ne veut pas dire « en panne ».
         _lg = _pdb.execute(
             "SELECT COUNT(*), SUM(CASE WHEN verified=0 THEN 1 ELSE 0 END), "
             "MIN(CASE WHEN verified=0 THEN target_ts_end END) FROM prediction_log").fetchone()
@@ -6378,9 +6378,36 @@ def api_adaptive_calibration():
     return jsonify(data)
 
 
+@app.route("/api/insight/trend.json")
+def api_insight_trend():
+    """v13.3 — Tendance HF par bande : dérive « 14 derniers jours » vs « 60 jours précédents ».
+    Statuts : hausse / baisse / stable / insuffisant.  curl http://<pi>:8000/api/insight/trend.json"""
+    import predictor as _pmod
+    try:
+        trend = predictor._get_hf_trend()          # rafraîchit la dérive si le cache (30 min) est périmé
+        drift = dict(getattr(predictor, "_hf_drift", None) or {})
+    except Exception as e:
+        logger.warning(f"api_insight_trend: {e}")
+        return jsonify({"ok": False, "reason": str(e), "bands": {}}), 200
+    bands = {
+        b: {k: (round(v, 4) if isinstance(v, float) else v) for k, v in d.items()}
+        for b, d in drift.items()
+    }
+    return jsonify({
+        "ok": True,
+        "server_ts": time.time(),
+        "trend_ready": trend is not None,
+        "base": round(trend["base"], 4) if trend else None,
+        "windows": trend["windows"] if trend else None,
+        "fallback": bool(trend["fallback"]) if trend else None,
+        "drift_window_days": {"recent": _pmod.DRIFT_RECENT_DAYS, "past": _pmod.DRIFT_PAST_DAYS},
+        "bands": bands,
+    })
+
+
 @app.route("/api/insight/diagnostic.json")
 def api_insight_diagnostic():
-    """v13.1 — État de chaque module qui alimente la page AI Insight, avec la cause probable et le
+    """v13.2 — État de chaque module qui alimente la page AI Insight, avec la cause probable et le
     remède. Évite les « aucune donnée » sans explication.  curl http://<pi>:8000/api/insight/diagnostic.json"""
     mods = {}
     def mod(name, status, detail, hint=""):
@@ -6418,7 +6445,7 @@ def api_insight_diagnostic():
     # Calibration / prédicteur
     try:
         _c = sqlite3.connect("data/predictor.sqlite", timeout=10)
-        tot, ver, nxt = _c.execute("SELECT COUNT(*), SUM(verified), MIN(CASE WHEN verified=0 THEN target_ts_end END) FROM prediction_log").fetchone()
+        tot, ver, nxt = _c.execute("SELECT COUNT(*), SUM(CASE WHEN realized IS NOT NULL THEN 1 ELSE 0 END), MIN(CASE WHEN verified=0 THEN target_ts_end END) FROM prediction_log").fetchone()
         sp = _c.execute("SELECT COUNT(*) FROM spot_log").fetchone()[0]
         _c.close()
         tot, ver = int(tot or 0), int(ver or 0)
@@ -6487,7 +6514,7 @@ def api_weather_beacons():
 
 @app.route("/api/weather/storm_proximity.json")
 def api_weather_storm_proximity():
-    """v13.1 — Alerte orage proximité pour la page d'accueil (sécurité opérateur).
+    """v13.2 — Alerte orage proximité pour la page d'accueil (sécurité opérateur).
     Pure distance, découplée du calcul QRN (voir get_storm_proximity_alert)."""
     return jsonify(get_storm_proximity_alert())
 
@@ -6783,7 +6810,7 @@ def api_voacap():
 
 
 def _voacap_internal_prediction(rx_lat, rx_lon, rx_name, freqs, sfi, kp, month, ssn):
-    """v13.1 — Estimation interne (SFI/Kp), même format de réponse que le moteur voacap, pour que le
+    """v13.2 — Estimation interne (SFI/Kp), même format de réponse que le moteur voacap, pour que le
     panneau « Prédictions HF » reste utilisable quand le moteur réel n'est pas installé.
     Modèle simplifié MUF/LUF — PAS du VOACAP : la réponse porte engine='internal' et le panneau l'affiche.
     Heure solaire évaluée au POINT MILIEU du grand cercle (un circuit Europe→Japon n'est pas de jour

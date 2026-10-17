@@ -1,4 +1,4 @@
-# 🛰️ Neural DX Watcher 13.1
+# 🛰️ Neural DX Watcher 13.2
 
 > Plateforme de monitoring DX en temps réel pour radioamateurs — F1SMV / JN23
 > Raspberry Pi 5 · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
@@ -16,6 +16,7 @@
 - [Présentation](#-présentation)
 - [Stack technique](#-stack-technique)
 - [Historique des versions](#-historique-des-versions)
+  - [v13.2 — Pavés expérimentaux AI Insight](#v132--pavés-expérimentaux-ai-insight)
   - [v13.1 — Consolidation & préparation de publication](#v131--consolidation--préparation-de-publication)
   - [v13.0 — Adaptive Insight Engine](#v130--adaptive-insight-engine)
   - [v12.7 — Fixes & Polish](#v127--fixes--polish)
@@ -63,7 +64,51 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 
 ---
 
-### v13.1 — Consolidation & préparation de publication ← ACTUEL
+### v13.2 — Pavés expérimentaux AI Insight ← ACTUEL
+
+**Période :** octobre 2026  
+**Statut :** version en cours de validation sur Raspberry Pi. Les pavés marqués **[EXPÉRIMENTAL]** sont des mesures en cours de validation : ils ne constituent pas une prévision validée et ne doivent pas guider une décision de trafic.
+
+#### Changements par rapport à v13.1
+
+- **Carte HF honnête :** pour les bandes HF, la probabilité affichée est désormais le **taux de base réalisé** (part des fenêtres de 3 h où au moins un spot a été reçu), accompagné de la mention « Modèle HF non démontré ». Le score HF précédent n'avait pas de pouvoir discriminant hors échantillon (AUC ≈ 0,51, gain de Brier négatif) ; il n'est plus affiché.
+- **Modèle HF de tendance (backend) :** les prévisions HF reposent sur un modèle préfixe × bande × tranche horaire UTC (fenêtres de 3 h), calculé sur 120 jours d'historique, avec un a priori pondéré vers le taux de base. Validation hors échantillon sur 4 blocs temporels : AUC de 0,73 à 0,78. Le gain de Brier par rapport au taux de base n'est pas constant d'un découpage à l'autre : la carte affiche donc le taux de base, pas le score.
+- **Détection de dérive :** pour chaque bande HF, comparaison de la part des préfixes entendus par fenêtre de 3 h sur les 14 derniers jours et sur les 60 jours précédents (test de Welch, statistique z). Un état **hausse** ou **baisse** n'est signalé que si |z| ≥ 3 et si l'écart est d'au moins 2 points.
+- **Bande « Unknown »** exclue du calcul de tendance.
+
+#### Pavés expérimentaux
+
+| Pavé | Statut | Ce qu'il affiche | Limite actuelle |
+|------|--------|------------------|-----------------|
+| Carte HF (encadré probabilité) | [EXPÉRIMENTAL] | Taux de base réalisé par bande, sans score | Mention « Modèle HF non démontré » |
+| Tendance HF par bande | [EXPÉRIMENTAL] | Hausse / baisse / stable / insuffisant, avec valeurs récentes, de référence, écart et z | État « insuffisant » tant que le seuil de 20 fenêtres par période n'est pas atteint |
+| Précision & calibration | [EXPÉRIMENTAL] | Brier, ECE, gain et courbe score → réalité pour ES, tropo et HF | HF : anciennes prédictions comptées tant que la bascule `HF_V2_SINCE_TS` n'est pas appliquée |
+| Auto-Test | [EXPÉRIMENTAL] | Prédictions émises, confirmées, score de fraîcheur | Échelle du score à confirmer |
+| État des modules | Exploitable | État de chaque module, cause probable et remède | — |
+
+Les pavés sont déplaçables (glisser-déposer) ; l'ordre est mémorisé dans le navigateur.
+
+#### Conditions pour des chiffres corrects
+
+- **Tendance HF :** au moins **20 fenêtres de 3 h d'écoute** (≈ 60 h) dans la période récente (14 jours) **et** dans la période de référence (60 jours). Avec un Raspberry Pi qui écoute en continu, le minimum est atteint après **environ 2,5 semaines** de fonctionnement ; la référence complète de 60 jours demande **environ 10 semaines**. Une coupure du Pi allonge ce délai d'autant.
+- **Constat à la rédaction (17/10/2026) :** 56 fenêtres sur 120 jours d'historique, soit environ 168 h d'écoute enregistrée. Toutes les bandes restent à « insuffisant ». Ce constat doit être revérifié sur la base de la version déployée.
+
+#### Limites connues
+
+- **Calibration HF :** les anciennes prédictions HF restent comptées tant que la bascule `HF_V2_SINCE_TS` (calibration.py) n'est pas appliquée.
+- **Élévation solaire au point milieu :** testée hors échantillon (gain de 0,01 à 0,02 AUC au-delà du taux bande × préfixe et de l'heure). Non intégrée au scoring : statut NON VALIDÉ.
+- **SFI et Kp historiques :** non enregistrés (`solar_log` vide). Le modèle HF n'utilise pas l'indice d'ionisation.
+- **Généralisation :** les mesures de v13.2 reposent sur une seule station et un historique de 120 jours. Elles ne sont pas généralisables à d'autres QTH sans nouvelle validation.
+
+#### Fichiers modifiés
+
+- `webapp.py` : nouvelle route `GET /api/insight/trend.json`, insérée avant la route de diagnostic.
+- `predictor.py` : modèle de tendance HF, détection de dérive, compteurs de fenêtres par période, exclusion de « Unknown ».
+- `templates/ai_insight.html` : pavé « Tendance HF par bande », badges de dérive sur les lignes HF, explication des conditions.
+
+---
+
+### v13.1 — Consolidation & préparation de publication
 
 **Période :** octobre 2026  
 **Statut :** version de travail observée localement ; publication et validation fonctionnelle à confirmer.
@@ -303,6 +348,13 @@ Chaque configuration testée est versionnée de façon permanente en SQLite (`mo
 
 `calculate_spd_score()` lit la config du modèle actif via `ModelRegistry.get_active_model()` à chaque appel. Boucle entièrement fermée : données → apprentissage → scoring → données.
 
+### Pavés expérimentaux (v13.2)
+
+Voir la section v13.2 pour les conditions et les limites. Résumé :
+
+- **[EXPÉRIMENTAL]** Carte HF (taux de base, « Modèle HF non démontré »), Tendance HF par bande, Précision & calibration, Auto-Test.
+- **Exploitable :** État des modules.
+
 ### Panneaux de la page AI Insight
 
 | Panneau | Données | Rafraîchissement |
@@ -395,6 +447,13 @@ cd Neural-DX-Watcher
 | `GET /api/voacap.json` | Prédictions VOACAP par bande/zone |
 | `GET /api/briefing.json?lang=fr` | DX Briefing narratif |
 
+### Diagnostic et tendance (v13.2)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/insight/trend.json` | **[EXPÉRIMENTAL]** Tendance HF par bande : état, valeurs récente et de référence, écart, z, nombre de fenêtres par période |
+| `GET /api/insight/diagnostic.json` | État de chaque module de la page AI Insight, avec cause probable et remède |
+
 ### Adaptive Insight Engine (introduit en v13.0)
 
 | Endpoint | Description |
@@ -446,7 +505,7 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v13.1 — F1SMV — JN23 — La Seyne-sur-Mer, France*
+*Neural DX Watcher v13.2 — F1SMV — JN23 — La Seyne-sur-Mer, France*
 * vous pouvez me contacter via X 
 * design F1SMV programmé par Claude Ai
 *Historique initial rédigé pour les versions antérieures ; mise à jour documentaire : octobre 2026.*
