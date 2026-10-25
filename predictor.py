@@ -308,6 +308,36 @@ def build_hf_trend(spot_rows, sessions, now):
             "windows": n_w, "fallback": fallback}
 
 
+HF_PAIR_DAYS = 30
+HF_PAIR_PRIOR_M = 20.0
+HF_PAIR_MIN_ROWS = 200
+
+
+def build_hf_pair(pair_rows):
+    """Taux réalisé par couple bande/préfixe (v13.2), à partir des prévisions HF vérifiées des 30 derniers jours
+    (pair_rows : (bande, préfixe, réalisé)). Chaque taux est lissé vers le taux global (m = HF_PAIR_PRIOR_M).
+    Seules les vérifications antérieures à « maintenant » sont utilisées : pas de fuite temporelle.
+    Validé hors échantillon (sans fuite) : AUC 0,65 sur l'ensemble, gain de Brier positif vs taux global
+    sur les tranches testées, mais pouvoir de classement variable selon la période.
+    Retourne None si données insuffisantes."""
+    n = len(pair_rows)
+    if n < HF_PAIR_MIN_ROWS:
+        return None
+    base = sum(y for _, _, y in pair_rows) / n
+    agg = defaultdict(lambda: [0, 0])
+    for b, p, y in pair_rows:
+        a = agg[(b, p)]
+        a[0] += y
+        a[1] += 1
+    m = HF_PAIR_PRIOR_M
+    return {"pairs": {k: (v[0] + m * base) / (v[1] + m) for k, v in agg.items()},
+            "base": base, "rows": n}
+
+
+def score_hf_pair(model, band, prefix):
+    return model["pairs"].get((band, prefix), model["base"])
+
+
 def score_hf_trend(trend, band, prefix, hour_utc):
     z = trend["pairs"].get((band, prefix), _logit(trend["base"]))
     z += trend["hours"].get((hour_utc // 3) * 3, 0.0)
@@ -561,6 +591,9 @@ class Predictor:
         # empirique ni boost TEP, non validés hors échantillon
         if model == "hf":
             trend = self._get_hf_trend()
+            pair = getattr(self, "_hf_pair", None)
+            if pair is not None:
+                return score_hf_pair(pair, band, prefix), "hf"
             if trend is not None:
                 return score_hf_trend(trend, band, prefix, hour_utc), "hf"
         if model == "es":
@@ -592,6 +625,7 @@ class Predictor:
         self._hf_trend_ts = now
         self._hf_trend = None
         self._hf_drift = {}
+        self._hf_pair = None
         horizon = now - (HF_TREND_DAYS + DRIFT_PAST_DAYS) * 86400
         try:
             with self._conn() as conn:
@@ -599,10 +633,15 @@ class Predictor:
                     "SELECT ts, band, prefix FROM spot_log WHERE prefix IS NOT NULL "
                     "AND band IS NOT NULL AND band != 'Unknown' AND ts >= ?",
                     (horizon,)).fetchall()]
+                pair_rows = [(r["band"], r["prefix"], int(r["realized"])) for r in conn.execute(
+                    "SELECT band, prefix, realized FROM prediction_log WHERE model = 'hf' AND verified = 1 "
+                    "AND prefix IS NOT NULL AND realized IS NOT NULL AND verified_ts >= ? AND verified_ts < ?",
+                    (now - HF_PAIR_DAYS * 86400, now)).fetchall()]
                 sessions = [(float(r["ts_start"]), float(r["ts_last"])) for r in conn.execute(
                     "SELECT ts_start, ts_last FROM sessions WHERE ts_last >= ?", (horizon,)).fetchall()]
             self._hf_trend = build_hf_trend(spot_rows, sessions, now)
             self._hf_drift = hf_drift(spot_rows, sessions, now)
+            self._hf_pair = build_hf_pair(pair_rows)
             for band, d in self._hf_drift.items():
                 if d["status"] in ("hausse", "baisse"):
                     logger.warning(f"Dérive HF bande {band} : {d['status']} "
