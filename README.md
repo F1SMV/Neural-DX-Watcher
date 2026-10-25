@@ -1,4 +1,4 @@
-# 🛰️ Neural DX Watcher 13.2
+# 🛰️ Neural DX Watcher 13.3
 
 > Plateforme de monitoring DX en temps réel pour radioamateurs — F1SMV / JN23
 > Raspberry Pi 5 · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
@@ -16,6 +16,7 @@
 - [Présentation](#-présentation)
 - [Stack technique](#-stack-technique)
 - [Historique des versions](#-historique-des-versions)
+  - [v13.3 — Satellites lisibles, AI Insight pédagogique](#v133--satellites-lisibles-ai-insight-pédagogique)
   - [v13.2 — Pavés expérimentaux AI Insight](#v132--pavés-expérimentaux-ai-insight)
   - [v13.1 — Consolidation & préparation de publication](#v131--consolidation--préparation-de-publication)
   - [v13.0 — Adaptive Insight Engine](#v130--adaptive-insight-engine)
@@ -64,7 +65,56 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 
 ---
 
-### v13.2 — Pavés expérimentaux AI Insight ← ACTUEL
+### v13.3 — Satellites lisibles, AI Insight pédagogique ← ACTUEL
+
+**Période :** octobre 2026  
+**Statut :** version en cours de validation sur Raspberry Pi. Les vérifications de la section dédiée restent à faire après déploiement.
+
+#### Changements par rapport à v13.2
+
+**Satellites**
+
+- **Co-visibilité rétablie :** la route `GET /api/satellites/covisibility/<norad>` manquait, d'où le message « Erreur réseau lors du calcul ». Elle calcule désormais, sur 48 h au pas d'une minute, les fenêtres où le satellite est au-dessus de l'horizon à la fois depuis le QTH et depuis le locator du correspondant (format Maidenhead contrôlé).
+- **Bandeau des satellites modifiés :** chaque ajout ou retrait de la liste active est journalisé (`data/satellites_changes.json`) et affiché avec son nom et son NORAD jusqu'à acquittement (« OK, compris »). Le premier lancement crée l'instantané de référence sans afficher de bandeau.
+- **Retrait direct :** le bandeau « TLE indisponible » propose un bouton **✕ Retirer** par satellite. Le bouton ⚙ « Gérer » est mis en évidence et son texte corrigé.
+
+**AI Insight**
+
+- **Tendance HF lisible :** en-têtes explicites (Activité récente, Activité habituelle, Variation, Fiabilité z), infobulles, et légende de lecture en 14 px orange.
+- **Mobile :** sur téléphone, le tableau devient une carte par bande, sans défilement horizontal.
+- **Icône :** icône de la marque en tête de page et icône d'onglet du navigateur.
+
+**Version :** `APP_VERSION = '13.3'`. Les messages d'erreur de la tendance renvoient à webapp.py v13.3.
+
+#### Nouvelles API (v13.3)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/satellites/covisibility/<norad>?locator=IO91` | Fenêtres 48 h de co-visibilité entre le QTH et le locator du correspondant |
+| `GET /api/satellites/changes` | Ajouts et retraits de satellites non acquittés |
+| `POST /api/satellites/changes/ack` | Acquitte tous les changements affichés |
+
+#### Vérifications après déploiement
+
+- `curl -s "http://localhost:8000/api/satellites/covisibility/25544?locator=JN23"` renvoie du JSON (code 200), avec `windows` ou un `error` explicite.
+- Retrait d'AO-92 et AO-109 par « ✕ Retirer » : le bandeau des changements apparaît avec les noms, puis disparaît après « OK, compris ».
+
+#### Limites connues
+
+- Le modèle HF par paire (`predictor.py`) n'est pas encore déployé : les probabilités HF restent celles de la version précédente.
+- `start.sh` et `version.json` doivent être passés en 13.3 au moment du déploiement.
+- La co-visibilité repose sur les TLE en cache et une résolution d'une minute.
+
+#### Fichiers modifiés
+
+- `webapp.py` : `APP_VERSION`, route de co-visibilité, journal des changements (`_sync_sat_changes`), routes `changes` et `changes/ack`.
+- `templates/satellites.html` : bandeau des changements, bouton ✕ Retirer, bouton ⚙ Gérer.
+- `templates/ai_insight.html` : colonnes et légende de la tendance HF, cartes mobiles, icône.
+
+---
+
+
+### v13.2 — Pavés expérimentaux AI Insight
 
 **Période :** octobre 2026  
 **Statut :** version en cours de validation sur Raspberry Pi. Les pavés marqués **[EXPÉRIMENTAL]** sont des mesures en cours de validation : ils ne constituent pas une prévision validée et ne doivent pas guider une décision de trafic.
@@ -455,6 +505,14 @@ cd Neural-DX-Watcher
 | `GET /api/insight/trend.json` | **[EXPÉRIMENTAL]** Tendance HF par bande : état, valeurs récente et de référence, écart, z, nombre de fenêtres par période |
 | `GET /api/insight/diagnostic.json` | État de chaque module de la page AI Insight, avec cause probable et remède |
 
+### Satellites (v13.3)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/satellites/covisibility/<norad>?locator=IO91` | Fenêtres 48 h de co-visibilité QTH ↔ locator |
+| `GET /api/satellites/changes` | Ajouts / retraits de satellites non acquittés |
+| `POST /api/satellites/changes/ack` | Acquitte les changements affichés |
+
 ### Adaptive Insight Engine (introduit en v13.0)
 
 | Endpoint | Description |
@@ -506,7 +564,7 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v13.2 — F1SMV — JN23 — La Seyne-sur-Mer, France*
+*Neural DX Watcher v13.3 — F1SMV — JN23 — La Seyne-sur-Mer, France*
 * vous pouvez me contacter via X 
 * design F1SMV programmé par Claude Ai
 *Historique initial rédigé pour les versions antérieures ; mise à jour documentaire : octobre 2026.*

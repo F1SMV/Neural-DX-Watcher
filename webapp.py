@@ -222,7 +222,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '13.2'
+APP_VERSION = '13.3'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -7961,6 +7961,71 @@ def api_satellite_passes(norad_id):
     passes = _next_passes(tle1, tle2, user_lat, user_lon)
     return jsonify({'norad': norad_id, 'name': name, 'passes': passes})
 
+@app.route('/api/satellites/covisibility/<int:norad_id>')
+def api_satellite_covisibility(norad_id):
+    """Fenêtres sur 48 h où le satellite est au-dessus de l'horizon à la fois
+    depuis le QTH (user_lat/user_lon) et depuis le locator du correspondant."""
+    import datetime as dt
+    locator = (request.args.get('locator') or '').strip().upper()
+    if not locator:
+        return jsonify({'error': 'Locator du correspondant manquant'}), 400
+    if not re.fullmatch(r'[A-R]{2}[0-9]{2}([A-X]{2})?', locator):
+        return jsonify({'error': f'Locator invalide : {locator} (ex : IO91 ou JN23ab)'}), 400
+    lat_b, lon_b = _maidenhead_to_latlon(locator)
+    if not SGP4_AVAILABLE:
+        return jsonify({'error': 'sgp4 non disponible'}), 500
+    tles = _load_tle_cache()
+    if norad_id not in tles:
+        return jsonify({'error': f'TLE non disponible pour NORAD {norad_id}'}), 404
+    tle_name, tle1, tle2 = tles[norad_id]
+    meta = _get_sat_meta(norad_id)
+    name = meta.get('name') or tle_name or str(norad_id)
+    sat = _Satrec.twoline2rv(tle1, tle2)
+
+    step_s = 60
+    horizon_s = 48 * 3600
+    t0 = dt.datetime.now(dt.timezone.utc).replace(second=0, microsecond=0)
+    windows, cur = [], None
+    for k in range(0, horizon_s // step_s + 1):
+        t = t0 + dt.timedelta(seconds=k * step_s)
+        jd, fr = _dt_to_jd(t)
+        e, r, _v = sat.sgp4(jd, fr)
+        if e != 0:
+            continue
+        _, el_a = _azel(r, user_lat, user_lon, 0.0, t)
+        _, el_b = _azel(r, lat_b, lon_b, 0.0, t)
+        if el_a > 0 and el_b > 0:
+            if cur is None:
+                cur = {'start': t, 'end': t, 'max_a': el_a, 'max_b': el_b}
+            else:
+                cur['end'] = t
+                cur['max_a'] = max(cur['max_a'], el_a)
+                cur['max_b'] = max(cur['max_b'], el_b)
+        elif cur is not None:
+            windows.append(cur)
+            cur = None
+    if cur is not None:
+        windows.append(cur)
+
+    out = []
+    for w in windows:
+        out.append({
+            'start': w['start'].strftime('%d/%m %H:%M'),
+            'end': w['end'].strftime('%d/%m %H:%M'),
+            'duration_s': int((w['end'] - w['start']).total_seconds()) + step_s,
+            'max_el_a': round(w['max_a'], 1),
+            'max_el_b': round(w['max_b'], 1),
+        })
+    return jsonify({
+        'norad': norad_id,
+        'name': name,
+        'horizon_h': 48,
+        'observer_a': {'call': MY_CALL, 'lat': round(user_lat, 4), 'lon': round(user_lon, 4)},
+        'observer_b': {'locator': locator, 'lat': lat_b, 'lon': lon_b},
+        'windows': out,
+        'ts': time.time(),
+    })
+
 @app.route('/api/satellites/footprint/<int:norad_id>')
 def api_satellite_footprint(norad_id):
     """Retourne le footprint (cercle de visibilité) d'un satellite."""
@@ -8093,6 +8158,66 @@ def api_satellites_list():
         })
     return jsonify({'satellites': result})
 
+# ── v13.3 — Journal des ajouts / retraits de satellites (bandeau page satellites) ──
+SAT_SNAPSHOT_FILE = Path("data/satellites_snapshot.json")  # {norad: nom} dernier ensemble connu
+SAT_CHANGES_FILE  = Path("data/satellites_changes.json")   # journal (20 derniers) avec drapeau ack
+
+def _sat_current_map():
+    """{norad (str): nom} des satellites actifs maintenant (config ou défauts)."""
+    out = {}
+    for nid in _get_active_sat_ids():
+        out[str(nid)] = _get_sat_meta(nid).get('name') or str(nid)
+    return out
+
+def _load_sat_changes():
+    if SAT_CHANGES_FILE.exists():
+        try:
+            return json.loads(SAT_CHANGES_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            return []
+    return []
+
+def _sync_sat_changes():
+    """Compare l'ensemble actif à l'instantané et journalise ajouts/retraits.
+    Premier lancement : l'instantané est créé sans bandeau."""
+    try:
+        current = _sat_current_map()
+        SAT_SNAPSHOT_FILE.parent.mkdir(exist_ok=True)
+        if not SAT_SNAPSHOT_FILE.exists():
+            SAT_SNAPSHOT_FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding='utf-8')
+            return
+        previous = json.loads(SAT_SNAPSHOT_FILE.read_text(encoding='utf-8'))
+        if current == previous:
+            return
+        added   = [{'norad': int(k), 'name': v} for k, v in current.items() if k not in previous]
+        removed = [{'norad': int(k), 'name': v} for k, v in previous.items() if k not in current]
+        if added or removed:
+            changes = _load_sat_changes()
+            changes.append({'id': str(time.time_ns()), 'ts': time.time(),
+                            'added': added, 'removed': removed, 'ack': False})
+            SAT_CHANGES_FILE.write_text(json.dumps(changes[-20:], ensure_ascii=False, indent=2), encoding='utf-8')
+            logger.info(f"Satellites modifiés : +{[a['norad'] for a in added]} -{[r['norad'] for r in removed]}")
+        SAT_SNAPSHOT_FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding='utf-8')
+    except Exception as e:
+        logger.warning(f"Synchro changements satellites échouée: {e}")
+
+@app.route('/api/satellites/changes')
+def api_satellites_changes():
+    """Changements non acquittés (ajouts / retraits) à afficher en bandeau."""
+    _sync_sat_changes()
+    pending = [c for c in _load_sat_changes() if not c.get('ack')]
+    return jsonify({'pending': pending})
+
+@app.route('/api/satellites/changes/ack', methods=['POST'])
+def api_satellites_changes_ack():
+    """Marque tous les changements comme vus."""
+    changes = _load_sat_changes()
+    for c in changes:
+        c['ack'] = True
+    SAT_CHANGES_FILE.parent.mkdir(exist_ok=True)
+    SAT_CHANGES_FILE.write_text(json.dumps(changes, ensure_ascii=False, indent=2), encoding='utf-8')
+    return jsonify({'ok': True})
+
 @app.route('/api/satellites/config', methods=['POST'])
 @require_api_token
 def api_satellites_config():
@@ -8113,7 +8238,9 @@ def api_satellites_config():
             'icon':   s.get('icon', '🛰️'),
             'active': bool(s.get('active', True)),
         })
+    _sync_sat_changes()          # état avant sauvegarde (initialise l'instantané si absent)
     _save_sat_config(valid)
+    _sync_sat_changes()          # journalise les différences
     # Invalider le cache positions (pas TLE — les keps restent valides)
     return jsonify({'ok': True, 'saved': len([s for s in valid if s['active']])})
 

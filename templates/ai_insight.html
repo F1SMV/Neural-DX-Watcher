@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Neural DX Watcher — Adaptive Insight</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzAzMGExNCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTksMyA5LDE4IDE1LDE4IDEzLDI5IDIzLDE0IDE3LDE0IiBmaWxsPSIjMDBmM2ZmIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=">
 <style>
 :root{
   --bg:#04101a;--bg2:#071722;--panel:#081b29;--panel2:#0a2131;--line:#14384d;
@@ -101,12 +102,16 @@ body{font-family:Inter,"Aptos","Segoe UI Variable","Segoe UI",system-ui,sans-ser
 .rc-col.now .rc-val{color:#28e87d}
 .rc-col em{font-style:normal;font-size:9px;color:#6e8794;height:12px;line-height:12px;margin-top:3px}
 .rc-note{margin-top:6px;font-size:11px}
+/* v13.3 — tableau de tendance lisible sur téléphone */
+.trend-tbl{min-width:520px}
+.trend-tbl th{padding:4px 6px;vertical-align:bottom}
+@media(max-width:600px){.trend-tbl{min-width:0;font-size:13px}.trend-tbl thead{display:none}.trend-tbl,.trend-tbl tbody,.trend-tbl tr,.trend-tbl td{display:block;width:100%}.trend-tbl tr{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:rgba(4,16,26,.5)}.trend-tbl td{border:0!important;padding:3px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:right}.trend-tbl td:first-child{justify-content:flex-start;padding-bottom:6px}.trend-tbl td[data-l]::before{content:attr(data-l);color:#8faebe;font-size:12px;text-align:left}}
 </style>
 </head>
 <body>
 <div class="shell">
 <header class="top">
-  <div class="brand"><b>NEURAL <span>DX</span> WATCHER</b><small>ADAPTIVE INSIGHT · PROPAGATION FORECAST & VALIDATION</small></div>
+  <div class="brand" style="display:flex;align-items:center"><svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true" style="flex:none;margin-right:10px"><rect width="32" height="32" rx="6" fill="#030a14"/><polygon points="19,3 9,18 15,18 13,29 23,14 17,14" fill="#00f3ff" stroke="#00f3ff" stroke-width="0.5" stroke-linejoin="round"/></svg><div><b>NEURAL <span>DX</span> WATCHER</b><small>ADAPTIVE INSIGHT · PROPAGATION FORECAST & VALIDATION</small></div></div>
   <nav class="nav"><a href="/">Live</a><a href="/map">Map</a><a href="/world">World</a><a href="/briefing">Briefing</a><a class="active" href="/ai-insight">AI Insight</a><a href="/hunt">Hunt</a><a href="/weather">Météo</a></nav>
   <div class="live"><span class="live-dot"></span><span style="color:#4cf18b">Live</span><div><div id="clock" class="clock">--:-- UTC</div><div id="date" class="subclock"></div></div></div>
 </header>
@@ -541,7 +546,7 @@ async function loadDiagnostic(){
  const el=document.getElementById('diagList');if(!el)return;
  try{
   const r=await fetch('/api/insight/diagnostic.json',{cache:'no-store'});
-  if(!r.ok)throw new Error('HTTP '+r.status+' — serveur à mettre à jour (webapp.py v13.1)');
+  if(!r.ok)throw new Error('HTTP '+r.status+' — serveur à mettre à jour (webapp.py v13.3)');
   const d=await r.json(),mods=d.modules||{};
   const label={flux_spots:'Flux de spots',autotest:'Auto-Test',calibration:'Calibration',analytics:'Analytique',voacap:'VOACAP',maintenance:'Maintenance'};
   const col={ok:'#28e87d',warn:'#ffbd32',error:'#ff5364',info:'#2bbcff'};
@@ -560,7 +565,7 @@ async function loadTrend(){
  const el=document.getElementById('trendPanel');if(!el)return;
  try{
   const r=await fetch('/api/insight/trend.json',{cache:'no-store'});
-  if(!r.ok)throw new Error('HTTP '+r.status+' — serveur à mettre à jour (webapp.py v13.2)');
+  if(!r.ok)throw new Error('HTTP '+r.status+' — serveur à mettre à jour (webapp.py v13.3)');
   const d=await r.json();
   if(d.ok===false)throw new Error(d.reason||'tendance indisponible côté serveur');
   const bands=Object.entries(d.bands||{});
@@ -570,7 +575,7 @@ async function loadTrend(){
   const ok=v=>v!=null&&v>=need;
   const cnt=(v,lab)=>`<span style="color:${ok(v)?'#6fe3a0':'#ffb52e'}">${lab} ${v??'—'}/${need}</span>`;
   const ready=ok(nR)&&ok(nP);
-  const head=`<div class="muted" style="margin-bottom:10px;font-size:13px">Fenêtres de 3 h d'écoute : ${cnt(nR,'récentes ('+win.recent+' j)')} · ${cnt(nP,'référence ('+win.past+' j)')} · taux de base HF : ${d.base!=null?Math.round(d.base*100)+' %':'—'}${ready?'':' · <span style="color:#ffb52e">conditions non remplies : chiffres provisoires</span>'}${d.fallback?' · <span style="color:#ffb52e">présence non enregistrée : repli sur les fenêtres avec spots</span>':''}</div>`;
+  const head=`<div class="muted" style="margin-bottom:10px;font-size:13px">Données analysées (fenêtres de 3 h d'écoute) : ${cnt(nR,'dernier'+(win.recent>1?'s':'')+' '+win.recent+' jours : '+(nR??'—'))} · ${cnt(nP,'les '+win.past+' jours d\'avant : '+(nP??'—'))} · minimum requis : ${need} par période · activité HF moyenne : ${d.base!=null?Math.round(d.base*100)+' %':'—'}${ready?'':' · <span style="color:#ffb52e">conditions non remplies : chiffres provisoires</span>'}${d.fallback?' · <span style="color:#ffb52e">présence non enregistrée : repli sur les fenêtres avec spots</span>':''}</div>`;
   if(!bands.length){el.innerHTML=head+'<div class="empty">Pas encore de préfixe avec au moins 20 spots sur la période : aucune tendance calculable.</div>';return}
   const sum={hausse:0,baisse:0,stable:0,insuffisant:0};
   bands.forEach(([b,x])=>{sum[x.status]=(sum[x.status]||0)+1});
@@ -581,11 +586,11 @@ async function loadTrend(){
     const dl=x.delta==null?'—':((x.delta>=0?'+':'')+(x.delta*100).toFixed(1)+' pts');
     const z=x.z==null?'—':(x.z>=0?'+':'')+Number(x.z).toFixed(1);
     const bc=COLORS[b]||'#275c78';
-    return `<tr><td><span class="band" style="background:${bc}">${esc(b)}</span></td><td>${driftBadge(x.status)||esc(x.status)}</td><td>${pctTxt(x.recent)}</td><td>${pctTxt(x.past)}</td><td>${dl}</td><td>${z}</td></tr>`;
+    return `<tr><td><span class="band" style="background:${bc}">${esc(b)}</span></td><td data-l="Verdict">${driftBadge(x.status)||esc(x.status)}</td><td data-l="Activité récente (14 j)">${pctTxt(x.recent)}</td><td data-l="Activité habituelle (60 j d'avant)">${pctTxt(x.past)}</td><td data-l="Variation (points)">${dl}</td><td data-l="Fiabilité (z ≥ 3 = réel)">${z}</td></tr>`;
   }).join('');
   el.innerHTML=head+`<div style="margin-bottom:10px;font-size:14px">${verdict}</div>`+
-   `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;color:#8faebe"><th>Bande</th><th>État</th><th>Récent</th><th>Référence</th><th>Écart</th><th>z</th></tr></thead><tbody>${rows}</tbody></table></div>`+
-   `<div style="margin-top:8px;font-size:12px;color:#8faebe">« Récent » et « Référence » = part moyenne des préfixes entendus par fenêtre de 3 h. Un état « hausse » ou « baisse » doit être confirmé par les jours suivants avant d'être exploité.</div>`;
+   `<div style="overflow-x:auto"><table class="trend-tbl" style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;color:#8faebe;vertical-align:bottom"><th title="Bande radioamateur HF">Bande<br><small style="font-weight:400">HF</small></th><th title="Verdict automatique de la tendance">Verdict<br><small style="font-weight:400">hausse · baisse · stable</small></th><th title="Part des indicatifs entendus par fenêtre de 3 h, sur les 14 derniers jours">Activité récente<br><small style="font-weight:400">14 derniers jours</small></th><th title="Même mesure sur les 60 jours précédant la période récente">Activité habituelle<br><small style="font-weight:400">60 jours d'avant</small></th><th title="Activité récente moins activité habituelle, en points de pourcentage">Variation<br><small style="font-weight:400">points (récent − habituel)</small></th><th title="Score statistique : au-delà de ±3 la variation est probablement réelle, et non du hasard">Fiabilité<br><small style="font-weight:400">score z (≥ 3 = réel)</small></th></tr></thead><tbody>${rows}</tbody></table></div>`+
+   `<div style="margin-top:12px;font-size:14px;color:#ffa62b;line-height:1.6;border-left:3px solid #ffa62b;padding-left:12px"><b>Comment lire ce tableau :</b> « Activité récente » et « Activité habituelle » indiquent la part des indicatifs entendus à chaque fenêtre de 3 h. La « Variation » est la différence entre les deux. La « Fiabilité » (z) dit si cette variation dépasse le simple hasard : une bande n'est marquée <b>hausse</b> ou <b>baisse</b> que si |z| ≥ 3 et la variation atteint au moins 2 points. Une bande en <b>hausse</b> s'ouvre davantage que d'habitude ; en <b>baisse</b>, elle se referme. Attends quelques jours de confirmation avant d'en tirer une décision.</div>`;
  }catch(e){el.innerHTML='<span class="error">Tendance indisponible · '+esc(e.message)+'</span>'}
 }
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}

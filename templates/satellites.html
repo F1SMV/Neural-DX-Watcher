@@ -36,6 +36,8 @@
         #meta .kep-old{color:#ff6600;}
         #meta .kep-very-old{color:#ff3232;}
 
+        #sat-changes{display:none;background:rgba(0,243,255,.07);border:1px solid #00f3ff;
+            color:#cdeff5;padding:10px 20px;font-size:.84em;text-align:center;}
         #sgp4-warning{display:none;background:rgba(255,100,0,.15);border:1px solid #ff6600;
             color:#ff9944;padding:10px 20px;font-size:.82em;text-align:center;}
 
@@ -178,6 +180,8 @@
 <div id="sgp4-warning">
     ⚠ <b>sgp4</b> non installé — <code>pip install sgp4 --break-system-packages</code> puis redémarre l'appli.
 </div>
+
+<div id="sat-changes"></div>
 
 <div class="container">
     <div class="grid-top">
@@ -588,12 +592,12 @@ async function loadPositions() {
         const sgp4errs = (d.positions||[]).filter(p => p.error);
         const warn = document.getElementById('sgp4-warning');
         if(sgp4errs.length > 0) {
-            const names = sgp4errs.map(p => `${p.icon||'🛰️'} ${p.name} (NORAD ${p.norad})`).join(', ');
+            const names = sgp4errs.map(p => `<span style="white-space:nowrap;">${p.icon||'🛰️'} <strong>${p.name}</strong> (NORAD ${p.norad}) <button onclick="removeSat(${p.norad})" style="margin-left:4px;padding:1px 8px;font-size:0.9em;cursor:pointer;border-radius:4px;background:rgba(248,113,113,0.12);border:1px solid #f87171;color:#f87171;">✕ Retirer</button></span>`).join(' &nbsp;·&nbsp; ');
             const plural = sgp4errs.length > 1;
             const verbe = plural ? "n'ont" : "n'a";
             warn.style.display = 'block';
             warn.innerHTML = `⚠ ${sgp4errs.length} satellite${plural?'s':''} de ta liste ${verbe} plus de TLE disponible — probablement désorbité${plural?'s':''} : <strong>${names}</strong><br>
-                <span style="font-size:0.9em;opacity:0.85;">Pour le${plural?'s':''} retirer : ouvre <strong>⚙ Gérer les satellites</strong> (bouton en haut), colonne <strong>« Satellites suivis »</strong> (à gauche, pas le Catalogue à droite), puis clique sur <strong>✕</strong> à côté du satellite concerné.</span><br>
+                <span style="font-size:0.9em;opacity:0.85;">Clique sur <strong>✕ Retirer</strong> à côté de chaque satellite concerné. Positions et passages se recalculent aussitôt.</span><br>
                 <span style="font-size:0.85em;opacity:0.7;">💡 Nouveautés 2026 côté satellites amateurs : SO-127 (HADES-SA/SpinnyOne, désigné juin 2026), KNACKSAT-2 (actif depuis février 2026, digipeater APRS 145.825), JAMX01 et BY70-4 (lancement prévu 25 août 2026). Vérifie leur NORAD sur amsat.org avant ajout au catalogue.</span>`;
         } else if(warn) {
             warn.style.display = 'none';
@@ -673,8 +677,8 @@ function renderPassesSatSelector() {
             </button>`;
         }).join('') +
         `<button onclick="document.querySelector('#sat-active-list')?.closest('.panel')?.scrollIntoView({behavior:'smooth'})"
-            title="Gérer les satellites" style="padding:2px 9px;font-size:0.7em;cursor:pointer;
-            border-radius:4px;background:rgba(0,243,255,0.06);border:1px solid #333;color:#555;">⚙</button>`;
+            title="Gérer les satellites suivis (ajouter / retirer)" style="padding:2px 9px;font-size:0.7em;cursor:pointer;
+            border-radius:4px;background:rgba(0,243,255,0.10);border:1px solid #00f3ff;color:#00f3ff;">⚙ Gérer</button>`;
     renderCovisSatSelector();
 }
 
@@ -1168,10 +1172,40 @@ async function saveActiveSats() {
             await loadPositions();
             loadPasses();
             renderSatButtons();
+            loadSatChanges();
             return true;
         }
         return false;
     } catch(e) { console.error('saveActiveSats:', e); return false; }
+}
+
+
+// ── v13.3 — Bandeau des ajouts / retraits de satellites ──
+async function loadSatChanges() {
+    const el = document.getElementById('sat-changes');
+    if(!el) return;
+    try {
+        const r = await fetch('/api/satellites/changes');
+        const d = await r.json();
+        const pend = d.pending || [];
+        if(!pend.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        const fmt = s => `${s.name} (NORAD ${s.norad})`;
+        const lines = pend.map(c => {
+            const when = new Date(c.ts * 1000).toLocaleString('fr-FR', {dateStyle:'short', timeStyle:'short'});
+            const parts = [];
+            if(c.added.length)   parts.push(`<span style="color:#4ade80;">＋ ajouté${c.added.length>1?'s':''} : <strong>${c.added.map(fmt).join(', ')}</strong></span>`);
+            if(c.removed.length) parts.push(`<span style="color:#f87171;">− retiré${c.removed.length>1?'s':''} : <strong>${c.removed.map(fmt).join(', ')}</strong></span>`);
+            return `<div style="margin:3px 0;">${when} — ${parts.join(' · ')}</div>`;
+        }).join('');
+        el.innerHTML = `<div>🛰️ <b>Liste des satellites mise à jour</b></div>${lines}
+            <button onclick="ackSatChanges()" style="margin-top:6px;padding:3px 12px;cursor:pointer;border-radius:4px;background:transparent;border:1px solid #00f3ff;color:#00f3ff;">OK, compris</button>`;
+        el.style.display = 'block';
+    } catch(e) { console.error('loadSatChanges:', e); }
+}
+
+async function ackSatChanges() {
+    try { await fetch('/api/satellites/changes/ack', {method:'POST'}); } catch(e) {}
+    loadSatChanges();
 }
 
 // ── INIT ──────────────────────────────────────
@@ -1181,6 +1215,8 @@ loadPositions();
 loadPasses();
 loadKepStatus();
 loadSatConfig();
+loadSatChanges();
+setInterval(loadSatChanges, 60000);
 setInterval(loadPositions, 10000);
 setInterval(loadPasses, 5*60000);
 setInterval(loadKepStatus, 60000);
