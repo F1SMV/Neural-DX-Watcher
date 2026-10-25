@@ -101,13 +101,15 @@ Since v12.5, the application has included an experimental **adaptive AI Insight 
 
 #### Known limitations
 
-- The pair-rate HF model (`predictor.py`) is not deployed yet: HF probabilities are still those of the previous version.
+- **Pair-rate HF model** (`predictor.py`): deployed on the Pi. Average HF probability about 0.35 over the last hour (13 predictions); the sample is still small. Out-of-sample ranking power varies by period.
+- **Auto-Test:** probabilities come from a fixed activity table (× 1.1 for FT8), not calibrated. They do not reflect the HF model and will be replaced by measured rates.
 - `start.sh` and `version.json` must be set to 13.3 at deployment.
 - Co-visibility relies on cached TLEs and one-minute resolution.
 
 #### Modified files
 
 - `webapp.py`: `APP_VERSION`, co-visibility route, change log (`_sync_sat_changes`), `changes` and `changes/ack` routes.
+- `predictor.py`: pair-rate HF model by band × prefix (30 days, shrunk toward the global rate).
 - `templates/satellites.html`: changes banner, ✕ Remove button, ⚙ Manage button.
 - `templates/ai_insight.html`: HF trend columns and legend, mobile cards, icon.
 

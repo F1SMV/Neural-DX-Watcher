@@ -101,13 +101,15 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 
 #### Limites connues
 
-- Le modèle HF par paire (`predictor.py`) n'est pas encore déployé : les probabilités HF restent celles de la version précédente.
+- **Modèle HF par paire** (`predictor.py`) : déployé sur le Pi. Probabilité HF moyenne d'environ 0,35 sur la dernière heure (13 prédictions) ; l'échantillon reste petit. Le pouvoir de classement varie selon la période.
+- **Auto-Test** : les probabilités proviennent d'une table d'activité fixe (× 1,1 en FT8), non calibrée. Elles ne reflètent pas le modèle HF et seront remplacées par des taux mesurés.
 - `start.sh` et `version.json` doivent être passés en 13.3 au moment du déploiement.
 - La co-visibilité repose sur les TLE en cache et une résolution d'une minute.
 
 #### Fichiers modifiés
 
 - `webapp.py` : `APP_VERSION`, route de co-visibilité, journal des changements (`_sync_sat_changes`), routes `changes` et `changes/ack`.
+- `predictor.py` : modèle HF par paire bande × préfixe (30 jours, lissage vers le taux global).
 - `templates/satellites.html` : bandeau des changements, bouton ✕ Retirer, bouton ⚙ Gérer.
 - `templates/ai_insight.html` : colonnes et légende de la tendance HF, cartes mobiles, icône.
 
