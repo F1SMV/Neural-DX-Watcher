@@ -371,7 +371,7 @@ BAND_COLORS = {
 }
 
 # --- DX CLUSTER CONFIGURATION ---
-RSS_URLS = ["https://www.dx-world.net/feed/"]
+RSS_URLS = ["https://rsgb.org/main/blog/category/news/gb2rs/dx-news/feed/"]
 CLUSTERS = [
     ("dxfun.com", 8000),
     ("dxc.k0xm.net", 7300),
@@ -394,10 +394,10 @@ QO100_HEADERS = {
 }
 BRIEFING_DEFAULT_SOURCES = [
     {
-        "id": "dxworld",
-        "name": "DX-World",
-        "url": "https://www.dx-world.net/feed/",
-        "site": "https://www.dx-world.net/",
+        "id": "rsgb",
+        "name": "RSGB DX News",
+        "url": "https://rsgb.org/main/blog/category/news/gb2rs/dx-news/feed/",
+        "site": "https://rsgb.org/main/blog/category/news/gb2rs/dx-news/",
         "type": "rss",
     },
     {
