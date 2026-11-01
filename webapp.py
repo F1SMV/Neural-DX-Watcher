@@ -7908,6 +7908,17 @@ def satellites_page():
     return render_template('satellites.html', my_call=MY_CALL,
                            user_lat=user_lat, user_lon=user_lon)
 
+@app.route('/api/satellites/ham_radar')
+def api_satellites_ham_radar():
+    """Pavé radioamateur : lancements, fréquences, statuts (registre local, sans réseau)."""
+    import ham_radar
+    try:
+        reg = ham_radar.load_registry(Path("data/ham_satellites.json"))
+        return jsonify(ham_radar.build_payload(reg))
+    except Exception as e:
+        logger.warning(f"ham_radar: registre illisible : {e}")
+        return jsonify({'error': 'registre indisponible', 'groups': {}}), 500
+
 @app.route('/api/satellites/positions')
 def api_satellite_positions():
     """Retourne les positions actuelles de tous les satellites actifs."""
