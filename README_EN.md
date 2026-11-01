@@ -1,4 +1,4 @@
-# 🛰️ Neural DX Watcher 13.3
+# 🛰️ Neural DX Watcher 13.4
 
 > Real-time DX monitoring platform for amateur radio operators — F1SMV / JN23  
 > Raspberry Pi · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
@@ -16,6 +16,7 @@
 - [Overview](#-overview)
 - [Technology stack](#-technology-stack)
 - [Version history](#-version-history)
+  - [v13.4 — Radio satellite panel and RSGB feed](#v134--radio-satellite-panel-and-rsgb-feed)
   - [v13.3 — Readable satellites, pedagogical AI Insight](#v133--readable-satellites-pedagogical-ai-insight)
   - [v13.2 — Experimental AI Insight panels](#v132--experimental-ai-insight-panels)
   - [v13.1 — Consolidation and release preparation](#v131--consolidation-and-release-preparation)
@@ -65,7 +66,49 @@ Since v12.5, the application has included an experimental **adaptive AI Insight 
 
 ## 📜 Version history
 
-### v13.3 — Readable satellites, pedagogical AI Insight ← CURRENT
+### v13.4 — Radio satellite panel and RSGB feed ← CURRENT
+
+**Period:** November 2026  
+**Status:** to be validated on Raspberry Pi after deployment.
+
+#### Changes since v13.3
+
+**DX news**
+
+- **RSGB feed:** DX-World returns HTTP 403 from the Pi. Replaced by the RSGB GB2RS DX News feed. Briefing sources: ARRL, NG3K, RSGB.
+
+**Satellites — "Radio amateur" panel**
+
+- **Curated registry:** `data/ham_satellites.json` lists 39 satellites across 7 sources, with status (upcoming, deploying, active, unconfirmed status, out of service), published launch date, frequencies and a "recently active" flag.
+- **Cross-source confirmation:** a satellite is confirmed only with at least 2 distinct sources. A source cited twice counts once.
+- **Statistics:** total, confirmed and recently active counts.
+- **No network calls:** the panel reads the local registry; the page does not depend on any external source.
+
+#### New APIs (v13.4)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/satellites/ham_radar` | Radio amateur panel: satellites grouped by status, with sources and confirmation |
+
+#### Post-deployment checks
+
+- `python3 -m unittest test_ham_radar` reports 17 tests OK.
+- `curl -s http://localhost:8000/api/satellites/ham_radar` returns JSON with the groups `a_venir`, `en_deploiement`, `actif`, `statut_inconnu` and `hors_service`.
+
+#### Known limitations
+
+- The registry is maintained by hand; its `updated` field gives its date.
+- The page refreshes every 30 minutes.
+- Nightly memory growth of the webapp (≈ +17 MB per night): to be handled before v14 (see the Phase 0 closure).
+- DX-World remains blocked (403): no workaround is planned.
+
+#### Modified files
+
+`ham_radar.py` and `test_ham_radar.py` (new), `data/ham_satellites.json` (new, tracked thanks to an exception in `.gitignore`), `webapp.py`, `templates/satellites.html`, `.gitignore`, `start.sh`, `version.json`, `README.md`, `README_EN.md`.
+
+---
+
+### v13.3 — Readable satellites, pedagogical AI Insight
 
 **Period:** October 2026  
 **Status:** version under validation on Raspberry Pi. The checks listed in the dedicated section must be run after deployment.
@@ -496,6 +539,7 @@ cd Neural-DX-Watcher
 | `GET /api/satellites/covisibility/<norad>?locator=IO91` | 48-hour co-visibility windows, QTH ↔ locator |
 | `GET /api/satellites/changes` | Unacknowledged satellite additions / removals |
 | `POST /api/satellites/changes/ack` | Acknowledges displayed changes |
+| `GET /api/satellites/ham_radar` | Radio amateur panel (v13.4): satellites grouped by status, with sources and confirmation |
 
 ### Adaptive Insight Engine (introduced in v13.0)
 
@@ -550,5 +594,5 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v13.3 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
+*Neural DX Watcher v13.4 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
 *Historical release notes retained from the earlier French README; documentation updated October 2026.*

@@ -1,0 +1,571 @@
+{
+  "updated": "2026-10-28",
+  "note": "Statuts tels que publiés par les sources listées, à la date de constat. Aucune vérification en direct. Une entrée est « confirmée » si au moins 2 sources indépendantes la décrivent.",
+  "sources": [
+    {
+      "id": "amsat_upcoming",
+      "label": "AMSAT — Upcoming satellites",
+      "url": "https://www.amsat.org/upcoming-satellites/",
+      "date": "page sans date visible (consultée 2026-10-28)"
+    },
+    {
+      "id": "amsat_live_linear",
+      "label": "AMSAT — Live linear satellites",
+      "url": "https://www.amsat.org/live-linear-satellites-2/",
+      "date": "mise à jour 2026-02-21"
+    },
+    {
+      "id": "icq_fo29",
+      "label": "ICQ Podcast — FO-29 (mars 2026)",
+      "url": "https://www.icqpodcast.com/news/2026/3/22/fo-29-enters-full-sunlight-veteran-satellite-sees-renewed-activity-in-2026",
+      "date": "2026-03-22"
+    },
+    {
+      "id": "wiki_fox1e",
+      "label": "Wikipedia — Fox-1E",
+      "url": "https://en.wikipedia.org/wiki/Fox-1E",
+      "date": "page consultée 2026-10-28"
+    },
+    {
+      "id": "arnews_artemis",
+      "label": "ARNewsline — CubeSat AMSAT sur Artemis",
+      "url": "https://www.arnewsline.org/news-text/2026/6/11/amsat-explores-cubesat-payload-on-artemis-mission",
+      "date": "2026-06-11"
+    },
+    {
+      "id": "amsat_fr_news",
+      "label": "AMSAT-F — site.amsat-f.org (actualités satellites)",
+      "url": "https://site.amsat-f.org/",
+      "date": "consultée 2026-10-28 ; dernière entrée 27 oct. 2026"
+    },
+    {
+      "id": "amsat_news_ans",
+      "label": "AMSAT — bulletins ANS (amsat.org)",
+      "url": "https://www.amsat.org/",
+      "date": "consultée 2026-10-28 ; dernière entrée ANS-298 (25 oct. 2026)"
+    }
+  ],
+  "satellites": [
+    {
+      "name": "Lilium-4 (BN0YCA)",
+      "status": "en_deploiement",
+      "launch": "2026-03-30",
+      "launch_note": "11:20 UTC",
+      "uplink": "145.825 MHz APRS ; 145.980 MHz répéteur V/U",
+      "downlink": "145.825 MHz APRS ; 435.250 MHz répéteur V/U",
+      "modes": "APRS, répéteur V/U",
+      "note": "Lancé, en test",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "PARUS-6U1",
+      "status": "en_deploiement",
+      "launch": "2026-03-30",
+      "launch_note": "11:20 UTC",
+      "uplink": "145.825 MHz APRS",
+      "downlink": "145.825 MHz APRS ; 437.195 MHz 9k6 GMSK ; 2402.000 MHz TDMA 750 kb/s",
+      "modes": "APRS, GMSK, TDMA (S-band)",
+      "note": "Lancé, en test",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "CO-128 (MARMOTSat)",
+      "status": "en_deploiement",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "145.875 MHz",
+      "downlink": "145.875 MHz",
+      "modes": "1k2 GMSK",
+      "note": "En mise en service ; désignation Canada-OSCAR 128 publiée dans les bulletins ANS (2 août 2026)",
+      "sources": [
+        "amsat_upcoming",
+        "amsat_news_ans"
+      ]
+    },
+    {
+      "name": "HADES-SA (SpinnyONE)",
+      "status": "en_deploiement",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "145.875 MHz",
+      "downlink": "436.875 MHz",
+      "modes": "FSK 200–1600 bps, CODEC2, SSDV",
+      "note": "En test ; transmissions déjà reçues (AMSAT-EA)",
+      "recently_active": true,
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "CANVAS",
+      "status": "en_deploiement",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "437.250 MHz",
+      "downlink": "437.250 MHz AFSK 1200 bps",
+      "modes": "Digipeater AX.25",
+      "note": "En test ; digipeater ouvert après la phase scientifique (vers avril 2027)",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "UNNE-1B (HADES-E2)",
+      "status": "en_deploiement",
+      "launch": "2026-10-01",
+      "launch_note": "Transporter-18, Vandenberg ; HADES-L embarqué (montée ~29 MHz USB, descente 435 MHz FM)",
+      "uplink": "145.925 MHz",
+      "downlink": "436.888 MHz",
+      "modes": "FM voix, FSK, APRS, CODEC2",
+      "note": "Lancé ; statut en orbite non publié",
+      "sources": [
+        "amsat_upcoming",
+        "amsat_fr_news",
+        "amsat_news_ans"
+      ]
+    },
+    {
+      "name": "CAS-7A",
+      "status": "a_venir",
+      "launch": null,
+      "launch_note": "à déterminer",
+      "uplink": "145.950 MHz FM ; 145.865–145.895 MHz V/u",
+      "downlink": "435.455 MHz FM ; 435.385–435.415 MHz V/u",
+      "modes": "FM, linéaires H/t H/u V/u, image",
+      "note": "Bandes HF/UHF détaillées dans la source",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "CAS-7C",
+      "status": "a_venir",
+      "launch": null,
+      "launch_note": "à déterminer",
+      "uplink": "145.900 MHz FM",
+      "downlink": "435.690 MHz FM ; CW 435.715 MHz",
+      "modes": "FM",
+      "note": "",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "CAS-8A / 8B / 8C / 8D",
+      "status": "a_venir",
+      "launch": null,
+      "launch_note": "à déterminer",
+      "uplink": "145.805–145.940 MHz (selon satellite)",
+      "downlink": "435.510–435.695 MHz (selon satellite)",
+      "modes": "Linéaire, image, ISL 2405.300 MHz",
+      "note": "Quatre satellites de la même série",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "BY70-8 (transpondeur FM)",
+      "status": "a_venir",
+      "launch": null,
+      "launch_note": "à déterminer",
+      "uplink": "435.950 MHz",
+      "downlink": "145.950 MHz",
+      "modes": "FM",
+      "note": "",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "CRAC-01 (transpondeur FM)",
+      "status": "a_venir",
+      "launch": null,
+      "launch_note": "à déterminer",
+      "uplink": "435.900 MHz",
+      "downlink": "145.980 MHz ; télémétrie 145.995 MHz",
+      "modes": "FM, image 10.455 GHz",
+      "note": "",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "INCA-2",
+      "status": "a_venir",
+      "launch": null,
+      "launch_note": "à déterminer",
+      "uplink": "145.900 MHz 9k6 GMSK",
+      "downlink": "437.125 MHz 9k6 GMSK",
+      "modes": "Digipeater",
+      "note": "Digipeater actif seulement au-delà de 2 600 km de la station NMSU",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "REALOP",
+      "status": "a_venir",
+      "launch": null,
+      "launch_note": "à déterminer",
+      "uplink": "145.860–145.890 MHz",
+      "downlink": "435.760–435.790 MHz ; balise 435.750 MHz 1200 bps",
+      "modes": "Transpondeur LTM-1, FoxTelem BPSK",
+      "note": "",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "CubeSat AMSAT sur Artemis",
+      "status": "a_venir",
+      "launch": null,
+      "launch_note": "aucune date approuvée",
+      "uplink": "VHF ; 5 GHz",
+      "downlink": "UHF ; 10 GHz",
+      "modes": "Télémétrie",
+      "note": "Lettre d'intention à la NASA ; aucune mission ni date approuvée",
+      "sources": [
+        "arnews_artemis"
+      ]
+    },
+    {
+      "name": "FO-29 (JAS-2)",
+      "status": "actif",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "145.900–146.000 MHz LSB",
+      "downlink": "435.800–435.900 MHz USB ; balise CW 435.795 MHz",
+      "modes": "V/u linéaire SSB/CW",
+      "note": "Réactivée en mars 2026 ; fonctionne seulement en plein soleil",
+      "recently_active": true,
+      "sources": [
+        "amsat_live_linear",
+        "icq_fo29"
+      ]
+    },
+    {
+      "name": "AO-73 (FUNcube-1)",
+      "status": "actif",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "435.130–435.150 MHz LSB",
+      "downlink": "145.950–145.970 MHz USB ; télémétrie 145.935 MHz",
+      "modes": "U/v linéaire, télémétrie 1k2 BPSK",
+      "note": "Transpondeur actif en éclipse ; balise temporaire 145.935 MHz BPSK 1200 bps dès le 4 oct. 2026 ; retour au transpondeur normal le 12 oct.",
+      "sources": [
+        "amsat_live_linear",
+        "amsat_fr_news"
+      ]
+    },
+    {
+      "name": "AO-7 (modes A et B)",
+      "status": "actif",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "Mode A 145.850–145.950 MHz USB ; Mode B 432.125–432.175 MHz LSB",
+      "downlink": "Mode A 29.400–29.500 MHz USB ; Mode B 145.925–145.975 MHz USB ; balise 29.502 MHz",
+      "modes": "V/a et U/v linéaire",
+      "note": "Actif seulement en plein soleil ; bascule de mode par minuterie de 24 h",
+      "sources": [
+        "amsat_live_linear"
+      ]
+    },
+    {
+      "name": "TO-108 (CAS-6)",
+      "status": "actif",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "435.270–435.290 MHz LSB",
+      "downlink": "145.915–145.935 MHz USB ; balise CW 145.910 MHz",
+      "modes": "Linéaire",
+      "note": "Transpondeur intermittent (environ 2 s allumé, 5 s éteint)",
+      "sources": [
+        "amsat_live_linear"
+      ]
+    },
+    {
+      "name": "RS-44",
+      "status": "statut_inconnu",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "145.935–145.995 MHz LSB",
+      "downlink": "435.610–435.670 MHz USB ; balise CW 435.605 MHz",
+      "modes": "Linéaire",
+      "note": "Statut actuel non précisé par la source",
+      "sources": [
+        "amsat_live_linear"
+      ]
+    },
+    {
+      "name": "MO-122 (MESAT1)",
+      "status": "statut_inconnu",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "145.910–145.940 MHz LSB",
+      "downlink": "435.810–435.840 MHz USB ; balise 435.800 MHz 1200 bps",
+      "modes": "Linéaire, FoxTelem BPSK",
+      "note": "Statut actuel non précisé par la source",
+      "sources": [
+        "amsat_live_linear"
+      ]
+    },
+    {
+      "name": "QO-100 (Es'hail-2 / P4A)",
+      "status": "statut_inconnu",
+      "launch": null,
+      "launch_note": "géostationnaire, 25,9° E",
+      "uplink": "2400.000–2400.500 MHz USB",
+      "downlink": "10489.500–10490.000 MHz USB",
+      "modes": "Transpondeur linéaire (bande étroite et large)",
+      "note": "Statut actuel non précisé par la source",
+      "sources": [
+        "amsat_live_linear"
+      ]
+    },
+    {
+      "name": "Ten-Koh 2",
+      "status": "statut_inconnu",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "145.895–145.935 MHz",
+      "downlink": "435.875–435.915 MHz ; balise CW 5.839 GHz",
+      "modes": "CW, Digitalker, AFSK, GMSK, 4FSK",
+      "note": "Le propriétaire signalait des problèmes de transmission au 19 mars 2026",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "CSSARC (station spatiale chinoise)",
+      "status": "statut_inconnu",
+      "launch": null,
+      "launch_note": "en orbite",
+      "uplink": "145.875 MHz (V/u) ; 435.075 MHz (U/v)",
+      "downlink": "436.510 MHz (V/u) ; 145.985 MHz (U/v)",
+      "modes": "FM, SSTV, voix d'équipage, paquets",
+      "note": "Installation et activation non confirmées",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "Fox-1E",
+      "status": "hors_service",
+      "launch": "2021-01-17",
+      "launch_note": "19:38:51 UTC, LauncherOne R03",
+      "uplink": "non précisée",
+      "downlink": "435.750 MHz",
+      "modes": "Transpondeur linéaire 30 kHz",
+      "note": "Rentré dans l'atmosphère le 24 avril 2024 ; balise de télémétrie jamais rétablie",
+      "sources": [
+        "wiki_fox1e"
+      ]
+    },
+    {
+      "name": "JO-97 (JY1Sat)",
+      "status": "hors_service",
+      "launch": null,
+      "launch_note": "non publiée",
+      "uplink": "435.100–435.120 MHz LSB",
+      "downlink": "145.855–145.875 MHz USB",
+      "modes": "Linéaire",
+      "note": "Télémétrie inopérante ; transpondeur non confirmé",
+      "sources": [
+        "amsat_live_linear"
+      ]
+    },
+    {
+      "name": "PARUS-T2",
+      "status": "hors_service",
+      "launch": null,
+      "launch_note": "23 juin, 21:25 UTC, année non précisée",
+      "uplink": "145.980 MHz (67 Hz)",
+      "downlink": "435.250 MHz ; APRS 145.825 MHz",
+      "modes": "APRS",
+      "note": "Semble hors service",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "RIDU-Sat 1",
+      "status": "hors_service",
+      "launch": null,
+      "launch_note": "23 juin, 21:25 UTC, année non précisée",
+      "uplink": "145.825 MHz",
+      "downlink": "145.825 MHz ; télémétrie 145.925 MHz",
+      "modes": "APRS, télémétrie",
+      "note": "Semble hors service",
+      "sources": [
+        "amsat_upcoming"
+      ]
+    },
+    {
+      "name": "AO-129 (ERMINAZ-2U)",
+      "status": "actif",
+      "launch": "2026-10-01",
+      "launch_note": "Transporter-18 ; nommé AO-129 le 23 oct. 2026",
+      "uplink": "non publiée",
+      "downlink": "435.900 MHz (indicatif DP0PQA)",
+      "modes": "non publié",
+      "note": "En service selon AMSAT-DL",
+      "recently_active": true,
+      "sources": [
+        "amsat_fr_news",
+        "amsat_news_ans"
+      ]
+    },
+    {
+      "name": "AO-130 (ERMINAZ-2V)",
+      "status": "actif",
+      "launch": "2026-10-01",
+      "launch_note": "Transporter-18 ; nommé AO-130 le 23 oct. 2026",
+      "uplink": "non publiée",
+      "downlink": "145.920 MHz (sens non précisé ; indicatif DP0PQB)",
+      "modes": "non publié",
+      "note": "En service selon AMSAT-DL",
+      "recently_active": true,
+      "sources": [
+        "amsat_fr_news",
+        "amsat_news_ans"
+      ]
+    },
+    {
+      "name": "ERMINAZ-2X",
+      "status": "statut_inconnu",
+      "launch": "2026-10-01",
+      "launch_note": "Transporter-18",
+      "uplink": "non publiée",
+      "downlink": "145.960 MHz (indicatif DP0PQC)",
+      "modes": "non publié",
+      "note": "Silencieux depuis le lancement",
+      "sources": [
+        "amsat_fr_news",
+        "amsat_news_ans"
+      ]
+    },
+    {
+      "name": "QMR-KWT-2 (RS95S)",
+      "status": "actif",
+      "launch": null,
+      "launch_note": "NORAD 67291 (source AMSAT-F) ; date de lancement non publiée",
+      "uplink": "145.920 MHz FM, CTCSS 67,0 Hz",
+      "downlink": "436.950 MHz FM",
+      "modes": "FM ; balise Robot36",
+      "note": "Transpondeur activé les 10–11 oct. 2026",
+      "recently_active": true,
+      "sources": [
+        "amsat_fr_news"
+      ]
+    },
+    {
+      "name": "Luca-1 (RS90S)",
+      "status": "statut_inconnu",
+      "launch": null,
+      "launch_note": "NORAD 67287 (source AMSAT-F) ; date de lancement non publiée",
+      "uplink": "non publiée",
+      "downlink": "437.180 MHz",
+      "modes": "Balise Robot36",
+      "note": "Actif les 9–10 oct. 2026 ; statut actuel non publié",
+      "sources": [
+        "amsat_fr_news"
+      ]
+    },
+    {
+      "name": "UMKA-1 (RS40S)",
+      "status": "actif",
+      "launch": null,
+      "launch_note": "date de lancement non publiée",
+      "uplink": "non publiée",
+      "downlink": "437.625 MHz",
+      "modes": "SSTV Robot36",
+      "note": "Émissions les 1–2 oct., 9–11 nov. et 27–29 oct. 2026 ; intervalle 120 s ou 200 s selon les articles ; pause possible le 28 oct. selon la batterie",
+      "sources": [
+        "amsat_fr_news"
+      ]
+    },
+    {
+      "name": "FramSat-1 (Orbit NTNU)",
+      "status": "statut_inconnu",
+      "launch": "2026-09-05",
+      "launch_note": "Isar Aerospace Spectrum, 20:12 UTC, Andøya ; NORAD 98914 (source AMSAT-F)",
+      "uplink": "non publiée",
+      "downlink": "435.141 MHz FSK G3RUH 9600 bps, AX.25",
+      "modes": "FSK, AX.25",
+      "note": "Statut en orbite non publié",
+      "sources": [
+        "amsat_fr_news"
+      ]
+    },
+    {
+      "name": "SpaceTeamSat1 / STS1 (TU Wien)",
+      "status": "statut_inconnu",
+      "launch": "2026-09-05",
+      "launch_note": "Isar Aerospace Spectrum ; NORAD 99416 (source AMSAT-F)",
+      "uplink": "non publiée",
+      "downlink": "437.395 MHz (balise CW et GFSK 9600 bps)",
+      "modes": "CW, GFSK",
+      "note": "Statut en orbite non publié",
+      "sources": [
+        "amsat_fr_news"
+      ]
+    },
+    {
+      "name": "KENSAT (KO6IKZ)",
+      "status": "statut_inconnu",
+      "launch": "2026-10-01",
+      "launch_note": "Transporter-18",
+      "uplink": "non publiée",
+      "downlink": "437.080 MHz GFSK 9600 bauds, AX.25/G3RUH",
+      "modes": "GFSK, AX.25",
+      "note": "Existence confirmée par les deux sites ; fréquence publiée par AMSAT-F seul ; coordonnée IARU",
+      "sources": [
+        "amsat_fr_news",
+        "amsat_news_ans"
+      ]
+    },
+    {
+      "name": "SAJILO (UTNH-SAJILO-SAT / SanoSat-2)",
+      "status": "statut_inconnu",
+      "launch": "2026-10-01",
+      "launch_note": "Transporter-18",
+      "uplink": "non publiée",
+      "downlink": "436.650 MHz GFSK 1000 bps et CW 20 mpm",
+      "modes": "GFSK, CW, SSDV",
+      "note": "Statut en orbite non publié",
+      "sources": [
+        "amsat_fr_news"
+      ]
+    },
+    {
+      "name": "SIDLOC PQ-03 à 06 et NIS-PQ (Libre Space Foundation)",
+      "status": "statut_inconnu",
+      "launch": "2026-10-01",
+      "launch_note": "Transporter-18",
+      "uplink": "non publiée",
+      "downlink": "non publiée (balises DSSS basse puissance)",
+      "modes": "DSSS, identification et localisation",
+      "note": "Statut en orbite non publié",
+      "sources": [
+        "amsat_fr_news"
+      ]
+    },
+    {
+      "name": "UTNH-Sat (Argentine)",
+      "status": "statut_inconnu",
+      "launch": "2026-10-01",
+      "launch_note": "Transporter-18",
+      "uplink": "non publiée",
+      "downlink": "non publiée (non coordonné IARU)",
+      "modes": "non publié",
+      "note": "Paramètres radio non publiés",
+      "sources": [
+        "amsat_fr_news"
+      ]
+    }
+  ]
+}

@@ -12,7 +12,8 @@ __pycache__/
 # logs / runtime
 *.log
 logs/
-data/
+data/*
+!data/ham_satellites.json
 cache/
 
 # secrets / local config
@@ -56,7 +57,8 @@ secrets.py
 logs/
 
 # ── Données générées à l'exécution ────────────────
-data/
+data/*
+!data/ham_satellites.json
 data/meta/
 data/briefing/
 data/tle/

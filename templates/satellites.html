@@ -315,6 +315,17 @@
     </div>
 </div>
 
+<div class="panel" id="panel-ham-radar" style="margin-top:14px;">
+    <div class="panel-hdr" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span>📡 RADIOAMATEUR — LANCEMENTS, FRÉQUENCES, STATUTS</span>
+        <span id="ham-radar-meta" style="font-size:0.75em;color:#666;"></span>
+    </div>
+    <div id="ham-radar-body" style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+        <div style="color:#444;font-size:0.78em;font-style:italic;">Chargement…</div>
+    </div>
+    <div id="ham-radar-sources" style="padding:8px 12px;font-size:0.72em;color:#666;border-top:1px solid #1a1a1a;"></div>
+</div>
+
 <script>
 
         /* ── SÉCURITÉ v11 — Jeton API automatique (voir index.html) ──── */
@@ -1220,6 +1231,104 @@ setInterval(loadSatChanges, 60000);
 setInterval(loadPositions, 10000);
 setInterval(loadPasses, 5*60000);
 setInterval(loadKepStatus, 60000);
+</script>
+<script>
+// Pavé radioamateur — rendu sécurisé (textContent uniquement, pas d'innerHTML sur les données)
+(function () {
+    const STATUS_ORDER = ['en_deploiement', 'actif', 'a_venir', 'statut_inconnu', 'hors_service'];
+    const STATUS_COLOR = {
+        en_deploiement: '#00f3ff', actif: '#00ff80', a_venir: '#ffb000',
+        statut_inconnu: '#888', hors_service: '#ff003c'
+    };
+
+    function el(tag, text, style) {
+        const n = document.createElement(tag);
+        if (text !== undefined && text !== null) n.textContent = String(text);
+        if (style) n.setAttribute('style', style);
+        return n;
+    }
+
+    function badge(text, color) {
+        return el('span', text,
+            `font-size:0.68em;padding:1px 6px;border-radius:3px;border:1px solid ${color};color:${color};margin-left:6px;white-space:nowrap;`);
+    }
+
+    function row(label, value) {
+        const r = el('div', null, 'font-size:0.76em;margin-top:3px;line-height:1.35;');
+        r.appendChild(el('span', label + ' : ', 'color:#666;'));
+        r.appendChild(el('span', value || '—', 'color:var(--text);'));
+        return r;
+    }
+
+    function renderItem(it) {
+        const box = el('div', null,
+            'border:1px solid #1a1a1a;border-radius:4px;padding:8px 10px;background:#0a0a0a;');
+        const head = el('div', null, 'display:flex;align-items:center;flex-wrap:wrap;');
+        head.appendChild(el('strong', it.name, 'color:var(--accent);font-size:0.85em;'));
+        if (it.recently_active) head.appendChild(badge('NOUVEAU', '#00ff80'));
+        head.appendChild(it.confirmed
+            ? badge('✔ ' + it.sources.length + ' sources', '#00ff80')
+            : badge('1 source — à confirmer', '#ffb000'));
+        box.appendChild(head);
+        box.appendChild(row('Lancement', it.launch ? it.launch + (it.launch_note ? ' (' + it.launch_note + ')' : '') : (it.launch_note || 'non publié')));
+        box.appendChild(row('Montée', it.uplink));
+        box.appendChild(row('Descente', it.downlink));
+        if (it.modes) box.appendChild(row('Modes', it.modes));
+        if (it.note) box.appendChild(row('Note', it.note));
+        return box;
+    }
+
+    function renderSources(sources) {
+        const wrap = document.getElementById('ham-radar-sources');
+        wrap.textContent = '';
+        const seen = new Map();
+        Object.values(sources).forEach(s => seen.set(s.url, s));
+        wrap.appendChild(el('span', 'Sources : '));
+        seen.forEach(s => {
+            const a = document.createElement('a');
+            a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
+            a.textContent = s.label;
+            a.setAttribute('style', 'color:var(--accent);margin-right:12px;');
+            wrap.appendChild(a);
+        });
+    }
+
+    function renderAll(data) {
+        const body = document.getElementById('ham-radar-body');
+        body.textContent = '';
+        STATUS_ORDER.forEach(st => {
+            const items = (data.groups && data.groups[st]) || [];
+            const col = el('div', null, 'min-width:0;');
+            const title = el('div', null,
+                `font-family:'Orbitron',sans-serif;font-size:0.72em;text-transform:uppercase;color:${STATUS_COLOR[st]};margin-bottom:8px;`);
+            title.textContent = (data.labels && data.labels[st] ? data.labels[st] : st) + ' (' + items.length + ')';
+            col.appendChild(title);
+            if (!items.length) col.appendChild(el('div', 'Aucun', 'color:#444;font-size:0.78em;font-style:italic;'));
+            items.forEach(it => col.appendChild(renderItem(it)));
+            body.appendChild(col);
+        });
+        const st = data.stats || {};
+        document.getElementById('ham-radar-meta').textContent =
+            `${st.total || 0} satellites · ${st.confirmed || 0} confirmés · mis à jour ${data.updated || '?'}`;
+        renderSources(data.sources || {});
+    }
+
+    async function loadHamRadar() {
+        try {
+            const r = await fetch('/api/satellites/ham_radar');
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || 'erreur');
+            renderAll(data);
+        } catch (e) {
+            const body = document.getElementById('ham-radar-body');
+            body.textContent = '';
+            body.appendChild(el('div', 'Pavé indisponible (' + e.message + ')', 'color:var(--alert);font-size:0.8em;'));
+        }
+    }
+
+    loadHamRadar();
+    setInterval(loadHamRadar, 30 * 60 * 1000);
+})();
 </script>
 </body>
 </html>

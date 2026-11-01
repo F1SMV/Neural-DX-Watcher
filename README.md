@@ -1,4 +1,4 @@
-# 🛰️ Neural DX Watcher 13.3
+# 🛰️ Neural DX Watcher 13.4
 
 > Plateforme de monitoring DX en temps réel pour radioamateurs — F1SMV / JN23
 > Raspberry Pi 5 · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
@@ -16,6 +16,7 @@
 - [Présentation](#-présentation)
 - [Stack technique](#-stack-technique)
 - [Historique des versions](#-historique-des-versions)
+  - [v13.4 — Pavé radioamateur et flux RSGB](#v134--pavé-radioamateur-satellites-et-flux-rsgb)
   - [v13.3 — Satellites lisibles, AI Insight pédagogique](#v133--satellites-lisibles-ai-insight-pédagogique)
   - [v13.2 — Pavés expérimentaux AI Insight](#v132--pavés-expérimentaux-ai-insight)
   - [v13.1 — Consolidation & préparation de publication](#v131--consolidation--préparation-de-publication)
@@ -65,7 +66,49 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 
 ---
 
-### v13.3 — Satellites lisibles, AI Insight pédagogique ← ACTUEL
+### v13.4 — Pavé radioamateur satellites et flux RSGB ← ACTUEL
+
+**Période :** novembre 2026  
+**Statut :** à valider sur Raspberry Pi après déploiement.
+
+#### Changements par rapport à v13.3
+
+**Actualités DX**
+
+- **Flux RSGB :** DX-World renvoie HTTP 403 depuis le Pi. Remplacé par le flux RSGB GB2RS DX News. Sources du briefing : ARRL, NG3K, RSGB.
+
+**Satellites — pavé « Radioamateur »**
+
+- **Registre curé :** `data/ham_satellites.json` recense 39 satellites sur 7 sources, avec statut (à venir, en déploiement, actif, statut non confirmé, hors service), date de lancement publiée, fréquences et indicateur « récemment actif ».
+- **Confirmation croisée :** un satellite n'est confirmé qu'avec au moins 2 sources distinctes. Une source citée deux fois ne compte qu'une fois.
+- **Statistiques :** total, nombre de satellites confirmés et nombre d'actifs récemment.
+- **Sans réseau :** le pavé se lit dans le registre local ; la page ne dépend d'aucune source externe.
+
+#### Nouvelles API (v13.4)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/satellites/ham_radar` | Pavé radioamateur : satellites groupés par statut, avec sources et confirmation |
+
+#### Vérifications après déploiement
+
+- `python3 -m unittest test_ham_radar` affiche 17 tests OK.
+- `curl -s http://localhost:8000/api/satellites/ham_radar` renvoie du JSON avec les groupes `a_venir`, `en_deploiement`, `actif`, `statut_inconnu` et `hors_service`.
+
+#### Limites connues
+
+- Le registre est mis à jour à la main ; son champ `updated` indique sa date.
+- La page se rafraîchit toutes les 30 minutes.
+- Croissance mémoire nocturne de la webapp (≈ +17 Mo par nuit) : à traiter avant la v14 (voir la clôture Phase 0).
+- DX-World reste bloqué (403) : aucun contournement n'est prévu.
+
+#### Fichiers modifiés
+
+`ham_radar.py` et `test_ham_radar.py` (nouveaux), `data/ham_satellites.json` (nouveau, versionné grâce à une exception dans `.gitignore`), `webapp.py`, `templates/satellites.html`, `.gitignore`, `start.sh`, `version.json`, `README.md`, `README_EN.md`.
+
+---
+
+### v13.3 — Satellites lisibles, AI Insight pédagogique
 
 **Période :** octobre 2026  
 **Statut :** version en cours de validation sur Raspberry Pi. Les vérifications de la section dédiée restent à faire après déploiement.
@@ -514,6 +557,7 @@ cd Neural-DX-Watcher
 | `GET /api/satellites/covisibility/<norad>?locator=IO91` | Fenêtres 48 h de co-visibilité QTH ↔ locator |
 | `GET /api/satellites/changes` | Ajouts / retraits de satellites non acquittés |
 | `POST /api/satellites/changes/ack` | Acquitte les changements affichés |
+| `GET /api/satellites/ham_radar` | Pavé radioamateur (v13.4) : satellites groupés par statut, sources et confirmation |
 
 ### Adaptive Insight Engine (introduit en v13.0)
 
@@ -566,7 +610,7 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v13.3 — F1SMV — JN23 — La Seyne-sur-Mer, France*
+*Neural DX Watcher v13.4 — F1SMV — JN23 — La Seyne-sur-Mer, France*
 * vous pouvez me contacter via X 
 * design F1SMV programmé par Claude Ai
 *Historique initial rédigé pour les versions antérieures ; mise à jour documentaire : octobre 2026.*
