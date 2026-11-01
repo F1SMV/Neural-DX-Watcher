@@ -222,7 +222,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '13.3'
+APP_VERSION = '13.4'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -6380,7 +6380,7 @@ def api_adaptive_calibration():
 
 @app.route("/api/insight/trend.json")
 def api_insight_trend():
-    """v13.3 — Tendance HF par bande : dérive « 14 derniers jours » vs « 60 jours précédents ».
+    """v13.4 — Tendance HF par bande : dérive « 14 derniers jours » vs « 60 jours précédents ».
     Statuts : hausse / baisse / stable / insuffisant.  curl http://<pi>:8000/api/insight/trend.json"""
     import predictor as _pmod
     try:
@@ -8169,7 +8169,7 @@ def api_satellites_list():
         })
     return jsonify({'satellites': result})
 
-# ── v13.3 — Journal des ajouts / retraits de satellites (bandeau page satellites) ──
+# ── v13.4 — Journal des ajouts / retraits de satellites (bandeau page satellites) ──
 SAT_SNAPSHOT_FILE = Path("data/satellites_snapshot.json")  # {norad: nom} dernier ensemble connu
 SAT_CHANGES_FILE  = Path("data/satellites_changes.json")   # journal (20 derniers) avec drapeau ack
 
