@@ -222,7 +222,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '13.4'
+APP_VERSION = '13.5'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -2889,13 +2889,13 @@ CALLSIGN_ZONES = {
     'VK6': (-32.0, 115.9, 'W Australia'),
     'VK7': (-42.9, 147.3, 'Tasmania'),
     # Allemagne — districts DA-DL
-    'DL1': (52.5, 13.4, 'Berlin area'),
+    'DL1': (52.5, 13.5, 'Berlin area'),
     'DL2': (48.1, 11.6, 'Bavaria'),
     'DL3': (53.6, 10.0, 'Hamburg'),
     'DL4': (51.0,  7.0, 'NRW'),
     'DL5': (49.5,  8.5, 'Rhineland'),
     'DL6': (50.0, 12.0, 'Saxony'),
-    'DL7': (52.5, 13.4, 'Berlin'),
+    'DL7': (52.5, 13.5, 'Berlin'),
     'DL8': (51.5,  7.5, 'Westphalia'),
     'DL9': (48.5,  9.0, 'Baden-Württemberg'),
     # Espagne
@@ -6380,7 +6380,7 @@ def api_adaptive_calibration():
 
 @app.route("/api/insight/trend.json")
 def api_insight_trend():
-    """v13.4 — Tendance HF par bande : dérive « 14 derniers jours » vs « 60 jours précédents ».
+    """v13.5 — Tendance HF par bande : dérive « 14 derniers jours » vs « 60 jours précédents ».
     Statuts : hausse / baisse / stable / insuffisant.  curl http://<pi>:8000/api/insight/trend.json"""
     import predictor as _pmod
     try:
@@ -7535,7 +7535,7 @@ SATELLITES_DEFAULT = {
     43017: {'name': 'AO-91 (RadFxSat)',    'type': 'amateur','color': '#00ff80', 'icon': '📻'},
     43137: {'name': 'AO-92 (Fox-1D)',      'type': 'amateur','color': '#00ff80', 'icon': '📻'},
     27607: {'name': 'SO-50 (SaudiSat 1C)', 'type': 'amateur','color': '#00cc66', 'icon': '📻'},
-    39444: {'name': 'LilacSat-2',          'type': 'amateur','color': '#00cc66', 'icon': '📻'},
+    40908: {'name': 'LilacSat-2',          'type': 'amateur','color': '#00cc66', 'icon': '📻'},
     44109: {'name': 'AO-109 (RadFxSat-2)', 'type': 'amateur','color': '#00ff80', 'icon': '📻'},
 }
 # Alias utilisé dans le code
@@ -8169,7 +8169,7 @@ def api_satellites_list():
         })
     return jsonify({'satellites': result})
 
-# ── v13.4 — Journal des ajouts / retraits de satellites (bandeau page satellites) ──
+# ── v13.5 — Journal des ajouts / retraits de satellites (bandeau page satellites) ──
 SAT_SNAPSHOT_FILE = Path("data/satellites_snapshot.json")  # {norad: nom} dernier ensemble connu
 SAT_CHANGES_FILE  = Path("data/satellites_changes.json")   # journal (20 derniers) avec drapeau ack
 
@@ -8249,6 +8249,11 @@ def api_satellites_config():
             'icon':   s.get('icon', '🛰️'),
             'active': bool(s.get('active', True)),
         })
+    # v13.5 — un satellite sans TLE ne peut pas être suivi : refus explicite
+    tles_dispo = _load_tle_cache()
+    sans_tle = [s['name'] for s in valid if s['active'] and s['norad'] not in tles_dispo]
+    if sans_tle:
+        return jsonify({'ok': False, 'error': 'TLE indisponible', 'sans_tle': sans_tle}), 409
     _sync_sat_changes()          # état avant sauvegarde (initialise l'instantané si absent)
     _save_sat_config(valid)
     _sync_sat_changes()          # journalise les différences

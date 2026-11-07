@@ -1,7 +1,7 @@
-# 🛰️ Neural DX Watcher 13.4
+# 🛰️ Neural DX Watcher 13.5
 
 > Plateforme de monitoring DX en temps réel pour radioamateurs — F1SMV / JN23
-> Raspberry Pi 5 · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
+> Raspberry Pi 4 · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
 
 ---
 
@@ -16,6 +16,7 @@
 - [Présentation](#-présentation)
 - [Stack technique](#-stack-technique)
 - [Historique des versions](#-historique-des-versions)
+  - [v13.5 — Synchronisation des satellites et contrôle TLE](#v135--synchronisation-des-satellites-et-contrôle-tle)
   - [v13.4 — Pavé radioamateur et flux RSGB](#v134--pavé-radioamateur-satellites-et-flux-rsgb)
   - [v13.3 — Satellites lisibles, AI Insight pédagogique](#v133--satellites-lisibles-ai-insight-pédagogique)
   - [v13.2 — Pavés expérimentaux AI Insight](#v132--pavés-expérimentaux-ai-insight)
@@ -66,7 +67,54 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 
 ---
 
-### v13.4 — Pavé radioamateur satellites et flux RSGB ← ACTUEL
+### v13.5 — Synchronisation des satellites et contrôle TLE ← ACTUEL
+
+**Période :** novembre 2026  
+**Statut :** à valider sur Raspberry Pi après déploiement.
+
+#### Changements par rapport à v13.4
+
+**Satellites — NORAD et TLE automatiques**
+
+- **NORAD automatique :** `tools/sync_satellites.py` retrouve le numéro NORAD de chaque satellite du registre dans SatNOGS, y compris par l'alias entre parenthèses (ex. « AO-129 (ERMINAZ-2U) »). 26 numéros trouvés automatiquement au premier passage.
+- **Contrôle TLE :** les éléments orbitaux sont lus sur AMSAT (`nasa.all`), CelesTrak étant injoignable depuis le Pi. Un satellite reçoit `tle_disponible: true` si son NORAD figure dans ces éléments.
+- **Règles de statut :** un satellite « à venir » sans NORAD passe en « statut non confirmé », un lancement annoncé devant être documenté. Un TLE absent ne modifie pas le statut opérationnel : un satellite actif sans TLE reste actif, mais ne peut pas être suivi.
+- **Découverte en rapport seul :** les nouveaux satellites SatNOGS (à venir ou lancés depuis moins de 180 jours) sont listés dans le rapport. Ils n'entrent dans le registre qu'avec `--discover`, pour ne pas surcharger la page.
+- **Garde côté serveur :** `POST /api/satellites/config` refuse d'activer un satellite absent du cache TLE (HTTP 409, « TLE indisponible », avec les noms). Le refus ne dépend pas de l'interface.
+
+**Corrections de données**
+
+- **LilacSat-2 :** NORAD 40908 (et non 39444, qui est FUNcube-1 / AO-73) dans `SATELLITES_DEFAULT`.
+- **QO-100 (Es'hail-2 / P4A) :** statut actif, confirmé par l'exploitation.
+- **AO-129 et AO-130 (ERMINAZ-2U/2V) :** statut actif (en service selon AMSAT-DL) ; pas encore de TLE, donc non suivables.
+
+#### Nouvelles API (v13.5)
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/satellites/config` | Activation des satellites suivis ; refus (HTTP 409) de tout satellite absent du cache TLE |
+
+#### Vérifications après déploiement
+
+- `python3 -m unittest test_sync_satellites test_enrich_satellites` affiche 32 tests OK.
+- `python3 tools/sync_satellites.py` affiche le rapport ; n'ajouter `--write` qu'après relecture (sauvegarde `.bak`).
+- Tenter d'activer AO-129 depuis le sélecteur : le refus « TLE indisponible » doit apparaître tant qu'aucun TLE n'est publié.
+
+#### Limites connues
+
+- Neuf satellites attendent encore un NORAD saisi à la main : CAS-7A, CAS-7C, CAS-8A/8B/8C/8D (groupe), BY70-8, CRAC-01, REALOP, CubeSat AMSAT sur Artemis, CSSARC, SIDLOC PQ-03 à 06 et NIS-PQ (groupe). Les entrées de groupe doivent d'abord être découpées en satellites individuels.
+- La synchronisation n'est pas planifiée : elle se lance à la demande.
+- CelesTrak est injoignable depuis le Pi (timeout) : seule la source AMSAT est utilisée pour les TLE.
+- `tle_disponible` dans le registre est indicatif ; la garde serveur s'appuie sur le cache TLE réel.
+- Limites de v13.4 inchangées : registre mis à jour à la main, croissance mémoire nocturne.
+
+#### Fichiers modifiés
+
+`tools/sync_satellites.py` et `test_sync_satellites.py` (nouveaux) ; `tools/enrich_satellites.py` et `test_enrich_satellites.py` ; `data/ham_satellites.json` ; `webapp.py` (NORAD LilacSat-2, garde d'activation, `APP_VERSION`) ; `start.sh`, `version.json`, `README.md`, `README_EN.md`.
+
+---
+
+### v13.4 — Pavé radioamateur satellites et flux RSGB
 
 **Période :** novembre 2026  
 **Statut :** à valider sur Raspberry Pi après déploiement.
@@ -558,6 +606,7 @@ cd Neural-DX-Watcher
 | `GET /api/satellites/changes` | Ajouts / retraits de satellites non acquittés |
 | `POST /api/satellites/changes/ack` | Acquitte les changements affichés |
 | `GET /api/satellites/ham_radar` | Pavé radioamateur (v13.4) : satellites groupés par statut, sources et confirmation |
+| `POST /api/satellites/config` | Activation des satellites suivis ; refus (HTTP 409) de tout satellite absent du cache TLE (v13.5) |
 
 ### Adaptive Insight Engine (introduit en v13.0)
 
@@ -610,7 +659,7 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v13.4 — F1SMV — JN23 — La Seyne-sur-Mer, France*
+*Neural DX Watcher v13.5 — F1SMV — JN23 — La Seyne-sur-Mer, France*
 * vous pouvez me contacter via X 
 * design F1SMV programmé par Claude Ai
 *Historique initial rédigé pour les versions antérieures ; mise à jour documentaire : octobre 2026.*

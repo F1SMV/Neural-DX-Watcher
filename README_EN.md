@@ -1,4 +1,4 @@
-# 🛰️ Neural DX Watcher 13.4
+# 🛰️ Neural DX Watcher 13.5
 
 > Real-time DX monitoring platform for amateur radio operators — F1SMV / JN23  
 > Raspberry Pi · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
@@ -16,6 +16,7 @@
 - [Overview](#-overview)
 - [Technology stack](#-technology-stack)
 - [Version history](#-version-history)
+  - [v13.5 — Satellite synchronisation and TLE control](#v135--satellite-synchronisation-and-tle-control)
   - [v13.4 — Radio satellite panel and RSGB feed](#v134--radio-satellite-panel-and-rsgb-feed)
   - [v13.3 — Readable satellites, pedagogical AI Insight](#v133--readable-satellites-pedagogical-ai-insight)
   - [v13.2 — Experimental AI Insight panels](#v132--experimental-ai-insight-panels)
@@ -66,7 +67,54 @@ Since v12.5, the application has included an experimental **adaptive AI Insight 
 
 ## 📜 Version history
 
-### v13.4 — Radio satellite panel and RSGB feed ← CURRENT
+### v13.5 — Satellite synchronisation and TLE control ← CURRENT
+
+**Period:** November 2026  
+**Status:** to be validated on Raspberry Pi after deployment.
+
+#### Changes since v13.4
+
+**Satellites — automatic NORAD and TLE control**
+
+- **Automatic NORAD:** `tools/sync_satellites.py` looks up the NORAD number of each registry satellite in SatNOGS, including the alias in parentheses (e.g. "AO-129 (ERMINAZ-2U)"). 26 numbers were found automatically on the first pass.
+- **TLE check:** orbital elements are read from AMSAT (`nasa.all`), because CelesTrak is not reachable from the Pi. A satellite gets `tle_disponible: true` when its NORAD number appears in these elements.
+- **Status rules:** an "upcoming" satellite without a NORAD number is shown as "unconfirmed status", since an announced launch must be documented. A missing TLE does not change the operational status: an active satellite without a TLE stays active, but cannot be tracked.
+- **Discovery as a report only:** new SatNOGS satellites (upcoming, or launched within the last 180 days) are listed in the report. They enter the registry only with `--discover`, to avoid flooding the page.
+- **Server-side guard:** `POST /api/satellites/config` refuses to activate a satellite absent from the TLE cache (HTTP 409, "TLE indisponible", with the names). The refusal does not depend on the interface.
+
+**Data corrections**
+
+- **LilacSat-2:** NORAD 40908 (not 39444, which is FUNcube-1 / AO-73) in `SATELLITES_DEFAULT`.
+- **QO-100 (Es'hail-2 / P4A):** active status, confirmed by operation.
+- **AO-129 and AO-130 (ERMINAZ-2U/2V):** active status (in service according to AMSAT-DL); no TLE yet, so they cannot be tracked.
+
+#### New APIs (v13.5)
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/satellites/config` | Activates tracked satellites; refuses (HTTP 409) any satellite absent from the TLE cache |
+
+#### Post-deployment checks
+
+- `python3 -m unittest test_sync_satellites test_enrich_satellites` reports 32 tests OK.
+- `python3 tools/sync_satellites.py` prints the report; add `--write` only after review (backup `.bak`).
+- Try to activate AO-129 from the selector: the "TLE indisponible" refusal must appear while no TLE is published.
+
+#### Known limitations
+
+- Nine satellites still need a NORAD number entered by hand: CAS-7A, CAS-7C, CAS-8A/8B/8C/8D (group), BY70-8, CRAC-01, REALOP, CubeSat AMSAT on Artemis, CSSARC, SIDLOC PQ-03 to 06 and NIS-PQ (group). Group entries must first be split into individual satellites.
+- The synchronisation is not scheduled: it runs on demand.
+- CelesTrak is unreachable from the Pi (timeout): AMSAT is the only TLE source.
+- `tle_disponible` in the registry is informational; the server guard relies on the live TLE cache.
+- v13.4 limitations still apply: manually maintained registry, nightly memory growth.
+
+#### Modified files
+
+`tools/sync_satellites.py` and `test_sync_satellites.py` (new); `tools/enrich_satellites.py` and `test_enrich_satellites.py`; `data/ham_satellites.json`; `webapp.py` (LilacSat-2 NORAD, activation guard, `APP_VERSION`); `start.sh`, `version.json`, `README.md`, `README_EN.md`.
+
+---
+
+### v13.4 — Radio satellite panel and RSGB feed
 
 **Period:** November 2026  
 **Status:** to be validated on Raspberry Pi after deployment.
@@ -540,6 +588,7 @@ cd Neural-DX-Watcher
 | `GET /api/satellites/changes` | Unacknowledged satellite additions / removals |
 | `POST /api/satellites/changes/ack` | Acknowledges displayed changes |
 | `GET /api/satellites/ham_radar` | Radio amateur panel (v13.4): satellites grouped by status, with sources and confirmation |
+| `POST /api/satellites/config` | Activates tracked satellites; refuses (HTTP 409) any satellite absent from the TLE cache (v13.5) |
 
 ### Adaptive Insight Engine (introduced in v13.0)
 
@@ -594,5 +643,5 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v13.4 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
+*Neural DX Watcher v13.5 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
 *Historical release notes retained from the earlier French README; documentation updated October 2026.*
