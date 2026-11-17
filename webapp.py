@@ -222,7 +222,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '13.5'
+APP_VERSION = '14.0'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -1941,6 +1941,7 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # --- FLASK APP INITIALIZATION ---
+import voacap_model as _vm
 app = Flask(__name__, template_folder="templates")
 
 # ── SÉCURITÉ v11 — Niveau 2 : jeton local sur les routes qui modifient un
@@ -2193,7 +2194,7 @@ if _DRIFT_OK:
 _auto_test = None
 if _AUTOTEST_OK:
     try:
-        _auto_test = AutoTest(db_path="data/predictor.sqlite")
+        _auto_test = AutoTest(db_path="data/predictor.sqlite", db_analytics="data/analytics.sqlite")
         logger.info("AutoTest initialisé.")
     except Exception as _ate:
         logger.warning(f"AutoTest init échoué: {_ate}")
@@ -2280,7 +2281,7 @@ def _get_auto_test():
         return None
     _auto_test_last_retry = now
     try:
-        _auto_test = AutoTest(db_path="data/predictor.sqlite")
+        _auto_test = AutoTest(db_path="data/predictor.sqlite", db_analytics="data/analytics.sqlite")
         logger.info("AutoTest initialisé (reprise après échec au démarrage).")
         try:
             _autotest_generate_hourly(time.gmtime(time.time()).tm_hour)
@@ -6685,61 +6686,16 @@ VOACAP_BANDS = [3.5, 7.0, 10.1, 14.0, 18.1, 21.0, 24.9, 28.0]
 VOACAP_BAND_LABELS = ['80m','40m','30m','20m','17m','15m','12m','10m']
 
 def _voacap_muf(sfi, dist_km):
-    """Estime la MUF selon SFI et distance (formule empirique simplifiée)."""
-    # MUF de base augmente avec le SFI
-    base_muf = 5.0 + (sfi - 60) * 0.18
-    # Correction distance : trajets courts favorisent les hautes fréquences
-    if dist_km < 500:
-        dist_factor = 0.6
-    elif dist_km < 2000:
-        dist_factor = 0.8 + (dist_km - 500) / 7500
-    elif dist_km < 8000:
-        dist_factor = 1.0 + (dist_km - 2000) / 20000
-    else:
-        dist_factor = 1.3
-    return min(35.0, max(4.0, base_muf * dist_factor))
+    """v14 : délègue à voacap_model (même formule, une seule source)."""
+    return _vm.muf_base(sfi, dist_km)
 
 def _voacap_reliability(freq_mhz, muf, luf, hour_utc, dist_km, kp):
-    """Calcule la fiabilité (0-1) pour une bande/heure donnée."""
-    import math
-    # Fenêtre MUF/LUF : fiabilité max au milieu
-    if freq_mhz > muf * 1.15:
-        return 0.0
-    if freq_mhz < luf * 0.85:
-        return 0.0
-
-    # Score de base : position dans la fenêtre
-    center = (muf + luf) / 2
-    half = (muf - luf) / 2 if muf > luf else 1.0
-    dist_from_center = abs(freq_mhz - center) / max(half, 0.1)
-    base = max(0.0, 1.0 - dist_from_center ** 1.5)
-
-    # Correction heure : nuit favorise les basses fréquences
-    night = (hour_utc < 6 or hour_utc >= 20)
-    if night and freq_mhz > 14:
-        base *= max(0.1, 1.0 - (freq_mhz - 14) * 0.08)
-    if not night and freq_mhz < 7:
-        base *= max(0.1, 1.0 - (7 - freq_mhz) * 0.15)
-
-    # Correction Kp : perturbations géomagnétiques réduisent la propagation
-    if kp is not None:
-        kp_val = float(kp)
-        if kp_val >= 5:
-            base *= max(0.05, 1.0 - (kp_val - 4) * 0.18)
-
-    return min(1.0, max(0.0, base))
+    """v14 : délègue à voacap_model. hour_utc doit être une heure SOLAIRE locale."""
+    return _vm.reliability(freq_mhz, muf, luf, hour_utc, dist_km, kp)
 
 def _voacap_luf(dist_km, hour_utc):
-    """Estime la LUF (fréquence minimale utilisable)."""
-    # La nuit la LUF baisse (absorption D moindre)
-    night = (hour_utc < 6 or hour_utc >= 20)
-    if dist_km < 1000:
-        base = 4.0 if night else 7.0
-    elif dist_km < 5000:
-        base = 3.5 if night else 5.5
-    else:
-        base = 3.0 if night else 4.5
-    return base
+    """v14 : délègue à voacap_model (LUF continue en distance)."""
+    return _vm.luf(dist_km, hour_utc)
 
 _voacap_cache = {}
 _voacap_cache_ts = {}
@@ -6773,25 +6729,17 @@ def api_voacap():
     rx_lat, rx_lon = rx['lat'], rx['lon']
     dist_km = calculate_distance(tx_lat, tx_lon, rx_lat, rx_lon)
 
-    # Calcul pour chaque heure (0-23) et chaque bande
-    grid = {}  # grid[band_label][hour] = reliability 0-100
+    # v14 : même profil que l'insight (heure solaire au point milieu, LUF continue).
+    prof = _vm.profile(tx_lat, tx_lon, rx_lat, rx_lon, sfi, kp, VOACAP_BANDS)
+    grid = {}  # grid[band_label][hour_utc] = reliability 0-100
     for i, freq in enumerate(VOACAP_BANDS):
-        band = VOACAP_BAND_LABELS[i]
-        grid[band] = []
-        for h in range(24):
-            muf = _voacap_muf(sfi, dist_km)
-            # Variation diurne de la MUF : +20% en milieu de journée
-            hour_angle = math.pi * (h - 12) / 12
-            muf_h = muf * (1.0 + 0.2 * math.cos(hour_angle))
-            luf = _voacap_luf(dist_km, h)
-            rel = _voacap_reliability(freq, muf_h, luf, h, dist_km, kp)
-            grid[band].append(round(rel * 100))
+        grid[VOACAP_BAND_LABELS[i]] = [round(prof[h]["rel"][freq] * 100) for h in range(24)]
 
-    # MUF et LUF à l'heure actuelle UTC
+    # MUF et LUF à l'heure actuelle UTC, au point milieu
     import datetime
     utc_hour = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).hour
-    muf_now = _voacap_muf(sfi, dist_km) * (1 + 0.2 * math.cos(math.pi * (utc_hour - 12) / 12))
-    luf_now = _voacap_luf(dist_km, utc_hour)
+    now_p = prof[utc_hour]
+    muf_now, luf_now = now_p["muf"], now_p["luf"]
 
     result = {
         'zone': zone,
@@ -6816,24 +6764,14 @@ def _voacap_internal_prediction(rx_lat, rx_lon, rx_name, freqs, sfi, kp, month, 
     Heure solaire évaluée au POINT MILIEU du grand cercle (un circuit Europe→Japon n'est pas de jour
     en même temps aux deux bouts), SNR non fourni (le modèle n'en calcule pas)."""
     import math
-    dist_km = calculate_distance(user_lat, user_lon, float(rx_lat), float(rx_lon))
-    p1, l1 = math.radians(user_lat), math.radians(user_lon)
-    p2, l2 = math.radians(float(rx_lat)), math.radians(float(rx_lon))
-    bx, by = math.cos(p2) * math.cos(l2 - l1), math.cos(p2) * math.sin(l2 - l1)
-    mid_lon = math.degrees(l1 + math.atan2(by, math.cos(p1) + bx))
-    mid_lon = (mid_lon + 180.0) % 360.0 - 180.0
-    base_muf = _voacap_muf(sfi, dist_km)
+    prof = _vm.profile(user_lat, user_lon, float(rx_lat), float(rx_lon), sfi, kp, freqs)
+    dist_km = _vm.distance_km(user_lat, user_lon, float(rx_lat), float(rx_lon))
     hours = []
     for h in range(24):
-        local = (h + mid_lon / 15.0) % 24.0
-        muf = base_muf * (1.0 + 0.2 * math.cos(math.pi * (local - 12.0) / 12.0))
-        luf = _voacap_luf(dist_km, int(local) % 24)
-        fr, best_f, best_r = {}, None, -1.0
-        for f in freqs:
-            rel = round(_voacap_reliability(f, muf, luf, int(local) % 24, dist_km, kp), 2)
-            fr[str(f)] = {"rel": rel, "snr": None}
-            if rel > best_r:
-                best_r, best_f = rel, f
+        p = prof[h]
+        fr = {str(f): {"rel": round(p["rel"][f], 2), "snr": None} for f in freqs}
+        best_f = max(freqs, key=lambda f: p["rel"][f]) if freqs else None
+        best_r = p["rel"][best_f] if best_f is not None else -1.0
         hours.append({"hour_utc": h, "best_freq_mhz": best_f, "rel": max(best_r, 0.0),
                       "snr": None, "frequencies": fr})
     return {

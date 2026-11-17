@@ -9,6 +9,10 @@ from datetime import datetime, timezone, timedelta
 
 import analytics
 
+# Isolation (v14) : sans cela, les lectures sans base valide retombent sur la base
+# predictor réelle du Pi (data/predictor.sqlite) et les tests « base absente » échouent.
+analytics.PREDICTOR_DB_PATH = os.path.join(tempfile.mkdtemp(), "absent_predictor.sqlite")
+
 
 # ── Fabriques de bases de test ────────────────────────────────────────
 
@@ -130,8 +134,16 @@ class TestDemarrageAFroid(unittest.TestCase):
         self.assertFalse(r["available"])
         os.unlink(p)
 
-    def test_patterns_actif_a_24h(self):
+    def test_patterns_refuse_a_24h(self):
+        """v13.2 : il faut 30 h pour avoir un jour de référence."""
         p, now = uniform_db(24)
+        r = analytics.compute_patterns(p, now=now)
+        self.assertFalse(r["available"])
+        self.assertIn("30 h", r["reason"])
+        os.unlink(p)
+
+    def test_patterns_actif_a_36h(self):
+        p, now = uniform_db(36)
         r = analytics.compute_patterns(p, now=now)
         self.assertTrue(r["available"])
         self.assertTrue(r["bands"])
@@ -275,8 +287,8 @@ class TestPatterns(unittest.TestCase):
         self.assertEqual(counts, sorted(counts, reverse=True))
 
     def test_fenetre_adaptative(self):
-        """Sans window_days imposé, la fenêtre suit l'historique."""
-        p, now = uniform_db(30)
+        """Sans window_days imposé, la fenêtre reste de 24 h (v13.2)."""
+        p, now = uniform_db(36)
         r = analytics.compute_patterns(p, now=now)
         self.assertTrue(r["available"])
         self.assertLessEqual(r["window_hours"], 24)
@@ -391,7 +403,7 @@ class TestRobustesse(unittest.TestCase):
 class TestPerformance(unittest.TestCase):
     """Le Pi 5 est ~3x plus lent : garder une marge confortable."""
 
-    BUDGET_MS = 400
+    BUDGET_MS = 1500
 
     def test_compute_all_sous_budget(self):
         import random

@@ -172,7 +172,7 @@ body{font-family:Inter,"Aptos","Segoe UI Variable","Segoe UI",system-ui,sans-ser
   <div class="legend"><span><i style="background:#12ad62"></i>excellent</span><span><i style="background:#efc000"></i>bon</span><span><i style="background:#ff8a00"></i>moyen</span><span><i style="background:#f0443e"></i>faible</span><span><i style="background:#172b36"></i>silence</span></div>
  </section>
  <section class="card xpanel full draggable-panel" data-panel-id="voacap" draggable="true">
-  <div class="xhead"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Prédictions HF · VOACAP <span class="xtag">CIRCUIT DX</span></div>
+  <div class="xhead"><span class="drag-handle" title="Déplacer ce pavé">⋮⋮</span>Prédictions HF · estimation interne <span class="xtag">CIRCUIT DX</span></div>
   <div class="voa-controls">
    <input id="voaCall" type="text" maxlength="20" placeholder="Indicatif DX — ex. JA1ABC" autocomplete="off" spellcheck="false">
    <button class="action" id="voaRun">Prévoir</button>
@@ -289,6 +289,12 @@ function updateHero(){
    :valid===0
    ?total+' prédictions en attente : chacune est validée dès qu’un spot réel arrive sur sa bande (±1 h).'
    :'Fiabilité = prédictions confirmées par un spot réel / prédictions émises. Les non-confirmées après 24 h sont purgées.';
+ /* v14 : origine des probabilités — taux mesuré sur 30 j, ou table fixe non calibrée (repli). */
+ const src=stats&&stats.sources;
+ if(hint&&src&&total>0){const m=Number(src.mesure)||0,st=Number(src.statique)||0;
+   hint.textContent+=st===0?' Probabilités : taux mesurés sur 30 jours.'
+     :m===0?' Probabilités : table fixe, non calibrée (moins de 7 jours d’écoute à cette heure).'
+     :' Probabilités : '+m+' mesurées sur 30 jours, '+st+' issues de la table fixe (non calibrées).';}
  updateWindow();
 }
 /* v13.1 — « Prochaine fenêtre favorable » : l'historique réel (/api/analytics → forecast, 30 j) est la

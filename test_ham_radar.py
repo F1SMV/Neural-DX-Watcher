@@ -37,7 +37,7 @@ class TestRegistreReel(unittest.TestCase):
         p = hr.build_payload(self.reg)
         fox = next(i for i in p["groups"]["hors_service"] if i["name"] == "Fox-1E")
         self.assertEqual(fox["launch"], "2021-01-17")
-        self.assertFalse(fox["confirmed"])          # une seule source : pas confirmé
+        self.assertTrue(fox["confirmed"])           # v13.5 : deux sources (wiki + SatNOGS)
 
     def test_fo29_confirme_et_nouvellement_actif(self):
         p = hr.build_payload(self.reg)

@@ -6,7 +6,17 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${YELLOW}[INIT] Démarrage de Neural Dx Watcher v13.5 crée par F1SMV...${NC}"
+# v14 — Si le service systemd fait déjà tourner l'application, un lancement manuel
+# l'arrêterait, puis systemd le relancerait contre celui-ci, en boucle.
+# INVOCATION_ID est défini par systemd : absent, le lancement est manuel.
+if [ -z "$INVOCATION_ID" ] && command -v systemctl >/dev/null 2>&1 \
+   && systemctl is-active --quiet neural-dx-watcher.service 2>/dev/null; then
+    echo -e "${RED}[STOP] L'application tourne déjà comme service systemd.${NC}"
+    echo "       Redémarrer : sudo systemctl restart neural-dx-watcher.service"
+    exit 1
+fi
+
+echo -e "${YELLOW}[INIT] Démarrage de Neural Dx Watcher v14.0 crée par F1SMV...${NC}"
 sleep 10
 
 # 1. Nettoyage des ports — arrêt propre (SIGTERM) avant kill -9 en dernier
