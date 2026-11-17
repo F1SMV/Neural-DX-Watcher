@@ -403,7 +403,7 @@
 
         <div class="panel" id="panel-voacap">
             <div class="panel-header">
-                <span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 📶 VOACAP RAPIDE</span>
+                <span class="ph-left"><span class="dd-handle" title="Drag &amp; Drop">⋮⋮</span> 📶 PROPAGATION HF · estimation interne</span>
                 <select id="voacap-zone-select" onchange="loadVoacap()">
                     <option value="EU">Europe</option>
                     <option value="NA">Amérique du Nord</option>
@@ -741,7 +741,7 @@ async function loadVoacap() {
                 <div class="vb-label">Meilleure bande maintenant</div>
                 <div class="vb-band">${bestBand} (${bestRel}%)</div>
             </div>
-            <div class="band-table-title" style="margin-top:14px;">Fiabilité par bande — ce trajet uniquement</div>
+            <div class="band-table-title" style="margin-top:14px;">Score modèle par bande — ce trajet uniquement (estimation interne)</div>
             <div style="margin-top:4px;">${barsHtml}</div>
             <div class="panel-subtitle" style="margin-top:10px;">
                 ⚠️ Cette prédiction ne concerne QUE le trajet vers <strong>${data.zone_name}</strong> (${data.dist_km} km) à l'heure actuelle. Elle peut légitimement différer du pavé "Activité par bande" ci-contre, qui lui reflète les spots <em>réels</em> reçus toutes distances et directions confondues — les deux mesurent des choses différentes, ce n'est pas une incohérence.

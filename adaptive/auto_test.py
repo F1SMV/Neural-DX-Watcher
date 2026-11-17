@@ -42,10 +42,95 @@ class AutoTest:
         '160m': {0: 75, 6: 85, 12: 35, 18: 70, 23: 80},
     }
     
-    def __init__(self, db_path: str = "data/predictor.sqlite"):
+    # v14 — taux mesurés : la table BAND_ACTIVITY_PATTERNS n'est plus qu'un repli.
+    RATE_LOOKBACK_DAYS = 30      # fenêtre d'historique lue dans analytics.sqlite
+    RATE_MIN_DAYS = 7            # jours d'écoute minimum pour publier un taux mesuré
+    RATE_CACHE_SEC = 6 * 3600    # la table des taux est recalculée au plus toutes les 6 h
+    SOURCE_MEASURED = "mesure"
+    SOURCE_STATIC = "statique"
+
+    def __init__(self, db_path: str = "data/predictor.sqlite",
+                 db_analytics: Optional[str] = None):
         self.db_path = db_path
+        # db_analytics=None : pas de taux mesurés, table fixe seule (comportement v13).
+        self.db_analytics = db_analytics
+        self._rates = None           # {"ts": float, "any": {h: n_jours}, "band": {(bande, h): n_jours}}
         self._last_warn_ts = 0.0     # anti-flood des logs d'erreur (appelé à chaque spot)
         self._init_db()
+
+    # ── v14 : taux mesurés ───────────────────────────────────────────────
+
+    def _load_rates(self, now: Optional[float] = None):
+        """Compte, par heure UTC, les jours d'écoute et les jours où chaque bande a été entendue.
+
+        Une seule requête agrégée (GROUP BY heure, bande) : au plus quelques milliers de lignes,
+        quelle que soit la taille de l'historique. Le jour en cours est exclu (incomplet).
+        Renvoie None si la base est absente ou illisible.
+        """
+        if not self.db_analytics:
+            return None
+        if now is None:
+            now = time.time()
+        if self._rates and 0 <= now - self._rates["ts"] < self.RATE_CACHE_SEC:
+            return self._rates
+        end = (int(now) // 86400) * 86400                 # minuit UTC du jour en cours
+        start = end - self.RATE_LOOKBACK_DAYS * 86400
+        days_any, days_band = {}, {}
+        conn = None
+        try:
+            conn = sqlite3.connect(f"file:{self.db_analytics}?mode=ro", uri=True, timeout=30)
+            cur = conn.execute(
+                "SELECT CAST(ts / 3600 AS INTEGER) AS hslot, band FROM spots "
+                "WHERE ts >= ? AND ts < ? GROUP BY hslot, band", (start, end))
+            for hslot, band in cur:
+                day, hour = divmod(int(hslot), 24)
+                days_any.setdefault(hour, set()).add(day)
+                days_band.setdefault((str(band).strip(), hour), set()).add(day)
+        except Exception as e:
+            self._warn(f"AutoTest._load_rates: {e}")
+            return None
+        finally:
+            if conn is not None:
+                conn.close()
+        self._rates = {
+            "ts": now,
+            "any": {h: len(d) for h, d in days_any.items()},
+            "band": {k: len(d) for k, d in days_band.items()},
+        }
+        return self._rates
+
+    def measured_rate(self, band: str, hour_utc: int, now: Optional[float] = None):
+        """Part des jours d'écoute où la bande a reçu au moins un spot à cette heure UTC.
+
+        Jour d'écoute = jour où au moins un spot, toutes bandes confondues, a été reçu à
+        cette heure : une heure où la station était arrêtée ne compte pas comme « fermée ».
+        Tous modes confondus, comme la validation (validate_spot ne filtre pas le mode).
+
+        Returns: (taux 0-1, jours avec la bande, jours d'écoute), ou None sous RATE_MIN_DAYS.
+        """
+        rates = self._load_rates(now)
+        if not rates:
+            return None
+        n = rates["any"].get(int(hour_utc) % 24, 0)
+        if n < self.RATE_MIN_DAYS:
+            return None
+        k = rates["band"].get((band, int(hour_utc) % 24), 0)
+        return (k / n, k, n)
+
+    def _static_probability(self, band: str, mode: str, hour_utc: int) -> float:
+        """Repli : table d'activité fixe (non calibrée), interpolée entre créneaux de 6 h."""
+        pattern = self.BAND_ACTIVITY_PATTERNS.get(band, {})
+        h_floor = (hour_utc // 6) * 6
+        h_ceil = (h_floor + 6) % 24
+        base_floor = pattern.get(h_floor, 50) / 100.0
+        base_ceil = pattern.get(h_ceil, 50) / 100.0
+        frac = (hour_utc % 6) / 6.0
+        prob = base_floor * (1 - frac) + base_ceil * frac
+        if mode == 'FT8':
+            prob *= 1.1
+        elif mode == 'SSB':
+            prob *= 0.9
+        return max(0.0, min(1.0, prob))
 
     def _connect(self):
         """v13.1 : timeout 30 s (au lieu de 5 s par défaut). predictor.sqlite est écrit en
@@ -97,38 +182,25 @@ class AutoTest:
         """
         if band not in self.BANDS:
             return 0.0
-        
-        # Pattern de base
-        pattern = self.BAND_ACTIVITY_PATTERNS.get(band, {})
-        
-        # Interpolation linéaire entre heures
-        h_floor = (hour_utc // 6) * 6  # Round to nearest 6h
-        h_ceil = (h_floor + 6) % 24
-        
-        base_floor = pattern.get(h_floor, 50) / 100.0
-        base_ceil = pattern.get(h_ceil, 50) / 100.0
-        
-        # Interpolation simple
-        frac = (hour_utc % 6) / 6.0
-        pred_prob = base_floor * (1 - frac) + base_ceil * frac
-        
-        # Mode bonus (FT8 plus actif)
-        if mode == 'FT8':
-            pred_prob *= 1.1
-        elif mode == 'SSB':
-            pred_prob *= 0.9
-        
-        # Clamp [0, 1]
-        pred_prob = max(0.0, min(1.0, pred_prob))
-        
-        # Créer la prédiction
+        hour_utc = int(hour_utc) % 24
+
+        # v14 : taux mesuré si l'historique suffit, sinon table fixe (signalée comme telle).
+        measured = self.measured_rate(band, hour_utc)
+        if measured is not None:
+            pred_prob, k, n = measured
+            notes = f"{self.SOURCE_MEASURED} {k}/{n} j"
+        else:
+            pred_prob = self._static_probability(band, mode, hour_utc)
+            notes = self.SOURCE_STATIC
+
         ts = datetime.now(timezone.utc).timestamp()
-        self._record_prediction(ts, band, mode, hour_utc, pred_prob, model_version_id)
-        
+        self._record_prediction(ts, band, mode, hour_utc, pred_prob, model_version_id, notes)
+
         return pred_prob
-    
+
     def _record_prediction(self, ts: float, band: str, mode: str, hour_utc: int, 
-                          prob: float, model_version_id: Optional[int] = None):
+                          prob: float, model_version_id: Optional[int] = None,
+                          notes: Optional[str] = None):
         """Enregistrer la prédiction en DB."""
         # v13.1 : l'échec est remonté à l'appelant (avant : print() + succès apparent →
         # _autotest_generate_hourly comptait des prédictions jamais enregistrées).
@@ -136,9 +208,9 @@ class AutoTest:
         try:
             conn.execute("""
                 INSERT INTO auto_test_predictions 
-                (ts_created, band, mode, hour_utc, pred_probability, model_version_id)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (ts, band, mode, hour_utc, prob, model_version_id))
+                (ts_created, band, mode, hour_utc, pred_probability, model_version_id, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (ts, band, mode, hour_utc, prob, model_version_id, notes))
             conn.commit()
         finally:
             conn.close()
@@ -230,7 +302,7 @@ class AutoTest:
             conn = self._connect()
             c = conn.cursor()
             
-            query = "SELECT id, ts_created, band, mode, hour_utc, pred_probability, actual_call, match_score FROM auto_test_predictions"
+            query = "SELECT id, ts_created, band, mode, hour_utc, pred_probability, actual_call, match_score, notes FROM auto_test_predictions"
             params = []
             
             if band:
@@ -255,7 +327,12 @@ class AutoTest:
                     "hour_utc": row[4],
                     "pred_probability": row[5],
                     "actual_call": row[6],
-                    "match_score": row[7]
+                    "match_score": row[7],
+                    # v14 : origine de la probabilité. Lignes d'avant la v14 : table fixe.
+                    "source": (self.SOURCE_MEASURED
+                               if str(row[8] or "").startswith(self.SOURCE_MEASURED)
+                               else self.SOURCE_STATIC),
+                    "source_detail": row[8],
                 })
             
             return result
@@ -295,13 +372,20 @@ class AutoTest:
             for band, count, avg in c.fetchall():
                 per_band[band] = {"count": count, "avg_score": avg or 0.0}
             
+            # v14 : combien de prédictions reposent sur un taux mesuré
+            c.execute("SELECT COUNT(*) FROM auto_test_predictions WHERE notes LIKE ?",
+                      (self.SOURCE_MEASURED + "%",))
+            n_measured = c.fetchone()[0]
+
             conn.close()
             
             return {
                 "total_predictions": total_preds,
                 "validated": validated,
                 "avg_match_score": avg_score,
-                "per_band": per_band
+                "per_band": per_band,
+                "sources": {self.SOURCE_MEASURED: n_measured,
+                            self.SOURCE_STATIC: total_preds - n_measured},
             }
         
         except Exception as e:

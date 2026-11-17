@@ -45,54 +45,67 @@ def _score_spot(spot, config):
     return min(base, 100)
 
 
+def _actual_score(mode):
+    """Score « réel » de référence d'un spot (simplifié, dépend du mode seul)."""
+    actual = 30
+    if mode == "CW":
+        actual += 15
+    elif mode == "FT8":
+        actual += 25
+    return actual
+
+
 class BacktestResult:
-    """Résultat d'un backtest."""
+    """Résultat d'un backtest.
+
+    v14 : les prédictions ne sont plus conservées une à une. Seul un compteur
+    par couple (prédit, réel) est gardé : la mémoire ne dépend plus du nombre
+    de spots rejoués. Les métriques sont identiques à celles de la v13.
+    """
     def __init__(self):
-        self.predictions = []  # (ts, band, config_hash, predicted_spd, actual_spd)
+        self._counts = defaultdict(int)   # (predicted, actual) -> nombre
         self.metrics = {}
         self.config = {}
 
-    def add_prediction(self, ts, band, config_hash, pred, actual):
-        self.predictions.append({
-            "ts": ts, "band": band, "config": config_hash,
-            "predicted": pred, "actual": actual,
-        })
+    @property
+    def n_predictions(self):
+        return sum(self._counts.values())
+
+    def add_prediction(self, ts, band, config_hash, pred, actual, n=1):
+        """Ajoute n prédictions identiques. ts, band et config_hash sont
+        acceptés pour compatibilité mais n'entrent dans aucune métrique."""
+        if n > 0:
+            self._counts[(pred, actual)] += n
 
     def compute_metrics(self):
         """Calcule ECE, Brier, F1, precision, recall."""
-        if not self.predictions:
+        total = self.n_predictions
+        if not total:
             return {}
 
-        # Expected Calibration Error (ECE) — bin par decile
-        bins = defaultdict(lambda: {"pred": [], "actual": []})
-        for p in self.predictions:
-            bin_idx = min(9, int(p["predicted"] / 10))
-            bins[bin_idx]["pred"].append(p["predicted"])
-            bins[bin_idx]["actual"].append(1 if p["actual"] > 50 else 0)
+        # Expected Calibration Error (ECE) — bin par décile
+        bins = defaultdict(lambda: {"pred": 0.0, "actual": 0, "n": 0})
+        brier_sum = 0.0
+        tp = fp = fn = tn = 0
+        for (pred, actual), n in self._counts.items():
+            actual_pos = actual > 50
+            b = bins[min(9, int(pred / 10))]
+            b["pred"] += pred * n
+            b["actual"] += n if actual_pos else 0
+            b["n"] += n
+            brier_sum += n * (pred / 100 - (1 if actual_pos else 0)) ** 2
+            pred_pos = pred > 50
+            if pred_pos and actual_pos: tp += n
+            elif pred_pos and not actual_pos: fp += n
+            elif not pred_pos and actual_pos: fn += n
+            else: tn += n
 
         ece = 0
-        for bin_idx in bins:
-            if not bins[bin_idx]["pred"]:
-                continue
-            avg_pred = sum(bins[bin_idx]["pred"]) / len(bins[bin_idx]["pred"])
-            avg_actual = sum(bins[bin_idx]["actual"]) / len(bins[bin_idx]["actual"])
-            ece += abs(avg_pred/100 - avg_actual)
+        for b in bins.values():
+            ece += abs(b["pred"] / b["n"] / 100 - b["actual"] / b["n"])
         ece /= 10
 
-        # Brier Score — (pred - actual)²
-        brier = sum((p["predicted"]/100 - (1 if p["actual"] > 50 else 0))**2
-                    for p in self.predictions) / len(self.predictions)
-
-        # F1, precision, recall (seuil = 50)
-        tp = fp = fn = tn = 0
-        for p in self.predictions:
-            pred_pos = p["predicted"] > 50
-            actual_pos = p["actual"] > 50
-            if pred_pos and actual_pos: tp += 1
-            elif pred_pos and not actual_pos: fp += 1
-            elif not pred_pos and actual_pos: fn += 1
-            else: tn += 1
-
+        brier = brier_sum / total
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
         f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
@@ -103,7 +116,7 @@ class BacktestResult:
             "f1": round(f1, 4),
             "precision": round(precision, 4),
             "recall": round(recall, 4),
-            "n_predictions": len(self.predictions),
+            "n_predictions": total,
         }
         return self.metrics
 
@@ -116,63 +129,64 @@ class Backtester:
 
     def backtest(self, config, lookback_days=30, limit=None):
         """Replay historique et score la config.
-        
+
+        v14 : l'agrégation est faite par SQLite (GROUP BY mode). Aucun spot
+        n'est chargé en mémoire Python, quelle que soit la taille de
+        l'historique. Le score ne dépend que du mode : le résultat est le
+        même que le rejeu spot par spot de la v13.
+
         Args:
             config: dict des params (es_threshold_spots, distance_bonus_hf, etc.)
             lookback_days: historique sur N jours
-            limit: max spots à tester (None = tous)
-        
+            limit: max spots à tester, les plus anciens d'abord (None = tous)
+
         Returns:
             BacktestResult avec metrics.
         """
+        db = None
         try:
             db = sqlite3.connect(self.db_analytics)
-            db.row_factory = sqlite3.Row
-            
             cutoff_ts = time.time() - lookback_days * 86400
-            
-            # Charger tous les spots historiques
-            rows = db.execute("""
-                SELECT ts, band, mode
-                FROM spots
-                WHERE ts > ?
-                ORDER BY ts ASC
-                LIMIT ?
-            """, (cutoff_ts, limit or 999999)).fetchall()
-            
-            db.close()
-            
+
+            if limit:
+                query = """
+                    SELECT mode, COUNT(*) FROM (
+                        SELECT mode FROM spots WHERE ts > ?
+                        ORDER BY ts ASC LIMIT ?
+                    ) GROUP BY mode
+                """
+                params = (cutoff_ts, int(limit))
+            else:
+                query = "SELECT mode, COUNT(*) FROM spots WHERE ts > ? GROUP BY mode"
+                params = (cutoff_ts,)
+
             result = BacktestResult()
             result.config = config
-            
-            # Rejouer chaque spot : scorer et comparer à l'historique réel
-            for row in rows:
-                spot = dict(row)
-                pred_spd = _score_spot(spot, config)
-                
-                # "actual" = score du spot dans la réalité (simplifié)
-                actual_spd = 30  # base
-                if spot.get("mode") == "CW":
-                    actual_spd += 15
-                elif spot.get("mode") == "FT8":
-                    actual_spd += 25
-                
+            config_hash = hash(str(sorted(config.items())))
+
+            n_spots = 0
+            for mode, n in db.execute(query, params):
+                # Mode absent (NULL) : traité comme SSB, comme en v13.
+                spot = {"mode": mode if mode is not None else "SSB"}
                 result.add_prediction(
-                    ts=spot["ts"],
-                    band=spot.get("band"),
-                    config_hash=hash(str(sorted(config.items()))),
-                    pred=pred_spd,
-                    actual=actual_spd,
+                    ts=None, band=None, config_hash=config_hash,
+                    pred=_score_spot(spot, config),
+                    actual=_actual_score(mode),
+                    n=n,
                 )
-            
+                n_spots += n
+
             result.compute_metrics()
-            logger.info(f"Backtest {len(rows)} spots → ECE={result.metrics.get('ece', 'N/A')}, "
+            logger.info(f"Backtest {n_spots} spots → ECE={result.metrics.get('ece', 'N/A')}, "
                        f"F1={result.metrics.get('f1', 'N/A')}")
             return result
-            
+
         except Exception as e:
             logger.warning(f"Backtester: {e}")
             return BacktestResult()
+        finally:
+            if db is not None:
+                db.close()
 
     def compare_configs(self, configs, lookback_days=30):
         """Compare N configs et retourne classement par ECE (meilleur en tête).

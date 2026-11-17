@@ -1,4 +1,4 @@
-# 🛰️ Neural DX Watcher 13.5
+# 🛰️ Neural DX Watcher 14.0
 
 > Real-time DX monitoring platform for amateur radio operators — F1SMV / JN23  
 > Raspberry Pi · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
@@ -16,6 +16,7 @@
 - [Overview](#-overview)
 - [Technology stack](#-technology-stack)
 - [Version history](#-version-history)
+  - [v14.0 — Nightly memory, measured Auto-Test, automatic start](#v140--nightly-memory-measured-auto-test-automatic-start)
   - [v13.5 — Satellite synchronisation and TLE control](#v135--satellite-synchronisation-and-tle-control)
   - [v13.4 — Radio satellite panel and RSGB feed](#v134--radio-satellite-panel-and-rsgb-feed)
   - [v13.3 — Readable satellites, pedagogical AI Insight](#v133--readable-satellites-pedagogical-ai-insight)
@@ -67,7 +68,17 @@ Since v12.5, the application has included an experimental **adaptive AI Insight 
 
 ## 📜 Version history
 
-### v13.5 — Satellite synchronisation and TLE control ← CURRENT
+### v14.0 — Nightly memory, measured Auto-Test, automatic start ← CURRENT
+
+- **Memory**: the backtester aggregates spots in SQLite instead of loading them into Python. On the Pi, the nightly growth of the webapp (+17 MB per cycle) is gone: measured from 15 to 17 November, variation under 2 MB.
+- **Auto-Test**: the probability is the measured rate of listening days when the band was heard at this UTC hour (30 days, 7 days minimum). The fixed table is only a fallback, flagged on screen as uncalibrated.
+- **Services**: `deploy/install_services.sh` installs the systemd service for the application and the weekly satellite synchronisation (Sunday 05:30).
+- **Diagnostic**: `tools/diag_memory.py` gives the nightly memory growth verdict from the RSS log.
+- **HF forecast**: the home panel and the insight read the same internal model (`voacap_model.py`): solar time at the path midpoint, LUF continuous in distance, labels « internal estimate » and « model score ». Checked: 192 comparisons, no difference.
+
+---
+
+### v13.5 — Satellite synchronisation and TLE control
 
 **Period:** November 2026  
 **Status:** to be validated on Raspberry Pi after deployment.
@@ -643,5 +654,5 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v13.5 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
+*Neural DX Watcher v14.0 — F1SMV — JN23 — La Seyne-sur-Mer, France*  
 *Historical release notes retained from the earlier French README; documentation updated October 2026.*

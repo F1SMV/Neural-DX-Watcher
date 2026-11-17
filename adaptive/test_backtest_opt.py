@@ -14,26 +14,27 @@ def setup():
     DB_ANALYTICS = tempfile.mktemp(suffix=".sqlite")
     DB_PREDICTOR = tempfile.mktemp(suffix=".sqlite")
     
-    # Créer analytics.sqlite avec spot_log test
+    # Créer analytics.sqlite avec la table réelle « spots » (analytics.OWN_TABLE).
+    # v14 : la fixture créait « spot_log », table que le backtester ne lit pas.
     db = sqlite3.connect(DB_ANALYTICS)
     db.execute("""
-        CREATE TABLE spot_log (
-            ts REAL, band TEXT, dx_call TEXT, lat REAL, lon REAL,
-            mode TEXT, distance_km REAL
+        CREATE TABLE spots (
+            ts REAL NOT NULL, band TEXT NOT NULL, dx_call TEXT,
+            mode TEXT, country TEXT
         )
     """)
     
     # Insérer quelques spots test
     base_ts = time.time() - 86400
     spots = [
-        (base_ts, "6m", "DL1A", 51.0, 10.0, "SSB", 1200),
-        (base_ts+60, "6m", "OK2B", 50.0, 14.0, "SSB", 1100),
-        (base_ts+120, "6m", "SP3C", 52.0, 21.0, "FT8", 1500),
-        (base_ts+180, "10m", "W5A", 35.0, -100.0, "CW", 8000),
-        (base_ts+240, "10m", "PY2B", -23.0, -46.0, "SSB", 9000),
+        (base_ts, "6m", "DL1A", "SSB", "Germany"),
+        (base_ts+60, "6m", "OK2B", "SSB", "Czech Republic"),
+        (base_ts+120, "6m", "SP3C", "FT8", "Poland"),
+        (base_ts+180, "10m", "W5A", "CW", "United States"),
+        (base_ts+240, "10m", "PY2B", None, "Brazil"),
     ]
     for s in spots:
-        db.execute("INSERT INTO spot_log VALUES (?,?,?,?,?,?,?)", s)
+        db.execute("INSERT INTO spots VALUES (?,?,?,?,?)", s)
     db.commit()
     db.close()
 
@@ -75,6 +76,52 @@ def test_backtester_backtest():
     assert result.metrics["n_predictions"] > 0
     teardown()
     print(f"✓ Backtester backtest ({result.metrics['n_predictions']} preds)")
+
+def test_backtester_compte_tous_les_spots():
+    """Sans limite, chaque spot de la fenêtre est compté, mode NULL compris."""
+    setup()
+    bt = Backtester(db_analytics=DB_ANALYTICS)
+    result = bt.backtest(config={"distance_bonus_hf": 5}, lookback_days=30)
+    assert result.metrics["n_predictions"] == 5
+    teardown()
+    print("✓ Backtester compte les 5 spots")
+
+def test_backtester_limite():
+    """limit=N garde les N spots les plus anciens."""
+    setup()
+    bt = Backtester(db_analytics=DB_ANALYTICS)
+    result = bt.backtest(config={"distance_bonus_hf": 5}, lookback_days=30, limit=2)
+    assert result.metrics["n_predictions"] == 2
+    teardown()
+    print("✓ Backtester limite")
+
+def test_backtester_fenetre():
+    """Un spot plus ancien que la fenêtre est ignoré."""
+    setup()
+    bt = Backtester(db_analytics=DB_ANALYTICS)
+    result = bt.backtest(config={"distance_bonus_hf": 5}, lookback_days=0.5)
+    assert result.metrics == {}
+    teardown()
+    print("✓ Backtester fenêtre")
+
+def test_backtest_result_pondere():
+    """n prédictions groupées donnent les mêmes métriques que n ajouts."""
+    a, b = BacktestResult(), BacktestResult()
+    for _ in range(7):
+        a.add_prediction(0, "6m", 1, 55, 55)
+    for _ in range(3):
+        a.add_prediction(0, "6m", 1, 30, 30)
+    b.add_prediction(None, None, 1, 55, 55, n=7)
+    b.add_prediction(None, None, 1, 30, 30, n=3)
+    assert a.compute_metrics() == b.compute_metrics()
+    assert b.metrics["n_predictions"] == 10
+    print("✓ BacktestResult pondéré")
+
+def test_backtester_base_absente():
+    """Base illisible : résultat vide, pas d'exception."""
+    bt = Backtester(db_analytics="/nonexistent/dir/x.sqlite")
+    assert bt.backtest({"distance_bonus_hf": 5}).metrics == {}
+    print("✓ Backtester base absente")
 
 def test_backtester_compare():
     setup()
@@ -144,6 +191,11 @@ if __name__ == "__main__":
         test_backtest_result,
         test_backtester_init,
         test_backtester_backtest,
+        test_backtester_compte_tous_les_spots,
+        test_backtester_limite,
+        test_backtester_fenetre,
+        test_backtest_result_pondere,
+        test_backtester_base_absente,
         test_backtester_compare,
         test_optimizer_init,
         test_optimizer_tables,
