@@ -1,4 +1,4 @@
-# 🛰️ Neural DX Watcher 14.0
+# 🛰️ Neural DX Watcher 14.1
 
 > Plateforme de monitoring DX en temps réel pour radioamateurs — F1SMV / JN23
 > Raspberry Pi 4 · Flask · SQLite · Leaflet.js · WSJT-X · Adaptive AI Insight Engine
@@ -16,6 +16,7 @@
 - [Présentation](#-présentation)
 - [Stack technique](#-stack-technique)
 - [Historique des versions](#-historique-des-versions)
+  - [v14.1 — Alpha-5 et mise à jour TLE quotidienne](#v141--alpha-5-et-mise-à-jour-tle-quotidienne-actuel)
   - [v14.0 — Mémoire nocturne, Auto-Test mesuré, démarrage automatique](#v140--memoire-nocturne-auto-test-mesure-demarrage-automatique)
   - [v13.5 — Synchronisation des satellites et contrôle TLE](#v135--synchronisation-des-satellites-et-contrôle-tle)
   - [v13.4 — Pavé radioamateur et flux RSGB](#v134--pavé-radioamateur-satellites-et-flux-rsgb)
@@ -57,7 +58,7 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 | Foudre | Blitzortung MQTT (grille 3×3 autour du QTH) |
 | Signaux reçus | PSK Reporter MQTT + HTTP fallback |
 | WSPR | wspr.live |
-| Satellites | CelesTrak GP API (TLE), SatNOGS (fréquences), SGP4 |
+| Satellites | Space-Track OMM quotidien (TLE, principal depuis v14.1), AMSAT et CelesTrak (secours), SatNOGS (fréquences), SGP4 |
 | Cluster DX | Telnet (dxfun.com:8000, dxc.k0xm.net:7300, dxc.nc7j.com:7373) |
 | WSJT-X | UDP local port 2237 (décodages temps réel) |
 | Balises VHF | dl0tud.tu-dresden.de (CSV IARU R1, auto-update mensuel) |
@@ -68,7 +69,52 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 
 ---
 
-### v14.0 — Mémoire nocturne, Auto-Test mesuré, démarrage automatique ← ACTUEL
+### v14.1 — Alpha-5 et mise à jour TLE quotidienne ← ACTUEL
+
+**Période :** novembre 2026  
+**Statut :** à valider sur Raspberry Pi après déploiement.
+
+#### Changements par rapport à v14.0
+
+**Satellites — NORAD au-delà de 99999**
+
+- **Notation Alpha-5 :** le parseur TLE accepte désormais la notation Alpha-5 du NORAD (lettre + 4 chiffres, sans I ni O). Par exemple `A1101` désigne 101101, UNNE-1B (HADES-E2). Le format texte AMSAT ne contenait pas ces numéros.
+- **Mise à jour quotidienne par Space-Track :** `deploy/omm_spacetrack.sh` télécharge chaque nuit les éléments orbitaux (OMM JSON) des satellites actifs de `data/satellites_config.json` vers `data/omm_local.json`. Le script est planifié par cron à 04:30. Voir `deploy/README-omm-spacetrack.md`.
+- **Source locale en premier :** `data/omm_local.json` est lu en premier lors du chargement des TLE, avant les sources de secours (AMSAT, CelesTrak).
+- **Identifiants hors dépôt :** `~/.config/neural-dx/spacetrack.env`, droits `600`, jamais versionné.
+- **Synchronisation :** `tools/sync_satellites.py` utilise `data/omm_local.json` comme source TLE supplémentaire. Une source injoignable n'interrompt plus la synchronisation.
+
+**Diagnostic**
+
+- Les échecs de téléchargement TLE sont journalisés au niveau `WARNING` (au lieu de `DEBUG`), avec le type d'erreur. Une panne silencieuse ne peut plus passer inaperçue.
+
+**Démarrage**
+
+- `start.sh` : la vérification des dépendances est corrigée (import explicite de `importlib.util`). Sans cette correction, le test échouait et les dépendances étaient réinstallées à chaque lancement.
+- `start.sh` refuse un lancement manuel si le service systemd `neural-dx-watcher.service` tourne déjà.
+
+#### Vérifications après déploiement
+
+- `./start.sh` : le log affiche `TLE locale data/omm_local.json: N satellites` puis `N/N satellites d'intérêt trouvés`.
+- `~/Neural-DX-Watcher/deploy/omm_spacetrack.sh` affiche `Space-Track OK: N objets`.
+- `tail -5 ~/Neural-DX-Watcher/omm_spacetrack.log` montre une ligne `Space-Track OK` datée de la nuit.
+- `python3 tools/sync_satellites.py` affiche le rapport ; n'ajouter `--write` qu'après relecture (sauvegarde `.bak`).
+- `python3 -m unittest test_tle_omm test_sync_satellites -v` : tous les tests passent.
+
+#### Limites connues
+
+- L'ajout d'un satellite se fait en éditant `data/satellites_config.json` : la page ne le permet pas encore. Le téléchargement Space-Track ne couvre que les satellites de ce fichier.
+- CelesTrak reste injoignable depuis le Pi : il n'est qu'un secours.
+- La mise à jour quotidienne doit être installée sur chaque machine (identifiants et cron, voir le README dédié).
+- `tools/sync_satellites.py` ne modifie le registre qu'avec `--write`. Vérifier que l'application lit bien `data/ham_satellites.json`.
+
+#### Fichiers modifiés
+
+`webapp.py` (parseur Alpha-5, journalisation WARNING, chargement de `omm_local.json`) ; `tle_omm.py` et `test_tle_omm.py` (nouveaux) ; `deploy/omm_spacetrack.sh` et `deploy/README-omm-spacetrack.md` (nouveaux) ; `tools/sync_satellites.py`, `tools/README-sync-satellites.md` et `test_sync_satellites.py` ; `start.sh`, `version.json`, `README.md`.
+
+---
+
+### v14.0 — Mémoire nocturne, Auto-Test mesuré, démarrage automatique
 
 - **Mémoire** : le backtester agrège les spots dans SQLite au lieu de les charger en Python. Sur le Pi, la croissance nocturne de la webapp (+17 Mo par cycle) disparaît : mesure du 15 au 17 novembre, écart inférieur à 2 Mo.
 - **Auto-Test** : la probabilité est le taux mesuré de jours d'écoute où la bande a été entendue à cette heure UTC (30 jours, 7 jours minimum). La table fixe ne sert que de repli, signalé à l'écran comme non calibré.
@@ -216,7 +262,6 @@ Depuis la v12.5, l'application embarque un **moteur d'intelligence artificielle 
 - `templates/ai_insight.html` : colonnes et légende de la tendance HF, cartes mobiles, icône.
 
 ---
-
 
 ### v13.2 — Pavés expérimentaux AI Insight
 
@@ -570,7 +615,9 @@ cd Neural-DX-Watcher
 ```
 
 > ⚠️ **Toujours utiliser `./start.sh`**, jamais `python3 webapp.py` directement.
-> Le script active le venv (`venv/bin/python3`), vérifie les dépendances et gère le démarrage de l’application. Vérifier son comportement exact avant déploiement.
+> Le script active le venv (`venv/bin/python3`), vérifie les dépendances et gère le démarrage de l'application. Vérifier son comportement exact avant déploiement.
+
+Mise à jour quotidienne des TLE (v14.1) : voir `deploy/README-omm-spacetrack.md` pour les identifiants Space-Track et la planification cron.
 
 | URL | Page |
 |-----|------|
@@ -670,7 +717,7 @@ cd Neural-DX-Watcher
 
 ---
 
-*Neural DX Watcher v14.0 — F1SMV — JN23 — La Seyne-sur-Mer, France*
-* vous pouvez me contacter via X 
+*Neural DX Watcher v14.1 — F1SMV — JN23 — La Seyne-sur-Mer, France*
+* vous pouvez me contacter via X
 * design F1SMV programmé par Claude Ai
-*Historique initial rédigé pour les versions antérieures ; mise à jour documentaire : octobre 2026.*
+*Historique initial rédigé pour les versions antérieures ; mise à jour documentaire : novembre 2026.*

@@ -222,7 +222,7 @@ tn_lock = threading.Lock()
 tn_current = None  # socket.socket when connected
 # --- FIN CLUSTER TX ---
 # --- CONFIGURATION GENERALE ---
-APP_VERSION = '14.0'
+APP_VERSION = '14.1'
 MY_CALL = "F1SMV"
 WEB_PORT = 8000
 KEEP_ALIVE = 60
@@ -1942,6 +1942,7 @@ logger.addHandler(console_handler)
 
 # --- FLASK APP INITIALIZATION ---
 import voacap_model as _vm
+import tle_omm as _tle_omm
 app = Flask(__name__, template_folder="templates")
 
 # ── SÉCURITÉ v11 — Niveau 2 : jeton local sur les routes qui modifient un
@@ -7523,7 +7524,8 @@ def _fetch_url(url):
             if text and len(text) > 50:
                 return text
     except Exception as e:
-        logger.debug(f"TLE fetch {url}: {e}")
+        # v14.1 : cause réelle visible dans le journal (avant : DEBUG, invisible)
+        logger.warning(f"TLE fetch échec {url}: {type(e).__name__}: {e}")
     return ''
 
 def _fetch_all_tles():
@@ -7549,33 +7551,31 @@ def _fetch_all_tles():
     json_ok = False
 
     # ── Tentative 1 : sources JSON OMM (CelesTrak GP API) ───────────────────
+    # v14 : fichier OMM déposé à la main (le Pi ne joint pas celestrak.org)
+    _local_omm = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'omm_local.json')
+    _found_local, _skipped_local = _tle_omm.load_omm_file(_local_omm)
+    if _found_local:
+        for _norad, _rec in _found_local.items():
+            json_tles.setdefault(_norad, _rec)
+        json_ok = True
+        logger.info(f"TLE locale data/omm_local.json: {len(_found_local)} satellites, {_skipped_local} rejetés")
+    # v14 : les objets sans TLE_LINE1/2 sont convertis depuis l'OMM (tle_omm.py).
+    # Avant, ils étaient silencieusement ignorés : aucun nouveau satellite n'apparaissait.
     for source_name, url in TLE_JSON_SOURCES:
         text = _fetch_url(url)
         if not text:
             continue
-        try:
-            data = _json.loads(text)
-            if not isinstance(data, list) or not data:
-                logger.warning(f"TLE JSON {source_name}: réponse vide ou invalide")
-                continue
-            count = 0
-            for obj in data:
-                try:
-                    norad = int(obj.get('NORAD_CAT_ID') or obj.get('CCSDS_OMM_VERS', '0'))
-                    if norad <= 0:
-                        continue
-                    name  = obj.get('OBJECT_NAME', str(norad)).strip()
-                    tle1  = obj.get('TLE_LINE1', '').strip()
-                    tle2  = obj.get('TLE_LINE2', '').strip()
-                    if tle1 and tle2 and norad not in json_tles:
-                        json_tles[norad] = (name, tle1, tle2)
-                        count += 1
-                except (ValueError, TypeError):
-                    continue
-            logger.info(f"TLE JSON {source_name}: {count} satellites chargés")
-            json_ok = True
-        except _json.JSONDecodeError as e:
-            logger.warning(f"TLE JSON {source_name}: JSON invalide ({e})")
+        found, skipped = _tle_omm.parse_omm_json(text)
+        if not found:
+            logger.warning(f"TLE JSON {source_name}: aucun élément exploitable ({skipped} rejetés)")
+            continue
+        count = 0
+        for norad, rec in found.items():
+            if norad not in json_tles:
+                json_tles[norad] = rec
+                count += 1
+        logger.info(f"TLE JSON {source_name}: {count} satellites chargés, {skipped} rejetés")
+        json_ok = True
 
     # ── Tentative 2 : fallback TLE texte (AMSAT nasa.all) ───────────────────
     for source_name, url in TLE_SOURCES:
@@ -7591,14 +7591,22 @@ def _fetch_all_tles():
 
     return json_tles, combined_text
 
+_ALPHA5_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'  # sans I ni O
+
+def _alpha5_to_int(token):
+    """v14.1 : '12345' -> 12345 ; 'A1101' -> 101101 (notation Alpha-5 du NORAD)."""
+    if token[0].isdigit():
+        return int(token)
+    return (_ALPHA5_LETTERS.index(token[0]) + 10) * 10000 + int(token[1:])
+
 def _parse_tle_text(text):
     """Parse TLE → dict {norad_id: (name, tle1, tle2)}.
     Robuste au format AMSAT nasa.all (header texte + noms libres).
     Stratégie : scanner toutes les lignes, détecter les paires "1 NNNNN / 2 NNNNN".
     """
     import re
-    TLE1 = re.compile(r'^1 (\d{5})')
-    TLE2 = re.compile(r'^2 (\d{5})')
+    TLE1 = re.compile(r'^1 ([0-9]{5}|[A-HJ-NP-Z][0-9]{4})')
+    TLE2 = re.compile(r'^2 ([0-9]{5}|[A-HJ-NP-Z][0-9]{4})')
     SKIP = re.compile(r'QST|@amsat|\.AMSAT|Orbital|2Line|SB KEPS|New England|From Orb|\$ORB')
 
     lines = [l.rstrip() for l in text.replace('\r','').split('\n')]
@@ -7613,7 +7621,7 @@ def _parse_tle_text(text):
                 j += 1
             m2 = TLE2.match(lines[j].strip()) if j < len(lines) else None
             if m2 and m1.group(1) == m2.group(1):
-                norad = int(m1.group(1))
+                norad = _alpha5_to_int(m1.group(1))
                 tle1  = lines[i].strip()
                 tle2  = lines[j].strip()
                 # Chercher le nom : ligne(s) avant TLE1 qui ne sont pas TLE ni header
@@ -7633,6 +7641,28 @@ def _parse_tle_text(text):
                 continue
         i += 1
     return result
+
+_catnr_miss_ts = {}          # {norad: instant de la dernière tentative infructueuse}
+CATNR_RETRY_SEC = 6 * 3600   # un NORAD introuvable n'est retenté qu'après 6 h
+CATNR_MAX_PER_REFRESH = 8    # plafond de requêtes par rafraîchissement
+
+def _fetch_missing_by_catnr(missing):
+    """v14 : interroge CelesTrak NORAD par NORAD pour les satellites suivis absents du groupe.
+    Un NORAD introuvable est mis en attente 6 h (pas de requête en boucle)."""
+    found = {}
+    now = time.time()
+    todo = [n for n in missing if now - _catnr_miss_ts.get(n, 0) >= CATNR_RETRY_SEC]
+    for norad in todo[:CATNR_MAX_PER_REFRESH]:
+        text = _fetch_url(f'https://celestrak.org/NORAD/elements/gp.php?CATNR={norad}&FORMAT=json')
+        recs, _ = _tle_omm.parse_omm_json(text) if text else ({}, 0)
+        if norad in recs:
+            found[norad] = recs[norad]
+            _catnr_miss_ts.pop(norad, None)
+        else:
+            _catnr_miss_ts[norad] = now
+    if found:
+        logger.info(f"TLE par NORAD: {len(found)} satellite(s) ajouté(s) : {sorted(found)}")
+    return found
 
 def _load_tle_cache():
     """
@@ -7659,6 +7689,15 @@ def _load_tle_cache():
                 merged += 1
         if merged:
             logger.info(f"TLE fallback texte: {merged} satellites ajoutés")
+
+    # v14 : satellites suivis absents du groupe → requête ciblée par NORAD
+    try:
+        active = _get_active_sat_ids()
+        missing = [n for n in active if n not in all_tles]
+        if missing:
+            all_tles.update(_fetch_missing_by_catnr(missing))
+    except Exception as exc:
+        logger.warning(f"TLE par NORAD: {exc}")
 
     if all_tles:
         _tle_cache = all_tles

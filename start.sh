@@ -16,7 +16,7 @@ if [ -z "$INVOCATION_ID" ] && command -v systemctl >/dev/null 2>&1 \
     exit 1
 fi
 
-echo -e "${YELLOW}[INIT] Démarrage de Neural Dx Watcher v14.0 crée par F1SMV...${NC}"
+echo -e "${YELLOW}[INIT] Démarrage de Neural Dx Watcher v14.1 crée par F1SMV...${NC}"
 sleep 10
 
 # 1. Nettoyage des ports — arrêt propre (SIGTERM) avant kill -9 en dernier
@@ -60,6 +60,7 @@ echo -e "${GREEN}[OK] venv activé : $(which python3)${NC}"
 echo -e "${YELLOW}[CHECK] Vérification des dépendances...${NC}"
 python3 -c "
 import importlib
+import importlib.util  # explicite : 'import importlib' seul ne garantit pas l'attribut util
 # paho-mqtt : utilisé par Blitzortung + PSK Reporter MQTT (chargé en lazy import dans webapp.py)
 mods = ['flask', 'requests', 'bs4', 'feedparser', 'paho']
 missing = [m for m in mods if importlib.util.find_spec(m) is None]
