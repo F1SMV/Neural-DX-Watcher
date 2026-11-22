@@ -56,7 +56,7 @@ def fetch_tle_norads(url=AMSAT_TLE, timeout=30):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         body = r.read().decode("utf-8", errors="replace")
-    if url.endswith(".json"):
+    if url.endswith(".json") or "format=json" in url.lower():   # CelesTrak : FORMAT=json en fin d'URL
         data = json.loads(body)
         if not isinstance(data, list):
             raise ValueError("réponse CelesTrak inattendue (liste attendue)")
@@ -187,7 +187,16 @@ def main(argv=None):
     path = Path(args.registry)
     doc = json.loads(path.read_text(encoding="utf-8"))
     records = fetch_satnogs()
-    tle_norads = fetch_tle_norads()
+    # v14 : union AMSAT + CelesTrak. AMSAT seul n'a pas les nouveaux NORAD (> 99999) :
+    # sans CelesTrak, un satellite actif récent était rétrogradé à chaque synchro.
+    tle_norads = set()
+    for src in (AMSAT_TLE, CELESTRAK_AMATEUR):
+        try:
+            tle_norads |= fetch_tle_norads(src)
+        except Exception as exc:          # une source indisponible n'arrête pas la synchro
+            print(f"[AVERTISSEMENT] {src} : {exc}")
+    if not tle_norads:
+        raise SystemExit("aucune source TLE disponible : synchro annulée, registre inchangé")
     doc, report = sync(doc, records, tle_norads, date.today(), discover_new=args.discover)
 
     for key, label in [
